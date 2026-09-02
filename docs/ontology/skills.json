@@ -1,0 +1,78 @@
+{
+  "version": "1.0.0",
+  "lastUpdated": "2026-09-02",
+  "skills": [
+    {
+      "id": "skill_javascript",
+      "canonicalName": "JavaScript",
+      "category": "Programming Languages",
+      "description": "Core language concepts including ES6+, closures, prototype inheritance, event loop, and asynchronous programming.",
+      "aliases": ["js", "es6", "vanilla js", "ecmascript"],
+      "prerequisites": []
+    },
+    {
+      "id": "skill_nodejs",
+      "canonicalName": "Node.js",
+      "category": "Runtimes & Frameworks",
+      "description": "Server-side JavaScript runtime environment, core modules (fs, http, path), event-driven architecture, and streams.",
+      "aliases": ["node", "nodejs", "node.js"],
+      "prerequisites": ["skill_javascript"]
+    },
+    {
+      "id": "skill_express",
+      "canonicalName": "Express.js",
+      "category": "Runtimes & Frameworks",
+      "description": "Fast, unopinionated minimalist web framework for Node.js, routing, middleware patterns, and error handling.",
+      "aliases": ["express", "expressjs", "express.js"],
+      "prerequisites": ["skill_nodejs"]
+    },
+    {
+      "id": "skill_sql",
+      "canonicalName": "SQL",
+      "category": "Databases",
+      "description": "Relational query language including complex joins, aggregations, subqueries, indexing strategies, and ACID transactions.",
+      "aliases": ["structured query language", "relational queries", "sql querying"],
+      "prerequisites": []
+    },
+    {
+      "id": "skill_postgresql",
+      "canonicalName": "PostgreSQL",
+      "category": "Databases",
+      "description": "Advanced open-source relational database, constraints, indexes (B-tree, GIN), JSONB operations, and query optimization (EXPLAIN).",
+      "aliases": ["postgres", "postgresql", "psql", "pg"],
+      "prerequisites": ["skill_sql"]
+    },
+    {
+      "id": "skill_rest_api",
+      "canonicalName": "REST APIs",
+      "category": "System Design & Architecture",
+      "description": "HTTP semantics (methods, status codes, headers), RESTful resource design, idempotency, authentication (JWT), and request validation.",
+      "aliases": ["rest", "restful api", "restful web services", "rest apis"],
+      "prerequisites": []
+    },
+    {
+      "id": "skill_git",
+      "canonicalName": "Git",
+      "category": "Tools & Version Control",
+      "description": "Distributed version control, branching strategies, rebase vs merge, resolve merge conflicts, and commit hygiene.",
+      "aliases": ["git version control", "github", "git workflow"],
+      "prerequisites": []
+    },
+    {
+      "id": "skill_docker",
+      "canonicalName": "Docker",
+      "category": "DevOps & Infrastructure",
+      "description": "Containerization fundamentals, Dockerfile multi-stage builds, port mappings, volumes, networking, and Docker Compose.",
+      "aliases": ["containers", "docker containerization", "docker compose"],
+      "prerequisites": []
+    },
+    {
+      "id": "skill_redis",
+      "canonicalName": "Redis",
+      "category": "Databases & Caching",
+      "description": "In-memory data store for caching, session management, Pub/Sub, and TTL key expiration.",
+      "aliases": ["redis cache", "redis key-value"],
+      "prerequisites": []
+    }
+  ]
+}

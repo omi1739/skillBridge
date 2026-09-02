@@ -1,0 +1,74 @@
+{
+  "roleId": "role_junior_backend",
+  "title": "Junior Backend Engineer",
+  "category": "Software Engineering",
+  "marketContext": {
+    "region": "Bangladesh / Emerging Tech Hubs",
+    "experienceLevel": "0-2 years",
+    "typicalTitles": [
+      "Junior Software Engineer (Backend)",
+      "Associate Backend Developer",
+      "Junior Node.js Developer",
+      "Junior Fullstack Developer (Backend Heavy)"
+    ]
+  },
+  "description": "Designs, implements, and maintains backend REST services, relational databases, business logic, authentication, and service deployments.",
+  "roleSkills": [
+    {
+      "skillId": "skill_javascript",
+      "required": true,
+      "roleWeight": 0.90,
+      "marketDemandFrequency": 0.88,
+      "proficiencyTarget": "Intermediate"
+    },
+    {
+      "skillId": "skill_nodejs",
+      "required": true,
+      "roleWeight": 0.95,
+      "marketDemandFrequency": 0.85,
+      "proficiencyTarget": "Intermediate"
+    },
+    {
+      "skillId": "skill_sql",
+      "required": true,
+      "roleWeight": 0.90,
+      "marketDemandFrequency": 0.82,
+      "proficiencyTarget": "Intermediate"
+    },
+    {
+      "skillId": "skill_postgresql",
+      "required": true,
+      "roleWeight": 0.85,
+      "marketDemandFrequency": 0.74,
+      "proficiencyTarget": "Intermediate"
+    },
+    {
+      "skillId": "skill_rest_api",
+      "required": true,
+      "roleWeight": 0.95,
+      "marketDemandFrequency": 0.92,
+      "proficiencyTarget": "Intermediate"
+    },
+    {
+      "skillId": "skill_git",
+      "required": true,
+      "roleWeight": 0.80,
+      "marketDemandFrequency": 0.80,
+      "proficiencyTarget": "Intermediate"
+    },
+    {
+      "skillId": "skill_docker",
+      "required": false,
+      "roleWeight": 0.65,
+      "marketDemandFrequency": 0.58,
+      "proficiencyTarget": "Beginner"
+    },
+    {
+      "skillId": "skill_redis",
+      "required": false,
+      "roleWeight": 0.50,
+      "marketDemandFrequency": 0.42,
+      "proficiencyTarget": "Beginner"
+    }
+  ]
+}

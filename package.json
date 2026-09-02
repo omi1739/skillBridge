@@ -1,0 +1,25 @@
+{
+  "name": "skillbridge",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Evidence-Based Labor Market Intelligence & Skill Assessment Platform",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspaces",
+    "dev:api": "npm run dev --workspace=apps/api",
+    "dev:web": "npm run dev --workspace=apps/web",
+    "build": "npm run build --workspaces",
+    "typecheck": "npm run typecheck --workspaces"
+  },
+  "keywords": [
+    "labor-market-intelligence",
+    "skill-assessment",
+    "skill-gap-analysis",
+    "career-development"
+  ],
+  "author": "SkillBridge Team",
+  "license": "MIT"
+}
