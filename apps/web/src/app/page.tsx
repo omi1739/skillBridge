@@ -31,7 +31,12 @@ import {
   Github,
   FolderGit2,
   ExternalLink,
-  PlusCircle
+  PlusCircle,
+  FileText,
+  Printer,
+  Copy,
+  Check,
+  X
 } from 'lucide-react';
 
 const API_BASE = 'http://localhost:4000/api';
@@ -66,6 +71,11 @@ export default function SkillBridgeApp() {
     primarySkills: ['Node.js', 'PostgreSQL', 'REST APIs', 'Docker']
   });
   const [isSubmittingProject, setIsSubmittingProject] = useState(false);
+
+  // Passport / Career Report states
+  const [showPassportModal, setShowPassportModal] = useState(false);
+  const [passportData, setPassportData] = useState<any | null>(null);
+  const [copiedMarkdown, setCopiedMarkdown] = useState(false);
 
   // Fetch initial data from API
   const refreshUserData = () => {
@@ -113,6 +123,37 @@ export default function SkillBridgeApp() {
 
     refreshUserData();
   }, []);
+
+  const handleOpenPassport = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/me/report?userId=demo_user_01`);
+      const data = await res.json();
+      setPassportData(data);
+      setShowPassportModal(true);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleCopyMarkdown = () => {
+    if (!passportData) return;
+    const md = `# SkillBridge Verified Talent Passport
+**Candidate**: ${passportData.candidate.name}
+**Target Role**: ${passportData.candidate.targetRole}
+**Passport ID**: \`${passportData.passportId}\`
+**Issued At**: ${new Date(passportData.issuedAt).toLocaleDateString()}
+**Alignment Index**: ${passportData.metrics.overallAlignment}%
+
+## Verified Evidence Breakdown
+${passportData.evidence.map((e: any) => `- **${e.skillName}**: ${Math.round(e.proficiencyScore * 100)}% (${e.sourceType}) [Confidence: ${e.confidence}]`).join('\n')}
+
+## Priority Action Items
+${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 'x' : ' '}] **${r.title}** (~${r.estimatedHours} hrs)`).join('\n')}
+`;
+    navigator.clipboard.writeText(md);
+    setCopiedMarkdown(true);
+    setTimeout(() => setCopiedMarkdown(false), 2500);
+  };
 
   const handleSelectAnswer = (questionId: string, option: string) => {
     setUserAnswers(prev => ({ ...prev, [questionId]: option }));
@@ -264,6 +305,10 @@ export default function SkillBridgeApp() {
               <Briefcase size={16} /> Job Match
             </button>
           </nav>
+
+          <button className="btn btn-secondary" onClick={handleOpenPassport} style={{ fontSize: '0.85rem', padding: '0.45rem 0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <FileText size={15} color="#818cf8" /> Skill Passport
+          </button>
         </div>
       </header>
 
@@ -720,7 +765,6 @@ export default function SkillBridgeApp() {
         {/* TAB 5: ACTION PLAN & CAPSTONE PROJECTS WITH GITHUB PORTFOLIO */}
         {activeTab === 'actions' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-            {/* Action Recommendations */}
             <div className="card">
               <div className="card-header">
                 <div>
@@ -784,7 +828,6 @@ export default function SkillBridgeApp() {
               </div>
             </div>
 
-            {/* Submitted Portfolio & GitHub Evidence */}
             <div className="card">
               <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
                 <FolderGit2 size={20} color="#a5b4fc" /> Verified Portfolio & Project Evidence
@@ -833,72 +876,6 @@ export default function SkillBridgeApp() {
                 ))}
               </div>
             </div>
-
-            {/* Modal for Project Submission */}
-            {showProjectModal && (
-              <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '1rem' }}>
-                <div className="card" style={{ maxWidth: '560px', width: '100%', background: '#0d1322', border: '1px solid var(--border-active)' }}>
-                  <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>
-                    Submit Capstone Project Repository
-                  </h3>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
-                    Provide your GitHub repository URL. The system will parse project signals and attach verified project evidence to your skill profile.
-                  </p>
-
-                  <form onSubmit={handleSubmitProject} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    <div>
-                      <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.35rem' }}>
-                        Project Title
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="e.g. Production Task Management REST API"
-                        value={projectForm.title}
-                        onChange={e => setProjectForm({ ...projectForm, title: e.target.value })}
-                        style={{ width: '100%', padding: '0.65rem', background: '#070b14', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.9rem', outline: 'none' }}
-                      />
-                    </div>
-
-                    <div>
-                      <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.35rem' }}>
-                        GitHub Repository URL
-                      </label>
-                      <input
-                        type="url"
-                        required
-                        placeholder="https://github.com/username/project-repo"
-                        value={projectForm.repoUrl}
-                        onChange={e => setProjectForm({ ...projectForm, repoUrl: e.target.value })}
-                        style={{ width: '100%', padding: '0.65rem', background: '#070b14', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.9rem', outline: 'none' }}
-                      />
-                    </div>
-
-                    <div>
-                      <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.35rem' }}>
-                        Description & Implementation Highlights
-                      </label>
-                      <textarea
-                        rows={3}
-                        placeholder="Mention used technologies (e.g. Node.js, PostgreSQL, Docker, Jest tests, JWT auth)..."
-                        value={projectForm.description}
-                        onChange={e => setProjectForm({ ...projectForm, description: e.target.value })}
-                        style={{ width: '100%', padding: '0.65rem', background: '#070b14', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.9rem', outline: 'none', resize: 'vertical' }}
-                      />
-                    </div>
-
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
-                      <button type="button" className="btn btn-secondary" onClick={() => setShowProjectModal(false)}>
-                        Cancel
-                      </button>
-                      <button type="submit" className="btn btn-primary" disabled={isSubmittingProject}>
-                        {isSubmittingProject ? 'Verifying...' : 'Verify & Submit'}
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-            )}
           </div>
         )}
 
@@ -965,6 +942,189 @@ export default function SkillBridgeApp() {
           </div>
         )}
       </div>
+
+      {/* MODAL 1: SUBMIT PROJECT REPO */}
+      {showProjectModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '1rem' }}>
+          <div className="card" style={{ maxWidth: '560px', width: '100%', background: '#0d1322', border: '1px solid var(--border-active)' }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>
+              Submit Capstone Project Repository
+            </h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
+              Provide your GitHub repository URL. The system will parse project signals and attach verified project evidence to your skill profile.
+            </p>
+
+            <form onSubmit={handleSubmitProject} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.35rem' }}>
+                  Project Title
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Production Task Management REST API"
+                  value={projectForm.title}
+                  onChange={e => setProjectForm({ ...projectForm, title: e.target.value })}
+                  style={{ width: '100%', padding: '0.65rem', background: '#070b14', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.9rem', outline: 'none' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.35rem' }}>
+                  GitHub Repository URL
+                </label>
+                <input
+                  type="url"
+                  required
+                  placeholder="https://github.com/username/project-repo"
+                  value={projectForm.repoUrl}
+                  onChange={e => setProjectForm({ ...projectForm, repoUrl: e.target.value })}
+                  style={{ width: '100%', padding: '0.65rem', background: '#070b14', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.9rem', outline: 'none' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.35rem' }}>
+                  Description & Implementation Highlights
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="Mention used technologies (e.g. Node.js, PostgreSQL, Docker, Jest tests, JWT auth)..."
+                  value={projectForm.description}
+                  onChange={e => setProjectForm({ ...projectForm, description: e.target.value })}
+                  style={{ width: '100%', padding: '0.65rem', background: '#070b14', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.9rem', outline: 'none', resize: 'vertical' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowProjectModal(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={isSubmittingProject}>
+                  {isSubmittingProject ? 'Verifying...' : 'Verify & Submit'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 2: TALENT PASSPORT / CAREER REPORT */}
+      {showPassportModal && passportData && (
+        <div className="passport-modal-container" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 110, padding: '1rem', overflowY: 'auto' }}>
+          <div className="passport-modal-content card" style={{ maxWidth: '800px', width: '100%', maxHeight: '90vh', overflowY: 'auto', background: '#0b101e', border: '1px solid var(--border-active)', padding: '2rem' }}>
+            {/* Passport Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border-color)', paddingBottom: '1.25rem', marginBottom: '1.5rem' }}>
+              <div>
+                <span className="badge badge-preferred" style={{ marginBottom: '0.4rem' }}>
+                  Official SkillBridge Talent Passport
+                </span>
+                <h2 style={{ fontSize: '1.5rem', fontWeight: 800 }}>{passportData.candidate.name}</h2>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                  Target Role: <strong style={{ color: '#a5b4fc' }}>{passportData.candidate.targetRole}</strong> • ID: <code style={{ fontFamily: 'var(--font-mono)' }}>{passportData.passportId}</code>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button className="btn btn-secondary" onClick={() => window.print()} style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem' }}>
+                  <Printer size={14} /> Print / Save PDF
+                </button>
+                <button className="btn btn-secondary" onClick={handleCopyMarkdown} style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem' }}>
+                  {copiedMarkdown ? <Check size={14} color="#6ee7b7" /> : <Copy size={14} />} {copiedMarkdown ? 'Copied' : 'Copy MD'}
+                </button>
+                <button className="btn btn-secondary" onClick={() => setShowPassportModal(false)} style={{ padding: '0.4rem 0.6rem' }}>
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+
+            {/* Passport Summary Metrics */}
+            <div className="grid-3" style={{ marginBottom: '1.5rem' }}>
+              <div className="stat-box">
+                <div className="stat-label">Role Alignment Index</div>
+                <div className="stat-value" style={{ color: '#6ee7b7' }}>
+                  {passportData.metrics.overallAlignment}%
+                </div>
+              </div>
+              <div className="stat-box">
+                <div className="stat-label">Verified Competencies</div>
+                <div className="stat-value">
+                  {passportData.metrics.verifiedSkillsCount} / {passportData.metrics.totalTrackedSkills}
+                </div>
+              </div>
+              <div className="stat-box">
+                <div className="stat-label">Submitted Projects</div>
+                <div className="stat-value">
+                  {passportData.metrics.submittedProjectsCount}
+                </div>
+              </div>
+            </div>
+
+            {/* Verified Evidence Table */}
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.75rem' }}>
+              Demonstrated Skill Evidence Records
+            </h3>
+            <div style={{ overflowX: 'auto', marginBottom: '1.5rem' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                <thead>
+                  <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border-color)' }}>
+                    <th style={{ padding: '0.6rem', textAlign: 'left' }}>Skill</th>
+                    <th style={{ padding: '0.6rem', textAlign: 'left' }}>Category</th>
+                    <th style={{ padding: '0.6rem', textAlign: 'left' }}>Evidence Source</th>
+                    <th style={{ padding: '0.6rem', textAlign: 'right' }}>Proficiency</th>
+                    <th style={{ padding: '0.6rem', textAlign: 'right' }}>Confidence</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {passportData.evidence.map((ev: any) => (
+                    <tr key={ev.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                      <td style={{ padding: '0.6rem', fontWeight: 600 }}>{ev.skillName}</td>
+                      <td style={{ padding: '0.6rem', color: 'var(--text-secondary)' }}>{ev.category}</td>
+                      <td style={{ padding: '0.6rem' }}>
+                        <span className="badge badge-preferred" style={{ fontSize: '0.7rem' }}>
+                          {ev.sourceType}
+                        </span>
+                      </td>
+                      <td style={{ padding: '0.6rem', textAlign: 'right', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
+                        {Math.round(ev.proficiencyScore * 100)}%
+                      </td>
+                      <td style={{ padding: '0.6rem', textAlign: 'right' }}>
+                        <span className={`badge ${ev.confidence === 'HIGH' ? 'badge-strength' : 'badge-gap'}`} style={{ fontSize: '0.7rem' }}>
+                          {ev.confidence}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Priority Actions */}
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.75rem' }}>
+              Prescribed Next Capstone Action Items
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {passportData.recommendations.map((rec: any) => (
+                <div key={rec.id} style={{ background: 'rgba(255,255,255,0.02)', padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <strong style={{ fontSize: '0.9rem' }}>{rec.title}</strong>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                      Targets: {rec.targetSkillNames.join(', ')} • ~{rec.estimatedHours} hrs effort
+                    </div>
+                  </div>
+                  <span className={`badge ${rec.status === 'COMPLETED' ? 'badge-strength' : 'badge-gap'}`}>
+                    {rec.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)', textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              Verified by SkillBridge Labor Market Intelligence System • All scores backed by deterministic practical evaluations and source traceability.
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

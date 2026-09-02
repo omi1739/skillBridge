@@ -375,22 +375,36 @@ body {
   background: rgba(244, 63, 94, 0.15);
 }
 
-/* Stat Box */
-.stat-box {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  padding: 1rem;
-}
-
-.stat-value {
-  font-size: 1.75rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-
-.stat-label {
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-  margin-top: 0.2rem;
+/* Print Styles for Skill Passport */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  .navbar, .nav-tabs, .btn, .hero {
+    display: none !important;
+  }
+  .passport-modal-content {
+    background: #ffffff !important;
+    color: #000000 !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+  }
+  .passport-modal-container {
+    position: static !important;
+    background: transparent !important;
+    padding: 0 !important;
+  }
+  .badge {
+    border: 1px solid #999 !important;
+    color: #000 !important;
+    background: #eee !important;
+  }
+  table, tr, td, th {
+    border: 1px solid #ddd !important;
+    color: #000 !important;
+  }
 }

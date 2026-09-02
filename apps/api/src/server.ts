@@ -341,6 +341,50 @@ app.post('/api/me/projects', (req: Request, res: Response) => {
   res.json(result);
 });
 
+// 10. Candidate Career Report & Skill Passport
+app.get('/api/me/report', (req: Request, res: Response) => {
+  const userId = (req.query.userId as string) || 'demo_user_01';
+  const user = store.users.get(userId);
+  const profile = store.profiles.get(userId);
+  const role = store.roles.get(profile?.targetRoleId || 'role_junior_backend');
+  const userEvidence = store.evidence.get(userId) || [];
+  const gaps = gapService.calculateGaps(userId, role?.id || 'role_junior_backend');
+  const recs = store.recommendations.get(userId) || [];
+  const projects = projectService.getProjects(userId);
+
+  const enrichedEvidence = userEvidence.map(e => ({
+    ...e,
+    skillName: store.skills.get(e.skillId)?.canonicalName || e.skillId,
+    category: store.skills.get(e.skillId)?.category || 'General'
+  }));
+
+  const verifiedCount = userEvidence.filter(e => e.proficiencyScore >= 0.75).length;
+  const overallAlignment = Math.round(
+    (enrichedEvidence.reduce((acc, curr) => acc + curr.proficiencyScore, 0) / Math.max(enrichedEvidence.length, 1)) * 100
+  );
+
+  res.json({
+    passportId: `SKILLBRIDGE-PASSPORT-${userId.toUpperCase()}`,
+    issuedAt: new Date().toISOString(),
+    candidate: {
+      name: profile?.fullName || 'Candidate',
+      email: user?.email || '',
+      githubUrl: profile?.githubUrl || '',
+      targetRole: role?.title || 'Junior Backend Engineer'
+    },
+    metrics: {
+      overallAlignment,
+      verifiedSkillsCount: verifiedCount,
+      totalTrackedSkills: role?.roleSkills.length || 8,
+      submittedProjectsCount: projects.length
+    },
+    evidence: enrichedEvidence,
+    gaps,
+    recommendations: recs,
+    projects
+  });
+});
+
 // 7. Jobs & Explainable Matching
 app.get('/api/jobs', (req: Request, res: Response) => {
   res.json(Array.from(store.jobs.values()));
