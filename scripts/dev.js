@@ -34,14 +34,14 @@ freePort(4000);
 freePort(3000);
 
 // 1. Start Backend API Server
-const apiProcess = spawn(npmCmd, ['run', 'dev', '--workspace=apps/api'], {
+const apiProcess = spawn(npmCmd, ['run', 'dev', '--workspace=backend'], {
   cwd: path.resolve(__dirname, '..'),
   stdio: 'inherit',
   shell: isWin
 });
 
 // 2. Start Frontend Web Server
-const webProcess = spawn(npmCmd, ['run', 'dev', '--workspace=apps/web'], {
+const webProcess = spawn(npmCmd, ['run', 'dev', '--workspace=frontend'], {
   cwd: path.resolve(__dirname, '..'),
   stdio: 'inherit',
   shell: isWin

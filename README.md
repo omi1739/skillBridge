@@ -18,32 +18,26 @@ Unlike conventional job boards or generic course aggregators, SkillBridge focuse
 
 SkillBridge is structured as a modular TypeScript monorepo to ensure clean separation of concerns without premature microservice overhead:
 
-- **Frontend (`apps/web`)**: Next.js, TypeScript, custom responsive CSS design system.
-- **Backend (`apps/api`)**: NestJS (Node.js runtime), modular architecture (Auth, Roles, Skills, Assessments, Gaps, Matches).
-- **Database**: PostgreSQL with normalized schema (roles, canonical skills, attempts, evidence records).
-- **Background Workers (`workers/`)**: Ingestion worker for market data cleaning and isolated worker for sandboxed evaluation.
-- **Cache & Message Broker**: Redis for job queues and rate limiting.
+- **Frontend (`frontend/`)**: Next.js 14, React, custom responsive dark-theme CSS design system.
+- **Backend (`backend/`)**: NestJS (Node.js runtime), modular architecture (Auth, Roles, Skills, Assessments, Sandbox, Projects, Jobs, Curriculum, Admin).
+- **Database**: PostgreSQL (Neon Serverless) with normalized schema (16 relational tables).
+- **Shared Types (`shared/`)**: Domain interfaces & DTOs shared across backend and frontend.
 
 ### Repository Layout
 
 ```
-skillbridge/
-├── apps/
-│   ├── web/               # Next.js web application
-│   └── api/               # NestJS core API
-├── packages/
-│   ├── types/             # Shared TypeScript interfaces & DTOs
-│   ├── validation/        # Shared validation schemas
-│   └── config/            # Shared ESLint/TS configs
-├── workers/
-│   ├── market-ingestion/  # Job data extraction & normalization
-│   └── assessment-runner/ # Ephemeral code/SQL execution sandbox
+SkillBridge/
+├── backend/               # NestJS core API (Auth, Roles, Assessments, Sandbox, Projects, Neon DB)
+├── frontend/              # Next.js 14 interactive dashboard & authenticated UI
+├── shared/                # Shared TypeScript domain models & DTOs (@skillbridge/types)
 ├── docs/
-│   ├── research/          # Market research, data legal matrix, user studies
-│   ├── ontology/          # Canonical skills and synonym definitions
-│   └── decisions/         # Architecture Decision Records (ADRs)
-└── infra/
-    └── docker/            # Docker Compose setup for local PostgreSQL, Redis & API
+│   ├── architecture/      # Relational schema.sql v2.0.0
+│   ├── ontology/          # Canonical skills & Junior Backend role definition
+│   └── research/          # Labor market methodology & compliance
+├── infra/
+│   └── docker/            # Docker Compose setup for PostgreSQL & Redis
+└── scripts/
+    └── dev.js             # Dev launcher with automatic port conflict resolution
 ```
 
 ---

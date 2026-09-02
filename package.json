@@ -4,15 +4,18 @@
   "private": true,
   "description": "Evidence-Based Labor Market Intelligence & Skill Assessment Platform",
   "workspaces": [
-    "packages/*",
-    "apps/*"
+    "shared",
+    "backend",
+    "frontend"
   ],
   "scripts": {
     "dev": "node scripts/dev.js",
-    "dev:api": "npm run dev --workspace=apps/api",
-    "dev:web": "npm run dev --workspace=apps/web",
+    "dev:backend": "npm run dev --workspace=@skillbridge/api",
+    "dev:frontend": "npm run dev --workspace=@skillbridge/web",
     "build": "npm run build --workspaces",
-    "typecheck": "npm run typecheck --workspaces"
+    "typecheck": "npm run typecheck --workspaces",
+    "db:setup": "npm run db:setup --workspace=@skillbridge/api",
+    "db:seed": "npm run db:seed --workspace=@skillbridge/api"
   },
   "keywords": [
     "labor-market-intelligence",
