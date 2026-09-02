@@ -399,6 +399,101 @@ app.get('/api/curriculum/analyze', (req: Request, res: Response) => {
   res.json(analysis);
 });
 
+// 12. Admin & Research Console Endpoints
+app.get('/api/admin/overview', (req: Request, res: Response) => {
+  let totalAliases = 0;
+  for (const s of store.skills.values()) {
+    totalAliases += s.aliases.length;
+  }
+
+  let totalQuestions = 0;
+  for (const a of store.assessments.values()) {
+    totalQuestions += a.questions?.length || 0;
+  }
+
+  res.json({
+    canonicalSkillsCount: store.skills.size,
+    totalAliasesCount: totalAliases,
+    totalJobsCount: store.jobs.size,
+    totalQuestionsCount: totalQuestions,
+    totalAttemptsCount: store.attempts.size
+  });
+});
+
+app.post('/api/admin/skills/alias', (req: Request, res: Response) => {
+  const { skillId, alias } = req.body;
+  if (!skillId || !alias) {
+    return res.status(400).json({ error: 'skillId and alias are required' });
+  }
+
+  const skill = store.skills.get(skillId);
+  if (!skill) {
+    return res.status(404).json({ error: 'Skill not found' });
+  }
+
+  const cleanAlias = alias.trim().toLowerCase();
+  if (!skill.aliases.includes(cleanAlias)) {
+    skill.aliases.push(cleanAlias);
+    store.skills.set(skillId, skill);
+  }
+
+  res.json({ success: true, skill });
+});
+
+app.patch('/api/admin/roles/:id/weights', (req: Request, res: Response) => {
+  const role = store.roles.get(req.params.id);
+  if (!role) {
+    return res.status(404).json({ error: 'Role not found' });
+  }
+
+  const { skillId, roleWeight, marketDemandFrequency } = req.body;
+  const roleSkill = role.roleSkills.find(rs => rs.skillId === skillId);
+  if (!roleSkill) {
+    return res.status(404).json({ error: 'Skill not in role' });
+  }
+
+  if (typeof roleWeight === 'number') {
+    roleSkill.roleWeight = Math.min(Math.max(roleWeight, 0), 1);
+  }
+  if (typeof marketDemandFrequency === 'number') {
+    roleSkill.marketDemandFrequency = Math.min(Math.max(marketDemandFrequency, 0), 1);
+  }
+
+  store.roles.set(role.id, role);
+  res.json({ success: true, roleSkill });
+});
+
+app.post('/api/admin/questions', (req: Request, res: Response) => {
+  const { assessmentId = 'assessment_backend_diagnostic', prompt, codeSnippet, questionType = 'MCQ', options, correctAnswer, explanation, subSkill, points = 15 } = req.body;
+  if (!prompt || !correctAnswer || !subSkill) {
+    return res.status(400).json({ error: 'prompt, correctAnswer, and subSkill are required' });
+  }
+
+  const assessment = store.assessments.get(assessmentId);
+  if (!assessment || !assessment.questions) {
+    return res.status(404).json({ error: 'Assessment not found' });
+  }
+
+  const newQuestion = {
+    id: `q_${Date.now()}`,
+    assessmentId,
+    prompt,
+    codeSnippet,
+    questionType,
+    options: options || ['Option A', 'Option B', 'Option C', 'Option D'],
+    correctAnswer,
+    explanation: explanation || 'Standard verified answer.',
+    subSkill,
+    difficulty: 'Intermediate' as const,
+    points
+  };
+
+  assessment.questions.push(newQuestion);
+  store.assessments.set(assessmentId, assessment);
+
+  res.json({ success: true, question: newQuestion });
+});
+
 // 7. Jobs & Explainable Matching
 app.get('/api/jobs', (req: Request, res: Response) => {
   res.json(Array.from(store.jobs.values()));

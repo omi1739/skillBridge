@@ -10,7 +10,8 @@ import {
   JobMatchResult,
   ProjectEvidence,
   CurriculumProfile,
-  CurriculumComparisonResult
+  CurriculumComparisonResult,
+  Skill
 } from '@skillbridge/types';
 import {
   TrendingUp,
@@ -41,14 +42,18 @@ import {
   X,
   GraduationCap,
   BookOpen,
-  HelpCircle
+  Sliders,
+  Settings,
+  Layers,
+  Save
 } from 'lucide-react';
 
 const API_BASE = 'http://localhost:4000/api';
 
 export default function SkillBridgeApp() {
-  const [activeTab, setActiveTab] = useState<'market' | 'curriculum' | 'assessment' | 'sandbox' | 'gaps' | 'actions' | 'jobs'>('market');
+  const [activeTab, setActiveTab] = useState<'market' | 'curriculum' | 'assessment' | 'sandbox' | 'gaps' | 'actions' | 'jobs' | 'admin'>('market');
   const [role, setRole] = useState<Role | null>(null);
+  const [skills, setSkills] = useState<Skill[]>([]);
   const [assessment, setAssessment] = useState<Assessment | null>(null);
   const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
   const [userAnswers, setUserAnswers] = useState<Record<string, string>>({});
@@ -87,6 +92,14 @@ export default function SkillBridgeApp() {
   const [passportData, setPassportData] = useState<any | null>(null);
   const [copiedMarkdown, setCopiedMarkdown] = useState(false);
 
+  // Admin Console states
+  const [adminOverview, setAdminOverview] = useState<any | null>(null);
+  const [selectedSkillForAlias, setSelectedSkillForAlias] = useState<string>('skill_postgresql');
+  const [newAliasInput, setNewAliasInput] = useState<string>('');
+  const [aliasFeedback, setAliasFeedback] = useState<string>('');
+  const [editingSkillWeight, setEditingSkillWeight] = useState<{ skillId: string; roleWeight: number; marketDemandFrequency: number } | null>(null);
+  const [weightSaveSuccess, setWeightSaveSuccess] = useState(false);
+
   // Fetch initial data from API
   const refreshUserData = () => {
     fetch(`${API_BASE}/me/gaps?userId=demo_user_01&roleId=role_junior_backend`)
@@ -108,13 +121,36 @@ export default function SkillBridgeApp() {
       .then(res => res.json())
       .then(data => setRecommendations(data))
       .catch(() => {});
+
+    fetch(`${API_BASE}/admin/overview`)
+      .then(res => res.json())
+      .then(data => setAdminOverview(data))
+      .catch(() => {});
+  };
+
+  const fetchRoleAndSkills = () => {
+    fetch(`${API_BASE}/roles/role_junior_backend`)
+      .then(res => res.json())
+      .then(data => {
+        setRole(data);
+        if (data.roleSkills && data.roleSkills.length > 0 && !editingSkillWeight) {
+          setEditingSkillWeight({
+            skillId: data.roleSkills[0].skillId,
+            roleWeight: data.roleSkills[0].roleWeight,
+            marketDemandFrequency: data.roleSkills[0].marketDemandFrequency
+          });
+        }
+      })
+      .catch(() => {});
+
+    fetch(`${API_BASE}/skills`)
+      .then(res => res.json())
+      .then(data => setSkills(data))
+      .catch(() => {});
   };
 
   useEffect(() => {
-    fetch(`${API_BASE}/roles/role_junior_backend`)
-      .then(res => res.json())
-      .then(data => setRole(data))
-      .catch(() => {});
+    fetchRoleAndSkills();
 
     fetch(`${API_BASE}/assessments/assessment_backend_diagnostic`)
       .then(res => res.json())
@@ -283,6 +319,53 @@ ${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 
     }
   };
 
+  const handleAddAlias = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAliasInput.trim()) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/admin/skills/alias`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          skillId: selectedSkillForAlias,
+          alias: newAliasInput.trim()
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAliasFeedback(`✓ Alias "${newAliasInput.trim()}" successfully mapped to ${selectedSkillForAlias}`);
+        setNewAliasInput('');
+        fetchRoleAndSkills();
+        refreshUserData();
+        setTimeout(() => setAliasFeedback(''), 3500);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleSaveRoleWeights = async () => {
+    if (!editingSkillWeight || !role) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/admin/roles/${role.id}/weights`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editingSkillWeight)
+      });
+      const data = await res.json();
+      if (data.success) {
+        setWeightSaveSuccess(true);
+        fetchRoleAndSkills();
+        refreshUserData();
+        setTimeout(() => setWeightSaveSuccess(false), 3000);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const activeChallenge = challenges[selectedChallengeIdx];
 
   return (
@@ -337,6 +420,12 @@ ${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 
               onClick={() => setActiveTab('jobs')}
             >
               <Briefcase size={16} /> Job Match
+            </button>
+            <button
+              className={`nav-tab-btn ${activeTab === 'admin' ? 'active' : ''}`}
+              onClick={() => setActiveTab('admin')}
+            >
+              <Sliders size={16} /> Admin & Research
             </button>
           </nav>
 
@@ -449,7 +538,6 @@ ${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 
               </p>
             </div>
 
-            {/* Select Curriculum */}
             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
               {curricula.map(c => (
                 <button
@@ -465,7 +553,6 @@ ${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 
 
             {curriculumAnalysis && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                {/* Summary Score */}
                 <div className="grid-3">
                   <div className="stat-box">
                     <div className="stat-label">Syllabus Alignment Score</div>
@@ -485,7 +572,6 @@ ${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 
                 </div>
 
                 <div className="grid-2">
-                  {/* Left: What University Taught Well */}
                   <div className="card">
                     <h3 className="card-title" style={{ color: '#6ee7b7', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
                       <CheckCircle2 size={18} /> Strong Academic Foundation
@@ -502,7 +588,6 @@ ${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 
                     </div>
                   </div>
 
-                  {/* Right: Critical Market Omissions */}
                   <div className="card">
                     <h3 className="card-title" style={{ color: '#fda4af', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
                       <AlertCircle size={18} /> Missing Industry Requirements
@@ -1067,6 +1152,197 @@ ${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 8: ADMIN & RESEARCH CONSOLE */}
+        {activeTab === 'admin' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div className="card" style={{ background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(245, 158, 11, 0.05))' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                <Sliders size={22} color="#fbbf24" />
+                <h2 className="card-title">Labor Market Ontology & Research Console</h2>
+              </div>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                Manage canonical skill ontologies, merge synonyms, tune role skill importance weights, and inspect ingestion coverage.
+              </p>
+            </div>
+
+            {/* Admin Overview Metrics */}
+            {adminOverview && (
+              <div className="grid-3">
+                <div className="stat-box">
+                  <div className="stat-label">Canonical Skills Tracked</div>
+                  <div className="stat-value">{adminOverview.canonicalSkillsCount}</div>
+                </div>
+                <div className="stat-box">
+                  <div className="stat-label">Synonym Aliases Mapped</div>
+                  <div className="stat-value" style={{ color: '#818cf8' }}>{adminOverview.totalAliasesCount}</div>
+                </div>
+                <div className="stat-box">
+                  <div className="stat-label">Ingested Job Postings</div>
+                  <div className="stat-value" style={{ color: '#38bdf8' }}>{adminOverview.totalJobsCount}</div>
+                </div>
+              </div>
+            )}
+
+            <div className="grid-2">
+              {/* Alias Merging Tool */}
+              <div className="card">
+                <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <Layers size={18} color="#a5b4fc" /> Skill Synonym & Alias Resolution
+                </h3>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1rem' }}>
+                  Map messy or colloquial skill names from raw job descriptions into single canonical ontology IDs.
+                </p>
+
+                <form onSubmit={handleAddAlias} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                  <div>
+                    <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.3rem' }}>
+                      Select Target Canonical Skill
+                    </label>
+                    <select
+                      value={selectedSkillForAlias}
+                      onChange={e => setSelectedSkillForAlias(e.target.value)}
+                      style={{ width: '100%', padding: '0.55rem', background: '#070b14', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.85rem', outline: 'none' }}
+                    >
+                      {skills.map(s => (
+                        <option key={s.id} value={s.id}>{s.canonicalName} ({s.category})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.3rem' }}>
+                      New Alias / Synonym String
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. postgres-db or nodejs-backend"
+                      value={newAliasInput}
+                      onChange={e => setNewAliasInput(e.target.value)}
+                      style={{ width: '100%', padding: '0.55rem', background: '#070b14', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.85rem', outline: 'none' }}
+                    />
+                  </div>
+
+                  {aliasFeedback && (
+                    <div style={{ fontSize: '0.8rem', color: '#6ee7b7', fontWeight: 600 }}>
+                      {aliasFeedback}
+                    </div>
+                  )}
+
+                  <button type="submit" className="btn btn-primary" style={{ marginTop: '0.35rem', alignSelf: 'flex-start', padding: '0.45rem 0.9rem', fontSize: '0.85rem' }}>
+                    <PlusCircle size={14} /> Merge Alias into Ontology
+                  </button>
+                </form>
+
+                {/* Show Current Aliases */}
+                <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
+                  <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+                    Current Aliases for {skills.find(s => s.id === selectedSkillForAlias)?.canonicalName || selectedSkillForAlias}:
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                    {skills.find(s => s.id === selectedSkillForAlias)?.aliases.map((al, idx) => (
+                      <span key={idx} style={{ background: 'rgba(255,255,255,0.04)', color: '#94a3b8', fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
+                        {al}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Live Role Weight Tuner */}
+              <div className="card">
+                <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <Sliders size={18} color="#fbbf24" /> Role Weight & Market Demand Tuner
+                </h3>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1rem' }}>
+                  Calibrate the mathematical weights ($Role\_Weight$ & $Market\_Demand$) for <strong>{role?.title}</strong>.
+                </p>
+
+                {role && role.roleSkills && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <div>
+                      <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.3rem' }}>
+                        Choose Role Skill to Calibrate
+                      </label>
+                      <select
+                        value={editingSkillWeight?.skillId}
+                        onChange={e => {
+                          const rs = role.roleSkills.find(r => r.skillId === e.target.value);
+                          if (rs) {
+                            setEditingSkillWeight({
+                              skillId: rs.skillId,
+                              roleWeight: rs.roleWeight,
+                              marketDemandFrequency: rs.marketDemandFrequency
+                            });
+                          }
+                        }}
+                        style={{ width: '100%', padding: '0.55rem', background: '#070b14', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.85rem', outline: 'none' }}
+                      >
+                        {role.roleSkills.map(rs => (
+                          <option key={rs.skillId} value={rs.skillId}>
+                            {rs.skill?.canonicalName || rs.skillId}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {editingSkillWeight && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                        <div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.2rem' }}>
+                            <span>Role Weight (Importance in Backend Engineering)</span>
+                            <strong style={{ color: '#a5b4fc', fontFamily: 'var(--font-mono)' }}>{Math.round(editingSkillWeight.roleWeight * 100)}%</strong>
+                          </div>
+                          <input
+                            type="range"
+                            min="0.10"
+                            max="1.00"
+                            step="0.05"
+                            value={editingSkillWeight.roleWeight}
+                            onChange={e => setEditingSkillWeight({ ...editingSkillWeight, roleWeight: parseFloat(e.target.value) })}
+                            style={{ width: '100%', accentColor: 'var(--accent-primary)' }}
+                          />
+                        </div>
+
+                        <div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.2rem' }}>
+                            <span>Observed Market Demand Frequency</span>
+                            <strong style={{ color: '#38bdf8', fontFamily: 'var(--font-mono)' }}>{Math.round(editingSkillWeight.marketDemandFrequency * 100)}%</strong>
+                          </div>
+                          <input
+                            type="range"
+                            min="0.10"
+                            max="1.00"
+                            step="0.05"
+                            value={editingSkillWeight.marketDemandFrequency}
+                            onChange={e => setEditingSkillWeight({ ...editingSkillWeight, marketDemandFrequency: parseFloat(e.target.value) })}
+                            style={{ width: '100%', accentColor: 'var(--accent-cyan)' }}
+                          />
+                        </div>
+
+                        {weightSaveSuccess && (
+                          <div style={{ fontSize: '0.8rem', color: '#6ee7b7', fontWeight: 600 }}>
+                            ✓ Role weights updated! Gap Engine priority scores recalculated.
+                          </div>
+                        )}
+
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          onClick={handleSaveRoleWeights}
+                          style={{ alignSelf: 'flex-start', padding: '0.45rem 0.9rem', fontSize: '0.85rem', background: 'var(--accent-emerald)' }}
+                        >
+                          <Save size={14} /> Save Weights & Recalculate Gaps
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
