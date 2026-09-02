@@ -97,5 +97,4 @@ To maintain focus, the initial implementation targets one specific role archetyp
 
 ---
 
-## License
-MIT
+
