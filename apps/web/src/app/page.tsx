@@ -11,7 +11,9 @@ import {
   ProjectEvidence,
   CurriculumProfile,
   CurriculumComparisonResult,
-  Skill
+  Skill,
+  User,
+  Profile
 } from '@skillbridge/types';
 import {
   TrendingUp,
@@ -45,13 +47,59 @@ import {
   Sliders,
   Settings,
   Layers,
-  Save
+  Save,
+  LogIn,
+  LogOut,
+  UserPlus,
+  KeyRound,
+  Mail,
+  User as UserIcon,
+  UserCheck
 } from 'lucide-react';
 
 const API_BASE = 'http://localhost:4000/api';
 
 export default function SkillBridgeApp() {
   const [activeTab, setActiveTab] = useState<'market' | 'curriculum' | 'assessment' | 'sandbox' | 'gaps' | 'actions' | 'jobs' | 'admin'>('market');
+
+  // Auth state
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentProfile, setCurrentProfile] = useState<Profile | null>(null);
+  const [authToken, setAuthToken] = useState<string | null>(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authMode, setAuthMode] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
+  const [authForm, setAuthForm] = useState({
+    email: '',
+    password: '',
+    fullName: '',
+    targetRoleId: 'role_junior_backend'
+  });
+  const [authError, setAuthError] = useState('');
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
+
+  const activeUserId = currentUser?.id || 'demo_user_01';
+
+  // Attach the JWT to requests when present.
+  const authHeaders = (json = false): Record<string, string> => {
+    const headers: Record<string, string> = {};
+    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+    if (json) headers['Content-Type'] = 'application/json';
+    return headers;
+  };
+
+  const activeRole = currentProfile?.targetRoleId || 'role_junior_backend';
+
+  const fetchJSON = async (path: string, init?: RequestInit) => {
+    const res = await fetch(`${API_BASE}${path}`,
+      init ? { ...init, headers: { ...authHeaders(Boolean(init.body)), ...(init.headers || {}) } } : { headers: authHeaders() }
+    );
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Request failed.');
+    }
+    return data;
+  };
+
   const [role, setRole] = useState<Role | null>(null);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [assessment, setAssessment] = useState<Assessment | null>(null);
@@ -102,22 +150,25 @@ export default function SkillBridgeApp() {
 
   // Fetch initial data from API
   const refreshUserData = () => {
-    fetch(`${API_BASE}/me/gaps?userId=demo_user_01&roleId=role_junior_backend`)
+    const uid = activeUserId;
+    const roleId = activeRole;
+
+    fetch(`${API_BASE}/me/gaps?userId=${uid}&roleId=${roleId}`, { headers: authHeaders() })
       .then(res => res.json())
       .then(data => setGaps(data))
       .catch(() => {});
 
-    fetch(`${API_BASE}/jobs/matches?userId=demo_user_01`)
+    fetch(`${API_BASE}/jobs/matches?userId=${uid}`, { headers: authHeaders() })
       .then(res => res.json())
       .then(data => setJobMatches(data))
       .catch(() => {});
 
-    fetch(`${API_BASE}/me/projects?userId=demo_user_01`)
+    fetch(`${API_BASE}/me/projects?userId=${uid}`, { headers: authHeaders() })
       .then(res => res.json())
       .then(data => setProjects(data))
       .catch(() => {});
 
-    fetch(`${API_BASE}/me/recommendations?userId=demo_user_01`)
+    fetch(`${API_BASE}/me/recommendations?userId=${uid}`, { headers: authHeaders() })
       .then(res => res.json())
       .then(data => setRecommendations(data))
       .catch(() => {});
@@ -177,8 +228,93 @@ export default function SkillBridgeApp() {
       .then(data => setCurriculumAnalysis(data))
       .catch(() => {});
 
+    // Restore a persisted session if present, otherwise load the demo user.
+    const savedToken = localStorage.getItem('skillbridge_token');
+    const savedUser = localStorage.getItem('skillbridge_user');
+    const savedProfile = localStorage.getItem('skillbridge_profile');
+    if (savedToken && savedUser && savedProfile) {
+      try {
+        setCurrentUser(JSON.parse(savedUser));
+        setCurrentProfile(JSON.parse(savedProfile));
+        setAuthToken(savedToken);
+      } catch {
+        loadDemoUser();
+      }
+    } else {
+      loadDemoUser();
+    }
+
     refreshUserData();
   }, []);
+
+  const loadDemoUser = () => {
+    fetch(`${API_BASE}/me?userId=demo_user_01`, { headers: authHeaders() })
+      .then(res => res.json())
+      .then(data => {
+        if (data.user && data.profile) {
+          setCurrentUser(data.user);
+          setCurrentProfile(data.profile);
+        }
+      })
+      .catch(() => {});
+  };
+
+  const handleAuthSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError('');
+    setIsAuthLoading(true);
+
+    const endpoint = authMode === 'REGISTER' ? `${API_BASE}/auth/register` : `${API_BASE}/auth/login`;
+    const payload = authMode === 'REGISTER'
+      ? {
+          email: authForm.email,
+          password: authForm.password,
+          fullName: authForm.fullName,
+          targetRoleId: authForm.targetRoleId
+        }
+      : {
+          email: authForm.email,
+          password: authForm.password
+        };
+
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Authentication failed.');
+      }
+
+      setCurrentUser(data.user);
+      setCurrentProfile(data.profile);
+      setAuthToken(data.token);
+
+      localStorage.setItem('skillbridge_token', data.token);
+      localStorage.setItem('skillbridge_user', JSON.stringify(data.user));
+      localStorage.setItem('skillbridge_profile', JSON.stringify(data.profile));
+
+      setShowAuthModal(false);
+      setAuthForm({ email: '', password: '', fullName: '', targetRoleId: 'role_junior_backend' });
+      refreshUserData();
+    } catch (err: any) {
+      setAuthError(err.message || 'An error occurred.');
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('skillbridge_token');
+    localStorage.removeItem('skillbridge_user');
+    localStorage.removeItem('skillbridge_profile');
+    setCurrentUser(null);
+    setCurrentProfile(null);
+    setAuthToken(null);
+    loadDemoUser();
+  };
 
   const handleCurriculumChange = (currId: string) => {
     setSelectedCurriculumId(currId);
@@ -190,7 +326,7 @@ export default function SkillBridgeApp() {
 
   const handleOpenPassport = async () => {
     try {
-      const res = await fetch(`${API_BASE}/me/report?userId=demo_user_01`);
+      const res = await fetch(`${API_BASE}/me/report?userId=${activeUserId}`, { headers: authHeaders() });
       const data = await res.json();
       setPassportData(data);
       setShowPassportModal(true);
@@ -235,9 +371,9 @@ ${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 
     try {
       const res = await fetch(`${API_BASE}/assessments/${assessment.id}/submit`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(true),
         body: JSON.stringify({
-          userId: 'demo_user_01',
+          userId: activeUserId,
           answers: answersPayload
         })
       });
@@ -266,13 +402,13 @@ ${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 
     setIsExecutingSandbox(true);
     const endpoint = challenge.type === 'SQL' ? `${API_BASE}/sandbox/run-sql` : `${API_BASE}/sandbox/run-code`;
     const payload = challenge.type === 'SQL'
-      ? { challengeId: challenge.id, query: sandboxCode, userId: 'demo_user_01' }
-      : { challengeId: challenge.id, code: sandboxCode, userId: 'demo_user_01' };
+      ? { challengeId: challenge.id, query: sandboxCode, userId: activeUserId }
+      : { challengeId: challenge.id, code: sandboxCode, userId: activeUserId };
 
     try {
       const res = await fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(true),
         body: JSON.stringify(payload)
       });
       const data = await res.json();
@@ -297,9 +433,9 @@ ${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 
     try {
       const res = await fetch(`${API_BASE}/me/projects`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(true),
         body: JSON.stringify({
-          userId: 'demo_user_01',
+          userId: activeUserId,
           ...projectForm
         })
       });
@@ -429,9 +565,40 @@ ${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 
             </button>
           </nav>
 
-          <button className="btn btn-secondary" onClick={handleOpenPassport} style={{ fontSize: '0.85rem', padding: '0.45rem 0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            <FileText size={15} color="#818cf8" /> Skill Passport
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+            {currentUser ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#f8fafc' }}>
+                    {currentProfile?.fullName || currentUser.email.split('@')[0]}
+                  </span>
+                  <span style={{ fontSize: '0.7rem', color: '#a5b4fc', fontFamily: 'var(--font-mono)' }}>
+                    {currentUser.email === 'candidate@skillbridge.org' ? 'Demo Candidate' : 'Signed in'}
+                  </span>
+                </div>
+                <button
+                  className="btn btn-secondary"
+                  onClick={handleLogout}
+                  title="Sign Out"
+                  style={{ padding: '0.4rem 0.6rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                >
+                  <LogOut size={14} /> Sign Out
+                </button>
+              </div>
+            ) : (
+              <button
+                className="btn btn-primary"
+                onClick={() => { setAuthMode('LOGIN'); setShowAuthModal(true); }}
+                style={{ fontSize: '0.85rem', padding: '0.45rem 0.85rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+              >
+                <LogIn size={14} /> Sign In
+              </button>
+            )}
+
+            <button className="btn btn-secondary" onClick={handleOpenPassport} style={{ fontSize: '0.85rem', padding: '0.45rem 0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <FileText size={15} color="#818cf8" /> Skill Passport
+            </button>
+          </div>
         </div>
       </header>
 
@@ -1523,6 +1690,136 @@ ${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 
 
             <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)', textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
               Verified by SkillBridge Labor Market Intelligence System • All scores backed by deterministic practical evaluations and source traceability.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: AUTH (LOGIN & REGISTER) */}
+      {showAuthModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 120, padding: '1rem' }}>
+          <div className="card" style={{ maxWidth: '440px', width: '100%', background: '#0b101e', border: '1px solid var(--border-active)', padding: '2rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <KeyRound size={20} color="#818cf8" />
+                <h3 style={{ fontSize: '1.3rem', fontWeight: 700 }}>
+                  {authMode === 'LOGIN' ? 'Sign In to SkillBridge' : 'Create Candidate Account'}
+                </h3>
+              </div>
+              <button className="btn btn-secondary" onClick={() => setShowAuthModal(false)} style={{ padding: '0.3rem 0.5rem' }}>
+                <X size={16} />
+              </button>
+            </div>
+
+            {authError && (
+              <div style={{ background: 'rgba(244, 63, 94, 0.1)', border: '1px solid var(--accent-rose)', color: '#fda4af', padding: '0.65rem', borderRadius: '6px', fontSize: '0.85rem', marginBottom: '1rem' }}>
+                {authError}
+              </div>
+            )}
+
+            <form onSubmit={handleAuthSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {authMode === 'REGISTER' && (
+                <div>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.35rem' }}>
+                    Full Name
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Shakib Al Hasan"
+                      value={authForm.fullName}
+                      onChange={e => setAuthForm({ ...authForm, fullName: e.target.value })}
+                      style={{ width: '100%', padding: '0.65rem 0.65rem 0.65rem 2.25rem', background: '#070b14', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.9rem', outline: 'none' }}
+                    />
+                    <UserIcon size={14} color="var(--text-muted)" style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)' }} />
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.35rem' }}>
+                  Email Address
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="email"
+                    required
+                    placeholder="name@example.com"
+                    value={authForm.email}
+                    onChange={e => setAuthForm({ ...authForm, email: e.target.value })}
+                    style={{ width: '100%', padding: '0.65rem 0.65rem 0.65rem 2.25rem', background: '#070b14', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.9rem', outline: 'none' }}
+                  />
+                  <Mail size={14} color="var(--text-muted)" style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)' }} />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.35rem' }}>
+                  Password
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="password"
+                    required
+                    minLength={8}
+                    placeholder="At least 8 characters"
+                    value={authForm.password}
+                    onChange={e => setAuthForm({ ...authForm, password: e.target.value })}
+                    style={{ width: '100%', padding: '0.65rem 0.65rem 0.65rem 2.25rem', background: '#070b14', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.9rem', outline: 'none' }}
+                  />
+                  <KeyRound size={14} color="var(--text-muted)" style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)' }} />
+                </div>
+              </div>
+
+              {authMode === 'REGISTER' && (
+                <div>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.35rem' }}>
+                    Target Career Role
+                  </label>
+                  <select
+                    value={authForm.targetRoleId}
+                    onChange={e => setAuthForm({ ...authForm, targetRoleId: e.target.value })}
+                    style={{ width: '100%', padding: '0.65rem', background: '#070b14', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.85rem', outline: 'none' }}
+                  >
+                    <option value="role_junior_backend">Junior Backend Engineer</option>
+                  </select>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={isAuthLoading}
+                style={{ width: '100%', padding: '0.75rem', marginTop: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+              >
+                <UserCheck size={15} />
+                {isAuthLoading ? 'Please wait...' : authMode === 'LOGIN' ? 'Sign In' : 'Create Account'}
+              </button>
+            </form>
+
+            <div style={{ marginTop: '1.25rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+              {authMode === 'LOGIN' ? (
+                <span>
+                  Don't have an account?{' '}
+                  <button
+                    onClick={() => { setAuthMode('REGISTER'); setAuthError(''); }}
+                    style={{ background: 'transparent', border: 'none', color: '#818cf8', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
+                  >
+                    Register now
+                  </button>
+                </span>
+              ) : (
+                <span>
+                  Already registered?{' '}
+                  <button
+                    onClick={() => { setAuthMode('LOGIN'); setAuthError(''); }}
+                    style={{ background: 'transparent', border: 'none', color: '#818cf8', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
+                  >
+                    Sign In
+                  </button>
+                </span>
+              )}
             </div>
           </div>
         </div>

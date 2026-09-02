@@ -7,6 +7,8 @@ import {
   SubSkillResult
 } from '@skillbridge/types';
 import { store } from './store';
+import { authService } from './services/auth.service';
+import { optionalAuth, requireAuth } from './middleware/auth';
 import { gapService } from './services/gap.service';
 import { matchService } from './services/match.service';
 import { sandboxService } from './services/sandbox.service';
@@ -30,8 +32,30 @@ app.get('/api/health', (req: Request, res: Response) => {
 });
 
 // 2. Auth & Current Profile
-app.get('/api/me', async (req: Request, res: Response) => {
-  const userId = (req.query.userId as string) || 'demo_user_01';
+app.post('/api/auth/register', async (req: Request, res: Response) => {
+  try {
+    const { email, password, fullName, targetRoleId } = req.body;
+    const result = await authService.register(email, password, fullName, targetRoleId);
+    res.status(201).json(result);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'Registration failed.' });
+  }
+});
+
+app.post('/api/auth/login', async (req: Request, res: Response) => {
+  try {
+    const { email, password } = req.body;
+    const result = await authService.login(email, password);
+    res.json(result);
+  } catch (err: any) {
+    res.status(401).json({ error: err.message || 'Authentication failed.' });
+  }
+});
+
+app.get('/api/me', optionalAuth, async (req: Request, res: Response) => {
+  // Authenticated user takes precedence; otherwise fall back to demo (query userId).
+  const userId = req.user?.userId || (req.query.userId as string) || 'demo_user_01';
+
   const [user, profile] = await Promise.all([
     store.getUser(userId),
     store.getProfile(userId)
@@ -41,6 +65,17 @@ app.get('/api/me', async (req: Request, res: Response) => {
     return res.status(404).json({ error: 'User not found' });
   }
 
+  res.json({ user, profile });
+});
+
+// Protected profile reads for the currently authenticated user.
+app.get('/api/me/account', requireAuth, async (req: Request, res: Response) => {
+  const userId = req.user!.userId;
+  const user = await store.getUser(userId);
+  const profile = await store.getProfile(userId);
+  if (!user || !profile) {
+    return res.status(404).json({ error: 'User not found' });
+  }
   res.json({ user, profile });
 });
 

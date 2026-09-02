@@ -18,6 +18,7 @@ import {
   INITIAL_JOBS
 } from '../data/seed';
 import { query, withTransaction } from './client';
+import { authService } from '../services/auth.service';
 
 const SCHEMA_PATH = path.resolve(__dirname, '../../../../docs/architecture/schema.sql');
 
@@ -108,6 +109,8 @@ export async function seedAll(): Promise<void> {
     }
 
     // --- Demo user + profile ---
+    // Demo login: candidate@skillbridge.org / SkillBridge@123
+    const demoPasswordHash = await authService.hashPassword('SkillBridge@123');
     const demoUser: User = {
       id: 'demo_user_01',
       email: 'candidate@skillbridge.org',
@@ -115,9 +118,13 @@ export async function seedAll(): Promise<void> {
       createdAt: new Date().toISOString()
     };
     await client.query(
-      `INSERT INTO users (id, email, role, created_at) VALUES ($1,$2,$3,$4::timestamptz)
-       ON CONFLICT (id) DO NOTHING`,
-      [demoUser.id, demoUser.email, demoUser.role, demoUser.createdAt]
+      `INSERT INTO users (id, email, password_hash, role, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5::timestamptz,$5::timestamptz)
+       ON CONFLICT (id) DO UPDATE SET
+         email = EXCLUDED.email,
+         password_hash = EXCLUDED.password_hash,
+         role = EXCLUDED.role`,
+      [demoUser.id, demoUser.email, demoPasswordHash, demoUser.role, demoUser.createdAt]
     );
 
     const demoProfile: Profile = {
