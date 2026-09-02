@@ -290,6 +290,33 @@ app.get('/api/me/recommendations', (req: Request, res: Response) => {
   res.json(recs);
 });
 
+import { sandboxService } from './services/sandbox.service';
+
+// 8. Sandbox & Practical Code Runner
+app.get('/api/sandbox/challenges', (req: Request, res: Response) => {
+  res.json(sandboxService.getChallenges());
+});
+
+app.post('/api/sandbox/run-sql', (req: Request, res: Response) => {
+  const { challengeId, query, userId = 'demo_user_01' } = req.body;
+  if (!challengeId || !query) {
+    return res.status(400).json({ error: 'challengeId and query are required' });
+  }
+
+  const result = sandboxService.executeSQL(challengeId, query, userId);
+  res.json(result);
+});
+
+app.post('/api/sandbox/run-code', async (req: Request, res: Response) => {
+  const { challengeId, code, userId = 'demo_user_01' } = req.body;
+  if (!challengeId || !code) {
+    return res.status(400).json({ error: 'challengeId and code are required' });
+  }
+
+  const result = await sandboxService.executeJavaScript(challengeId, code, userId);
+  res.json(result);
+});
+
 // 7. Jobs & Explainable Matching
 app.get('/api/jobs', (req: Request, res: Response) => {
   res.json(Array.from(store.jobs.values()));

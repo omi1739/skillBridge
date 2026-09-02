@@ -7,8 +7,7 @@ import {
   AssessmentAttempt,
   SkillGap,
   ActionRecommendation,
-  JobMatchResult,
-  SkillEvidence
+  JobMatchResult
 } from '@skillbridge/types';
 import {
   TrendingUp,
@@ -23,15 +22,18 @@ import {
   ShieldCheck,
   Zap,
   ChevronRight,
-  Layers,
   Database,
-  Sparkles
+  Code2,
+  Play,
+  Terminal,
+  Sparkles,
+  Table
 } from 'lucide-react';
 
 const API_BASE = 'http://localhost:4000/api';
 
 export default function SkillBridgeApp() {
-  const [activeTab, setActiveTab] = useState<'market' | 'assessment' | 'gaps' | 'actions' | 'jobs'>('market');
+  const [activeTab, setActiveTab] = useState<'market' | 'assessment' | 'sandbox' | 'gaps' | 'actions' | 'jobs'>('market');
   const [role, setRole] = useState<Role | null>(null);
   const [assessment, setAssessment] = useState<Assessment | null>(null);
   const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
@@ -43,7 +45,26 @@ export default function SkillBridgeApp() {
   const [jobMatches, setJobMatches] = useState<JobMatchResult[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Fetch initial data from API or fallbacks
+  // Sandbox states
+  const [challenges, setChallenges] = useState<any[]>([]);
+  const [selectedChallengeIdx, setSelectedChallengeIdx] = useState(0);
+  const [sandboxCode, setSandboxCode] = useState<string>('');
+  const [sandboxResult, setSandboxResult] = useState<any | null>(null);
+  const [isExecutingSandbox, setIsExecutingSandbox] = useState(false);
+
+  // Fetch initial data from API
+  const refreshUserData = () => {
+    fetch(`${API_BASE}/me/gaps?userId=demo_user_01&roleId=role_junior_backend`)
+      .then(res => res.json())
+      .then(data => setGaps(data))
+      .catch(() => {});
+
+    fetch(`${API_BASE}/jobs/matches?userId=demo_user_01`)
+      .then(res => res.json())
+      .then(data => setJobMatches(data))
+      .catch(() => {});
+  };
+
   useEffect(() => {
     fetch(`${API_BASE}/roles/role_junior_backend`)
       .then(res => res.json())
@@ -55,20 +76,22 @@ export default function SkillBridgeApp() {
       .then(data => setAssessment(data))
       .catch(() => {});
 
-    fetch(`${API_BASE}/me/gaps?userId=demo_user_01&roleId=role_junior_backend`)
-      .then(res => res.json())
-      .then(data => setGaps(data))
-      .catch(() => {});
-
     fetch(`${API_BASE}/me/recommendations?userId=demo_user_01`)
       .then(res => res.json())
       .then(data => setRecommendations(data))
       .catch(() => {});
 
-    fetch(`${API_BASE}/jobs/matches?userId=demo_user_01`)
+    fetch(`${API_BASE}/sandbox/challenges`)
       .then(res => res.json())
-      .then(data => setJobMatches(data))
+      .then(data => {
+        setChallenges(data);
+        if (data.length > 0) {
+          setSandboxCode(data[0].starterCode);
+        }
+      })
       .catch(() => {});
+
+    refreshUserData();
   }, []);
 
   const handleSelectAnswer = (questionId: string, option: string) => {
@@ -97,17 +120,51 @@ export default function SkillBridgeApp() {
       setAttemptResult(data.attempt);
       setGaps(data.gaps || []);
       setDetailedQuestions(data.detailedQuestions || []);
-
-      // Refresh job matches with new evidence
-      const matchesRes = await fetch(`${API_BASE}/jobs/matches?userId=demo_user_01`);
-      const matchesData = await matchesRes.json();
-      setJobMatches(matchesData);
+      refreshUserData();
     } catch (err) {
       console.error(err);
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const handleSelectChallenge = (index: number) => {
+    setSelectedChallengeIdx(index);
+    setSandboxCode(challenges[index].starterCode);
+    setSandboxResult(null);
+  };
+
+  const handleRunSandbox = async () => {
+    const challenge = challenges[selectedChallengeIdx];
+    if (!challenge) return;
+
+    setIsExecutingSandbox(true);
+    const endpoint = challenge.type === 'SQL' ? `${API_BASE}/sandbox/run-sql` : `${API_BASE}/sandbox/run-code`;
+    const payload = challenge.type === 'SQL'
+      ? { challengeId: challenge.id, query: sandboxCode, userId: 'demo_user_01' }
+      : { challengeId: challenge.id, code: sandboxCode, userId: 'demo_user_01' };
+
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      setSandboxResult(data);
+
+      if (data.passed) {
+        refreshUserData();
+      }
+    } catch (err) {
+      console.error(err);
+      setSandboxResult({ passed: false, message: 'Execution failed: Network error connecting to sandbox.' });
+    } finally {
+      setIsExecutingSandbox(false);
+    }
+  };
+
+  const activeChallenge = challenges[selectedChallengeIdx];
 
   return (
     <div>
@@ -130,7 +187,13 @@ export default function SkillBridgeApp() {
               className={`nav-tab-btn ${activeTab === 'assessment' ? 'active' : ''}`}
               onClick={() => setActiveTab('assessment')}
             >
-              <BrainCircuit size={16} /> Practical Test
+              <BrainCircuit size={16} /> Diagnostic Test
+            </button>
+            <button
+              className={`nav-tab-btn ${activeTab === 'sandbox' ? 'active' : ''}`}
+              onClick={() => setActiveTab('sandbox')}
+            >
+              <Code2 size={16} /> Code & SQL Sandbox
             </button>
             <button
               className={`nav-tab-btn ${activeTab === 'gaps' ? 'active' : ''}`}
@@ -172,7 +235,6 @@ export default function SkillBridgeApp() {
         {/* TAB 1: MARKET DEMAND EXPLORER */}
         {activeTab === 'market' && role && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            {/* Market Metadata Overview */}
             <div className="grid-3">
               <div className="stat-box">
                 <div className="stat-label">Focus Region</div>
@@ -194,7 +256,6 @@ export default function SkillBridgeApp() {
               </div>
             </div>
 
-            {/* In-Demand Skill Frequency Breakdown */}
             <div className="card">
               <div className="card-header">
                 <div>
@@ -264,7 +325,6 @@ export default function SkillBridgeApp() {
                   </div>
                 </div>
 
-                {/* Question Progress */}
                 {assessment.questions && assessment.questions.length > 0 && (
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
@@ -279,7 +339,6 @@ export default function SkillBridgeApp() {
                       />
                     </div>
 
-                    {/* Question Card */}
                     <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
                       <h3 style={{ fontSize: '1.05rem', fontWeight: 600, marginBottom: '0.75rem' }}>
                         {assessment.questions[currentQuestionIdx].prompt}
@@ -308,7 +367,6 @@ export default function SkillBridgeApp() {
                       </div>
                     </div>
 
-                    {/* Navigation Buttons */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1.5rem' }}>
                       <button
                         className="btn btn-secondary"
@@ -340,7 +398,6 @@ export default function SkillBridgeApp() {
                 )}
               </div>
             ) : (
-              /* Attempt Report Card */
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                 <div className="card" style={{ textAlign: 'center', padding: '2.5rem' }}>
                   <div style={{
@@ -376,7 +433,6 @@ export default function SkillBridgeApp() {
                   </div>
                 </div>
 
-                {/* Sub-Skill Strengths & Weaknesses */}
                 <div className="card">
                   <h3 className="card-title" style={{ marginBottom: '1rem' }}>Sub-Skill Diagnostic Breakdown</h3>
                   <div className="grid-2">
@@ -406,7 +462,164 @@ export default function SkillBridgeApp() {
           </div>
         )}
 
-        {/* TAB 3: SKILL GAP ENGINE */}
+        {/* TAB 3: CODE & SQL SANDBOX RUNNER */}
+        {activeTab === 'sandbox' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div className="card" style={{ background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(16, 185, 129, 0.05))' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                <Terminal size={20} color="#6ee7b7" />
+                <h2 className="card-title">Interactive Practical Execution Sandbox</h2>
+              </div>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                Solve real engineering queries and algorithmic problems against test datasets. Passing hands-on challenges elevates your skill evidence to <strong style={{ color: '#6ee7b7' }}>Verified (High Confidence)</strong>.
+              </p>
+            </div>
+
+            {/* Challenge Picker Tabs */}
+            <div style={{ display: 'flex', gap: '0.75rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
+              {challenges.map((ch, idx) => (
+                <button
+                  key={ch.id}
+                  className={`btn ${selectedChallengeIdx === idx ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => handleSelectChallenge(idx)}
+                  style={{ whiteSpace: 'nowrap', fontSize: '0.85rem' }}
+                >
+                  {ch.type === 'SQL' ? <Database size={14} /> : <Code2 size={14} />}
+                  {ch.title}
+                </button>
+              ))}
+            </div>
+
+            {activeChallenge && (
+              <div className="grid-2">
+                {/* Left: Problem & Schema */}
+                <div className="card">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                    <span className="badge badge-preferred">{activeChallenge.type} Challenge</span>
+                    <span style={{ fontSize: '0.8rem', color: '#fbbf24', fontWeight: 600 }}>
+                      Difficulty: {activeChallenge.difficulty}
+                    </span>
+                  </div>
+
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 700, marginBottom: '0.5rem' }}>
+                    {activeChallenge.title}
+                  </h3>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1rem' }}>
+                    {activeChallenge.description}
+                  </p>
+
+                  {activeChallenge.schemaPreview && (
+                    <div style={{ marginTop: '1rem' }}>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
+                        Database Schema
+                      </div>
+                      <pre className="code-block" style={{ fontSize: '0.8rem' }}>
+                        <code>{activeChallenge.schemaPreview}</code>
+                      </pre>
+                    </div>
+                  )}
+
+                  {activeChallenge.sampleDataDescription && (
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
+                      ℹ️ {activeChallenge.sampleDataDescription}
+                    </p>
+                  )}
+                </div>
+
+                {/* Right: Code Editor & Execution Console */}
+                <div className="card" style={{ display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                      Solution Editor ({activeChallenge.type})
+                    </span>
+                    <button
+                      className="btn btn-primary"
+                      disabled={isExecutingSandbox}
+                      onClick={handleRunSandbox}
+                      style={{ padding: '0.45rem 1rem', fontSize: '0.85rem', background: 'var(--accent-emerald)' }}
+                    >
+                      <Play size={14} /> {isExecutingSandbox ? 'Executing...' : 'Run & Verify'}
+                    </button>
+                  </div>
+
+                  <textarea
+                    value={sandboxCode}
+                    onChange={(e) => setSandboxCode(e.target.value)}
+                    style={{
+                      width: '100%',
+                      height: '240px',
+                      background: '#070b14',
+                      color: '#38bdf8',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: '0.85rem',
+                      padding: '1rem',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border-color)',
+                      resize: 'vertical',
+                      outline: 'none',
+                      lineHeight: '1.5'
+                    }}
+                  />
+
+                  {/* Execution Results Console */}
+                  {sandboxResult && (
+                    <div style={{ marginTop: '1rem', padding: '1rem', borderRadius: '8px', background: sandboxResult.passed ? 'rgba(16, 185, 129, 0.1)' : 'rgba(244, 63, 94, 0.1)', border: `1px solid ${sandboxResult.passed ? 'var(--accent-emerald)' : 'var(--accent-rose)'}` }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                        <span style={{ fontWeight: 700, color: sandboxResult.passed ? '#6ee7b7' : '#fda4af', fontSize: '0.9rem' }}>
+                          {sandboxResult.passed ? '✓ Tests Passed' : '✗ Tests Failed'}
+                        </span>
+                        <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>
+                          {sandboxResult.executionTimeMs}ms execution time
+                        </span>
+                      </div>
+
+                      <p style={{ fontSize: '0.85rem', color: '#e2e8f0', marginBottom: sandboxResult.outputRows ? '0.75rem' : 0 }}>
+                        {sandboxResult.message}
+                      </p>
+
+                      {/* SQL Output Rows Table Preview */}
+                      {sandboxResult.outputRows && (
+                        <div style={{ overflowX: 'auto', marginTop: '0.5rem' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', fontFamily: 'var(--font-mono)' }}>
+                            <thead>
+                              <tr style={{ background: 'rgba(255,255,255,0.05)', borderBottom: '1px solid var(--border-color)' }}>
+                                {Object.keys(sandboxResult.outputRows[0] || {}).map(k => (
+                                  <th key={k} style={{ padding: '0.4rem', textAlign: 'left', color: '#a5b4fc' }}>{k}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {sandboxResult.outputRows.map((row: any, rIdx: number) => (
+                                <tr key={rIdx} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                                  {Object.values(row).map((val: any, cIdx: number) => (
+                                    <td key={cIdx} style={{ padding: '0.4rem' }}>{String(val)}</td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+
+                      {/* JS Assertion Results */}
+                      {sandboxResult.testResults && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '0.5rem' }}>
+                          {sandboxResult.testResults.map((t: any, idx: number) => (
+                            <div key={idx} style={{ fontSize: '0.8rem', color: t.passed ? '#6ee7b7' : '#fda4af' }}>
+                              {t.passed ? '✓' : '✗'} {t.testName}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 4: SKILL GAP ENGINE */}
         {activeTab === 'gaps' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             <div className="card" style={{ background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(6, 182, 212, 0.05))' }}>
@@ -421,7 +634,6 @@ export default function SkillBridgeApp() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {gaps.map(gap => {
-                const priorityPercentage = Math.round(gap.priorityScore * 100);
                 const profPercentage = Math.round(gap.demonstratedProficiency * 100);
 
                 return (
@@ -461,7 +673,7 @@ export default function SkillBridgeApp() {
           </div>
         )}
 
-        {/* TAB 4: ACTION PLAN & CAPSTONE PROJECTS */}
+        {/* TAB 5: ACTION PLAN & CAPSTONE PROJECTS */}
         {activeTab === 'actions' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             <div className="card">
@@ -509,7 +721,7 @@ export default function SkillBridgeApp() {
           </div>
         )}
 
-        {/* TAB 5: EXPLAINABLE JOB MATCHING */}
+        {/* TAB 6: EXPLAINABLE JOB MATCHING */}
         {activeTab === 'jobs' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             <div className="card">
