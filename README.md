@@ -27,18 +27,85 @@ SkillBridge is structured as a modular TypeScript monorepo to ensure clean separ
 
 ```
 SkillBridge/
-├── backend/               # NestJS core API (Auth, Roles, Assessments, Sandbox, Projects, Neon DB)
-├── frontend/              # Next.js 14 interactive dashboard & authenticated UI
-├── shared/                # Shared TypeScript domain models & DTOs (@skillbridge/types)
+├── backend/                         # NestJS core API (@skillbridge/api)
+│   ├── src/
+│   │   ├── main.ts                  # API bootstrap (global /api prefix, CORS)
+│   │   ├── app.module.ts            # Root module wiring all feature modules
+│   │   ├── app.controller.ts        # GET /api/health
+│   │   ├── db/                      # DB client + schema/seed runner
+│   │   │   ├── client.ts            # PG pool & helpers
+│   │   │   └── seed.ts              # applySchema() + seedAll()
+│   │   ├── database/                # NestJS DatabaseModule (connection ping)
+│   │   ├── modules/                 # Feature modules (one per domain)
+│   │   │   ├── auth/                # register/login, /me, guards, decorators
+│   │   │   │   ├── guards/          # JwtAuthGuard, OptionalJwtAuthGuard, RolesGuard
+│   │   │   │   └── decorators/      # @CurrentUser(), @Roles()
+│   │   │   ├── admin/               # ontology management (aliases, weights, questions)
+│   │   │   ├── assessments/         # MCQ diagnostic + grading
+│   │   │   ├── curriculum/          # institution curricula comparison
+│   │   │   ├── jobs/                # job listings + matching
+│   │   │   ├── projects/            # portfolio project verification
+│   │   │   ├── roles/               # role catalog + demand context
+│   │   │   ├── sandbox/             # SQL / JS challenge runners
+│   │   │   └── skills/              # canonical skill ontology
+│   │   ├── services/                # core domain logic (match, gap, sandbox, auth)
+│   │   ├── store/                   # data-access layer over PostgreSQL
+│   │   └── data/                    # seed data (skills, roles, assessment, jobs)
+│   └── package.json
+│
+├── frontend/                        # Next.js 14 interactive dashboard (@skillbridge/web)
+│   └── src/app/
+│       ├── page.tsx                 # single-page app with 8-tab UI
+│       ├── layout.tsx               # root layout
+│       └── globals.css              # dark-theme design system
+│
+├── shared/                          # Shared TypeScript domain models (@skillbridge/types)
+│   └── src/index.ts                 # Role, Skill, Assessment, JobMatchResult, etc.
+│
 ├── docs/
-│   ├── architecture/      # Relational schema.sql v2.0.0
-│   ├── ontology/          # Canonical skills & Junior Backend role definition
-│   └── research/          # Labor market methodology & compliance
+│   ├── architecture/
+│   │   └── schema.sql               # normalized relational schema (16 tables)
+│   ├── ontology/                    # canonical skills.json & junior_backend_role.json
+│   └── research/                    # market study methodology & compliance
+│
 ├── infra/
-│   └── docker/            # Docker Compose setup for PostgreSQL & Redis
+│   └── docker/                      # Docker Compose for PostgreSQL & Redis
+│
 └── scripts/
-    └── dev.js             # Dev launcher with automatic port conflict resolution
+    └── dev.js                       # dev launcher with port conflict resolution
 ```
+
+### Backend API Surface
+
+| Method | Route | Description | Auth |
+|--------|-------|-------------|------|
+| GET | `/api/health` | Liveness check | – |
+| POST | `/api/auth/register` | Create account | – |
+| POST | `/api/auth/login` | Sign in, returns JWT | – |
+| GET | `/api/me` | Current user + profile | Optional |
+| GET | `/api/me/account` | Account details | JWT |
+| PATCH | `/api/me/profile` | Update profile | JWT |
+| POST | `/api/me/skills/declare` | Self-report a skill | JWT |
+| GET | `/api/me/gaps` | Skill gaps for a role | – |
+| GET | `/api/me/recommendations` | Action recommendations | – |
+| GET | `/api/me/report` | Career/evidence passport | – |
+| GET | `/api/me/projects` | User's projects | Optional |
+| POST | `/api/me/projects` | Submit a project | JWT |
+| GET | `/api/skills`, `/api/skills/:id` | Skill ontology | – |
+| GET | `/api/roles`, `/api/roles/:id` | Role catalog | – |
+| GET | `/api/assessments`, `/api/assessments/:id` | Assessments | – |
+| POST | `/api/assessments/:id/submit` | Submit answers, get score | JWT |
+| GET | `/api/sandbox/challenges` | List challenges | – |
+| POST | `/api/sandbox/run-sql` | Run SQL challenge | JWT |
+| POST | `/api/sandbox/run-code` | Run JS challenge | JWT |
+| GET | `/api/curriculum/institutions` | List curricula | – |
+| GET | `/api/curriculum/analyze` | Compare curriculum to role | – |
+| GET | `/api/jobs` | Job listings | – |
+| GET | `/api/jobs/matches` | Matched jobs for user | – |
+| GET | `/api/admin/overview` | Ontology stats | – |
+| POST | `/api/admin/skills/alias` | Add skill alias | Admin |
+| PATCH | `/api/admin/roles/:id/weights` | Tune role skill weights | Admin |
+| POST | `/api/admin/questions` | Add assessment question | Admin |
 
 ---
 
