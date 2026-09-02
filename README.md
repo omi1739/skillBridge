@@ -84,10 +84,63 @@ To maintain focus, the initial implementation targets one specific role archetyp
 
 ### Prerequisites
 - Node.js (>= 20.x)
-- Docker & Docker Compose
-- PostgreSQL (>= 15)
+- npm (>= 10.x)
+- PostgreSQL (>= 15) OR a Neon Serverless connection string
 
-*(Detailed setup instructions will be updated as packages are initialized in Phase 1).*
+### 1. Install Dependencies
+```bash
+npm install
+```
+
+### 2. Configure Environment
+Backend expects a `.env` file at `backend/.env` with:
+```
+DATABASE_URL=postgresql://USER:PASSWORD@HOST:PORT/dbname?sslmode=require
+PORT=4000
+JWT_SECRET=<a-long-random-secret>
+```
+
+Frontend reads `NEXT_PUBLIC_API_BASE` (defaults to `http://localhost:4000/api`). See `frontend/.env.example`.
+
+### 3. Prepare the Database
+Applies the relational schema and seeds demo data (skills, roles, assessment, jobs, demo user):
+```bash
+npm run db:setup
+```
+
+### 4. Run in Development
+Starts both backend (port 4000) and frontend (port 3000), auto-releasing occupied ports:
+```bash
+npm run dev
+```
+Or launch separately:
+```bash
+npm run dev:backend
+npm run dev:frontend
+```
+
+### 5. Build & Run Production
+```bash
+npm run build     # compiles shared, backend, and frontend
+npm start         # runs the compiled NestJS API
+```
+
+### Demo Access
+- Demo user: `candidate@skillbridge.org` / `SkillBridge@123`
+- The demo login grants access to all tabs, including the Admin & Ontology Console.
+
+---
+
+## Current Status
+
+The core platform is fully scaffolded and functional as a demo:
+- **9 NestJS modules**: Auth, Roles, Skills, Assessments, Sandbox, Projects, Jobs, Curriculum, Admin.
+- **8-tab interactive UI**: Market, Curriculum, Assessment, Sandbox, Gaps, Actions, Jobs, Admin.
+- **JWT authentication** with role-based protection on admin writes (`RolesGuard` + `@Roles('ADMIN')`).
+- **Practical evaluation**: MCQ assessment grading and SQL/JS sandbox challenge runners that elevate skill evidence to `HIGH` confidence.
+- **Evidence-based pipeline**: deterministic gap analysis, recommendations, job matching, and skill passports.
+
+> Note: Sandbox SQL evaluation and GitHub project verification are simulated (keyword-checked / inferred) rather than backed by a real engine, and are listed as follow-up work in `NEXT_STEPS.txt`.
 
 ---
 

@@ -49,3 +49,6 @@ coverage/
 .turbo/
 .temp/
 *.tmp
+
+# Internal project notes (not part of the shipped repo)
+NEXT_STEPS.txt
