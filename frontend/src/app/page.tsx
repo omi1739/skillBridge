@@ -25,9 +25,6 @@ import {
   AlertCircle,
   Clock,
   ArrowRight,
-  ShieldCheck,
-  Zap,
-  ChevronRight,
   Database,
   Code2,
   Play,
@@ -45,24 +42,19 @@ import {
   GraduationCap,
   BookOpen,
   Sliders,
-  Settings,
-  Layers,
-  Save,
   LogIn,
   LogOut,
   UserPlus,
-  KeyRound,
-  Mail,
-  User as UserIcon,
-  UserCheck,
   Lock,
-  Home
+  RotateCcw
 } from 'lucide-react';
 
 const API_BASE = 'http://localhost:4000/api';
 
 export default function SkillBridgeApp() {
-  const [activeTab, setActiveTab] = useState<'home' | 'market' | 'curriculum' | 'assessment' | 'sandbox' | 'gaps' | 'actions' | 'jobs' | 'admin'>('home');
+  type AppTab = 'market' | 'curriculum' | 'assessment' | 'sandbox' | 'gaps' | 'actions' | 'jobs' | 'admin';
+  const [activeTab, setActiveTab] = useState<AppTab>('market');
+  const [publicView, setPublicView] = useState<'home' | 'market' | 'curriculum'>('home');
 
   // Auth state
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -79,100 +71,84 @@ export default function SkillBridgeApp() {
   const [authError, setAuthError] = useState('');
   const [isAuthLoading, setIsAuthLoading] = useState(false);
 
-  const activeUserId = currentUser?.id || 'demo_user_01';
-
-  // Attach the JWT to requests when present.
-  const authHeaders = (json = false): Record<string, string> => {
-    const headers: Record<string, string> = {};
-    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
-    if (json) headers['Content-Type'] = 'application/json';
-    return headers;
-  };
-
-  const activeRole = currentProfile?.targetRoleId || 'role_junior_backend';
-
-  const fetchJSON = async (path: string, init?: RequestInit) => {
-    const res = await fetch(`${API_BASE}${path}`,
-      init ? { ...init, headers: { ...authHeaders(Boolean(init.body)), ...(init.headers || {}) } } : { headers: authHeaders() }
-    );
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || 'Request failed.');
-    }
-    return data;
-  };
-
+  // Core domain data
   const [role, setRole] = useState<Role | null>(null);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [assessment, setAssessment] = useState<Assessment | null>(null);
-  const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
-  const [userAnswers, setUserAnswers] = useState<Record<string, string>>({});
-  const [attemptResult, setAttemptResult] = useState<AssessmentAttempt | null>(null);
-  const [detailedQuestions, setDetailedQuestions] = useState<any[]>([]);
-  const [gaps, setGaps] = useState<SkillGap[]>([]);
-  const [recommendations, setRecommendations] = useState<ActionRecommendation[]>([]);
-  const [jobMatches, setJobMatches] = useState<JobMatchResult[]>([]);
-  const [projects, setProjects] = useState<ProjectEvidence[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Sandbox states
   const [challenges, setChallenges] = useState<any[]>([]);
-  const [selectedChallengeIdx, setSelectedChallengeIdx] = useState(0);
-  const [sandboxCode, setSandboxCode] = useState<string>('');
-  const [sandboxResult, setSandboxResult] = useState<any | null>(null);
-  const [isExecutingSandbox, setIsExecutingSandbox] = useState(false);
-
-  // Curriculum states
   const [curricula, setCurricula] = useState<CurriculumProfile[]>([]);
   const [selectedCurriculumId, setSelectedCurriculumId] = useState<string>('curr_bsc_cse');
   const [curriculumAnalysis, setCurriculumAnalysis] = useState<CurriculumComparisonResult | null>(null);
 
-  // Project Submission Form states
+  // Candidate assessment session state
+  const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
+  const [userAnswers, setUserAnswers] = useState<Record<string, string>>({});
+  const [isSubmittingAssessment, setIsSubmittingAssessment] = useState(false);
+  const [attemptResult, setAttemptResult] = useState<AssessmentAttempt | null>(null);
+  const [timeRemaining, setTimeRemaining] = useState<number>(30 * 60);
+
+  // Sandbox runner state
+  const [selectedChallengeIdx, setSelectedChallengeIdx] = useState(0);
+  const [sandboxCode, setSandboxCode] = useState('');
+  const [isRunningSandbox, setIsRunningSandbox] = useState(false);
+  const [sandboxResult, setSandboxResult] = useState<any | null>(null);
+
+  // Candidate personalized data
+  const [gaps, setGaps] = useState<SkillGap[]>([]);
+  const [recommendations, setRecommendations] = useState<ActionRecommendation[]>([]);
+  const [jobMatches, setJobMatches] = useState<JobMatchResult[]>([]);
+  const [userProjects, setUserProjects] = useState<ProjectEvidence[]>([]);
+
+  // Project submission modal state
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [projectForm, setProjectForm] = useState({
     title: '',
     repoUrl: '',
     description: '',
-    primarySkills: ['Node.js', 'PostgreSQL', 'REST APIs', 'Docker']
+    declaredSkills: [] as string[]
   });
   const [isSubmittingProject, setIsSubmittingProject] = useState(false);
+  const [projectSuccessMsg, setProjectSuccessMsg] = useState('');
 
-  // Passport / Career Report states
+  // Skill passport state
   const [showPassportModal, setShowPassportModal] = useState(false);
   const [passportData, setPassportData] = useState<any | null>(null);
-  const [copiedMarkdown, setCopiedMarkdown] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
 
-  // Admin Console states
+  // Admin state
   const [adminOverview, setAdminOverview] = useState<any | null>(null);
-  const [selectedSkillForAlias, setSelectedSkillForAlias] = useState<string>('skill_postgresql');
-  const [newAliasInput, setNewAliasInput] = useState<string>('');
-  const [aliasFeedback, setAliasFeedback] = useState<string>('');
   const [editingSkillWeight, setEditingSkillWeight] = useState<{ skillId: string; roleWeight: number; marketDemandFrequency: number } | null>(null);
+  const [aliasForm, setAliasForm] = useState({ rawAlias: '', canonicalSkillId: '' });
   const [weightSaveSuccess, setWeightSaveSuccess] = useState(false);
+  const [aliasSaveSuccess, setAliasSaveSuccess] = useState(false);
 
-  // Fetch initial data from API
-  const refreshUserData = () => {
-    const uid = activeUserId;
-    const roleId = activeRole;
+  const activeUserId = currentUser ? currentUser.id : 'demo_user_01';
 
-    fetch(`${API_BASE}/me/gaps?userId=${uid}&roleId=${roleId}`, { headers: authHeaders() })
+  const authHeaders = () => {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+    return headers;
+  };
+
+  const refreshUserData = (userId = activeUserId) => {
+    fetch(`${API_BASE}/me/gaps?userId=${userId}&roleId=role_junior_backend`)
       .then(res => res.json())
-      .then(data => setGaps(data))
+      .then(data => { if (Array.isArray(data)) setGaps(data); })
       .catch(() => {});
 
-    fetch(`${API_BASE}/jobs/matches?userId=${uid}`, { headers: authHeaders() })
+    fetch(`${API_BASE}/me/recommendations?userId=${userId}&roleId=role_junior_backend`)
       .then(res => res.json())
-      .then(data => setJobMatches(data))
+      .then(data => { if (Array.isArray(data)) setRecommendations(data); })
       .catch(() => {});
 
-    fetch(`${API_BASE}/me/projects?userId=${uid}`, { headers: authHeaders() })
+    fetch(`${API_BASE}/jobs/matches?userId=${userId}&roleId=role_junior_backend`)
       .then(res => res.json())
-      .then(data => setProjects(data))
+      .then(data => { if (Array.isArray(data)) setJobMatches(data); })
       .catch(() => {});
 
-    fetch(`${API_BASE}/me/recommendations?userId=${uid}`, { headers: authHeaders() })
+    fetch(`${API_BASE}/me/projects?userId=${userId}`)
       .then(res => res.json())
-      .then(data => setRecommendations(data))
+      .then(data => setUserProjects(data))
       .catch(() => {});
 
     fetch(`${API_BASE}/admin/overview`)
@@ -230,7 +206,7 @@ export default function SkillBridgeApp() {
       .then(data => setCurriculumAnalysis(data))
       .catch(() => {});
 
-    // Restore a persisted session if present
+    // Restore saved session if available
     const savedToken = localStorage.getItem('skillbridge_token');
     const savedUser = localStorage.getItem('skillbridge_user');
     const savedProfile = localStorage.getItem('skillbridge_profile');
@@ -263,7 +239,8 @@ export default function SkillBridgeApp() {
         localStorage.setItem('skillbridge_user', JSON.stringify(data.user));
         localStorage.setItem('skillbridge_profile', JSON.stringify(data.profile));
         setShowAuthModal(false);
-        refreshUserData();
+        setActiveTab('market');
+        refreshUserData('demo_user_01');
       }
     } catch (err) {
       console.error(err);
@@ -311,7 +288,8 @@ export default function SkillBridgeApp() {
 
       setShowAuthModal(false);
       setAuthForm({ email: '', password: '', fullName: '', targetRoleId: 'role_junior_backend' });
-      refreshUserData();
+      setActiveTab('market');
+      refreshUserData(data.user.id);
     } catch (err: any) {
       setAuthError(err.message || 'An error occurred.');
     } finally {
@@ -326,7 +304,8 @@ export default function SkillBridgeApp() {
     setCurrentUser(null);
     setCurrentProfile(null);
     setAuthToken(null);
-    setActiveTab('home');
+    setPublicView('home');
+    setActiveTab('market');
   };
 
   const handleCurriculumChange = (currId: string) => {
@@ -353,63 +332,50 @@ export default function SkillBridgeApp() {
     }
   };
 
-  const handleCopyMarkdown = () => {
+  const handleCopyPassportMarkdown = () => {
     if (!passportData) return;
-    const md = `# SkillBridge Verified Talent Passport
-**Candidate**: ${passportData.candidate.name}
-**Target Role**: ${passportData.candidate.targetRole}
-**Passport ID**: \`${passportData.passportId}\`
-**Issued At**: ${new Date(passportData.issuedAt).toLocaleDateString()}
-**Alignment Index**: ${passportData.metrics.overallAlignment}%
-
-## Verified Evidence Breakdown
-${passportData.evidence.map((e: any) => `- **${e.skillName}**: ${Math.round(e.proficiencyScore * 100)}% (${e.sourceType}) [Confidence: ${e.confidence}]`).join('\n')}
-
-## Priority Action Items
-${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 'x' : ' '}] **${r.title}** (~${r.estimatedHours} hrs)`).join('\n')}
-`;
-    navigator.clipboard.writeText(md);
-    setCopiedMarkdown(true);
-    setTimeout(() => setCopiedMarkdown(false), 2500);
+    navigator.clipboard.writeText(passportData.markdown);
+    setCopySuccess(true);
+    setTimeout(() => setCopySuccess(false), 2500);
   };
 
-  const handleSelectAnswer = (questionId: string, option: string) => {
-    setUserAnswers(prev => ({ ...prev, [questionId]: option }));
+  const handleAnswerSelect = (questionId: string, optionId: string) => {
+    setUserAnswers(prev => ({ ...prev, [questionId]: optionId }));
   };
 
   const handleSubmitAssessment = async () => {
     if (!assessment) return;
-    setIsSubmitting(true);
+    setIsSubmittingAssessment(true);
 
-    const answersPayload = Object.entries(userAnswers).map(([qId, ans]) => ({
-      questionId: qId,
-      selectedAnswer: ans
+    const answersPayload = Object.entries(userAnswers).map(([questionId, selectedOptionId]) => ({
+      questionId,
+      selectedOptionId
     }));
 
     try {
       const res = await fetch(`${API_BASE}/assessments/${assessment.id}/submit`, {
         method: 'POST',
-        headers: authHeaders(true),
+        headers: authHeaders(),
         body: JSON.stringify({
           userId: activeUserId,
+          timeSpentSeconds: 1800 - timeRemaining,
           answers: answersPayload
         })
       });
-      const data = await res.json();
-      setAttemptResult(data.attempt);
-      setGaps(data.gaps || []);
-      setDetailedQuestions(data.detailedQuestions || []);
+
+      const attempt = await res.json();
+      setAttemptResult(attempt);
       refreshUserData();
     } catch (err) {
       console.error(err);
     } finally {
-      setIsSubmitting(false);
+      setIsSubmittingAssessment(false);
     }
   };
 
-  const handleSelectChallenge = (index: number) => {
-    setSelectedChallengeIdx(index);
-    setSandboxCode(challenges[index].starterCode);
+  const handleSelectChallenge = (idx: number) => {
+    setSelectedChallengeIdx(idx);
+    setSandboxCode(challenges[idx].starterCode);
     setSandboxResult(null);
   };
 
@@ -417,55 +383,63 @@ ${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 
     const challenge = challenges[selectedChallengeIdx];
     if (!challenge) return;
 
-    setIsExecutingSandbox(true);
+    setIsRunningSandbox(true);
+    setSandboxResult(null);
+
     const endpoint = challenge.type === 'SQL' ? `${API_BASE}/sandbox/run-sql` : `${API_BASE}/sandbox/run-code`;
     const payload = challenge.type === 'SQL'
-      ? { challengeId: challenge.id, query: sandboxCode, userId: activeUserId }
-      : { challengeId: challenge.id, code: sandboxCode, userId: activeUserId };
+      ? { challengeId: challenge.id, sqlQuery: sandboxCode, userId: activeUserId }
+      : { challengeId: challenge.id, userCode: sandboxCode, userId: activeUserId };
 
     try {
       const res = await fetch(endpoint, {
         method: 'POST',
-        headers: authHeaders(true),
+        headers: authHeaders(),
         body: JSON.stringify(payload)
       });
       const data = await res.json();
       setSandboxResult(data);
-
       if (data.passed) {
         refreshUserData();
       }
     } catch (err) {
       console.error(err);
-      setSandboxResult({ passed: false, message: 'Execution failed: Network error connecting to sandbox.' });
+      setSandboxResult({ passed: false, error: 'Failed to run code.' });
     } finally {
-      setIsExecutingSandbox(false);
+      setIsRunningSandbox(false);
     }
   };
 
-  const handleSubmitProject = async (e: React.FormEvent) => {
+  const handleProjectSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!projectForm.title || !projectForm.repoUrl) return;
 
     setIsSubmittingProject(true);
+    setProjectSuccessMsg('');
+
     try {
       const res = await fetch(`${API_BASE}/me/projects`, {
         method: 'POST',
-        headers: authHeaders(true),
+        headers: authHeaders(),
         body: JSON.stringify({
           userId: activeUserId,
-          ...projectForm
+          title: projectForm.title,
+          repoUrl: projectForm.repoUrl,
+          description: projectForm.description,
+          declaredSkills: projectForm.declaredSkills
         })
       });
+
       const data = await res.json();
-      setShowProjectModal(false);
-      setProjectForm({
-        title: '',
-        repoUrl: '',
-        description: '',
-        primarySkills: ['Node.js', 'PostgreSQL', 'REST APIs', 'Docker']
-      });
-      refreshUserData();
+      if (data.project) {
+        setProjectSuccessMsg(`Successfully verified ${data.project.title}! Detected stack: ${data.project.detectedStack.join(', ')}.`);
+        setProjectForm({ title: '', repoUrl: '', description: '', declaredSkills: [] });
+        refreshUserData();
+        setTimeout(() => {
+          setShowProjectModal(false);
+          setProjectSuccessMsg('');
+        }, 2500);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -473,34 +447,34 @@ ${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 
     }
   };
 
-  const handleAddAlias = async (e: React.FormEvent) => {
+  const handleCreateAlias = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newAliasInput.trim()) return;
+    if (!aliasForm.rawAlias || !aliasForm.canonicalSkillId) return;
 
     try {
-      const res = await fetch(`${API_BASE}/admin/skills/alias`, {
+      const res = await fetch(`${API_BASE}/admin/aliases`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          skillId: selectedSkillForAlias,
-          alias: newAliasInput.trim()
+          rawAlias: aliasForm.rawAlias,
+          canonicalSkillId: aliasForm.canonicalSkillId
         })
       });
       const data = await res.json();
       if (data.success) {
-        setAliasFeedback(`✓ Alias "${newAliasInput.trim()}" successfully mapped to ${selectedSkillForAlias}`);
-        setNewAliasInput('');
-        fetchRoleAndSkills();
+        setAliasSaveSuccess(true);
+        setAliasForm({ rawAlias: '', canonicalSkillId: '' });
         refreshUserData();
-        setTimeout(() => setAliasFeedback(''), 3500);
+        setTimeout(() => setAliasSaveSuccess(false), 3000);
       }
     } catch (err) {
       console.error(err);
     }
   };
 
-  const handleSaveRoleWeights = async () => {
-    if (!editingSkillWeight || !role) return;
+  const handleUpdateRoleWeight = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!role || !editingSkillWeight) return;
 
     try {
       const res = await fetch(`${API_BASE}/admin/roles/${role.id}/weights`, {
@@ -522,1255 +496,471 @@ ${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 
 
   const activeChallenge = challenges[selectedChallengeIdx];
 
-  const AuthGate = ({ featureName, description }: { featureName: string; description: string }) => (
-    <div className="card" style={{ textAlign: 'center', padding: '4rem 2rem', margin: '2rem 0', background: 'linear-gradient(180deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%)', border: '1px solid rgba(99, 102, 241, 0.3)' }}>
-      <div style={{ width: '68px', height: '68px', borderRadius: '50%', background: 'rgba(99, 102, 241, 0.15)', border: '1px solid rgba(99, 102, 241, 0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem', color: '#818cf8' }}>
-        <Lock size={32} />
-      </div>
-      <div className="badge badge-accent" style={{ marginBottom: '1rem', background: 'rgba(99, 102, 241, 0.15)', color: '#a5b4fc' }}>
-        AUTHENTICATION REQUIRED
-      </div>
-      <h2 style={{ fontSize: '1.85rem', fontWeight: 800, marginBottom: '0.75rem', color: '#f8fafc' }}>
-        Sign In to Access {featureName}
-      </h2>
-      <p style={{ color: 'var(--text-secondary)', maxWidth: '580px', margin: '0 auto 2rem', lineHeight: 1.6, fontSize: '1rem' }}>
-        {description}
-      </p>
-      <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-        <button className="btn btn-primary" onClick={() => { setAuthMode('LOGIN'); setShowAuthModal(true); }}>
-          <LogIn size={16} /> Sign In
-        </button>
-        <button className="btn btn-secondary" onClick={() => { setAuthMode('REGISTER'); setShowAuthModal(true); }}>
-          <UserPlus size={16} /> Create Free Account
-        </button>
-        <button
-          className="btn btn-secondary"
-          onClick={handleDemoLogin}
-          style={{ borderColor: 'rgba(168, 85, 247, 0.4)', color: '#c084fc', background: 'rgba(168, 85, 247, 0.1)' }}
-        >
-          <Sparkles size={16} /> Continue as Demo Candidate (1-Click)
-        </button>
-      </div>
-    </div>
-  );
+  // ==========================================
+  // VIEW RENDERERS
+  // ==========================================
 
-  return (
-    <div>
-      {/* Top Navbar */}
-      <header className="navbar">
-        <div className="container nav-container">
-          <a href="#" className="brand" onClick={(e) => { e.preventDefault(); setActiveTab('home'); }}>
-            <span className="brand-badge">PROTOTYPE</span>
-            <span>SkillBridge</span>
-          </a>
-
-          <nav className="nav-tabs">
-            <button
-              className={`nav-tab-btn ${activeTab === 'home' ? 'active' : ''}`}
-              onClick={() => setActiveTab('home')}
-            >
-              <Home size={16} /> Home
-            </button>
-            <button
-              className={`nav-tab-btn ${activeTab === 'market' ? 'active' : ''}`}
-              onClick={() => setActiveTab('market')}
-            >
-              <TrendingUp size={16} /> Market Demand
-            </button>
-            <button
-              className={`nav-tab-btn ${activeTab === 'curriculum' ? 'active' : ''}`}
-              onClick={() => setActiveTab('curriculum')}
-            >
-              <GraduationCap size={16} /> Curriculum Gap
-            </button>
-            <button
-              className={`nav-tab-btn ${activeTab === 'assessment' ? 'active' : ''}`}
-              onClick={() => setActiveTab('assessment')}
-            >
-              <BrainCircuit size={16} /> Diagnostic Test
-              {!currentUser && <Lock size={11} style={{ opacity: 0.5, marginLeft: '0.2rem' }} />}
-            </button>
-            <button
-              className={`nav-tab-btn ${activeTab === 'sandbox' ? 'active' : ''}`}
-              onClick={() => setActiveTab('sandbox')}
-            >
-              <Code2 size={16} /> Code & SQL Sandbox
-              {!currentUser && <Lock size={11} style={{ opacity: 0.5, marginLeft: '0.2rem' }} />}
-            </button>
-            <button
-              className={`nav-tab-btn ${activeTab === 'gaps' ? 'active' : ''}`}
-              onClick={() => setActiveTab('gaps')}
-            >
-              <BarChart3 size={16} /> Gap Engine
-              {!currentUser && <Lock size={11} style={{ opacity: 0.5, marginLeft: '0.2rem' }} />}
-            </button>
-            <button
-              className={`nav-tab-btn ${activeTab === 'actions' ? 'active' : ''}`}
-              onClick={() => setActiveTab('actions')}
-            >
-              <Rocket size={16} /> Action Plan
-              {!currentUser && <Lock size={11} style={{ opacity: 0.5, marginLeft: '0.2rem' }} />}
-            </button>
-            <button
-              className={`nav-tab-btn ${activeTab === 'jobs' ? 'active' : ''}`}
-              onClick={() => setActiveTab('jobs')}
-            >
-              <Briefcase size={16} /> Job Match
-              {!currentUser && <Lock size={11} style={{ opacity: 0.5, marginLeft: '0.2rem' }} />}
-            </button>
-            <button
-              className={`nav-tab-btn ${activeTab === 'admin' ? 'active' : ''}`}
-              onClick={() => setActiveTab('admin')}
-            >
-              <Sliders size={16} /> Admin & Research
-              {!currentUser && <Lock size={11} style={{ opacity: 0.5, marginLeft: '0.2rem' }} />}
-            </button>
-          </nav>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-            {currentUser ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column' }}>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#f8fafc' }}>
-                    {currentProfile?.fullName || currentUser.email.split('@')[0]}
-                  </span>
-                  <span style={{ fontSize: '0.7rem', color: '#a5b4fc', fontFamily: 'var(--font-mono)' }}>
-                    {currentUser.email === 'candidate@skillbridge.org' ? 'Demo Candidate' : 'Signed in'}
-                  </span>
-                </div>
-                <button
-                  className="btn btn-secondary"
-                  onClick={handleLogout}
-                  title="Sign Out"
-                  style={{ padding: '0.4rem 0.6rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-                >
-                  <LogOut size={14} /> Sign Out
-                </button>
-              </div>
-            ) : (
-              <button
-                className="btn btn-primary"
-                onClick={() => { setAuthMode('LOGIN'); setShowAuthModal(true); }}
-                style={{ fontSize: '0.85rem', padding: '0.45rem 0.85rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-              >
-                <LogIn size={14} /> Sign In
-              </button>
-            )}
-
-            <button className="btn btn-secondary" onClick={handleOpenPassport} style={{ fontSize: '0.85rem', padding: '0.45rem 0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <FileText size={15} color="#818cf8" /> Skill Passport
-              {!currentUser && <Lock size={11} style={{ opacity: 0.5 }} />}
-            </button>
+  const renderMarketView = () => {
+    if (!role) return null;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">Junior Backend Job Market Demand</h1>
+            <p className="page-subtitle">
+              Empirical data from 142 junior backend job postings in Bangladesh (Dhaka, Chittagong, and remote positions).
+            </p>
           </div>
         </div>
-      </header>
 
-      {/* Main Content Area */}
-      <div className="container" style={{ paddingBottom: '5rem' }}>
-        {/* Hero Header for Non-Home Tabs */}
-        {activeTab !== 'home' && (
-          <section className="hero">
-            <div className="hero-pill">
-              <ShieldCheck size={14} /> Evidence-Based Labor Market Intelligence
-            </div>
-            <h1 className="hero-title">
-              Target Role: <span className="hero-gradient">{role?.title || 'Junior Backend Engineer'}</span>
-            </h1>
-            <p className="hero-subtitle">
-              Curated market requirements for Bangladesh & emerging hubs. Compare your verified diagnostic evidence against industry demand.
-            </p>
-          </section>
-        )}
-
-        {/* TAB 0: HOME / LANDING PAGE */}
-        {activeTab === 'home' && (
-          <div className="home-container">
-            {/* Hero Section */}
-            <section className="hero-section">
-              <div className="hero-badge">
-                <Sparkles size={14} /> Evidence-Based Labor Market Intelligence v2.0
-              </div>
-              <h1 className="hero-title">
-                Bridge the Gap Between Your Skills and Real Industry Demand
-              </h1>
-              <p className="hero-subtitle">
-                SkillBridge replaces arbitrary self-assessments with empirical labor market frequencies, practical SQL & coding execution sandboxes, and deterministic mathematical gap rankings.
-              </p>
-
-              <div className="hero-actions">
-                {currentUser ? (
-                  <button className="btn btn-primary" onClick={() => setActiveTab('assessment')}>
-                    <BrainCircuit size={18} /> Take Practical Diagnostic
-                  </button>
-                ) : (
-                  <button className="btn btn-primary" onClick={() => { setAuthMode('REGISTER'); setShowAuthModal(true); }}>
-                    <Rocket size={18} /> Get Started Free
-                  </button>
-                )}
-                <button className="btn btn-secondary" onClick={() => setActiveTab('market')}>
-                  <TrendingUp size={18} /> Explore Market Demand
-                </button>
-                <button className="btn btn-secondary" onClick={() => setActiveTab('curriculum')}>
-                  <GraduationCap size={18} /> Academic vs Market Gap
-                </button>
-                {!currentUser && (
-                  <button className="btn btn-secondary" onClick={handleDemoLogin} style={{ borderColor: 'rgba(168, 85, 247, 0.4)', color: '#c084fc', background: 'rgba(168, 85, 247, 0.08)' }}>
-                    <Sparkles size={16} /> 1-Click Demo Access
-                  </button>
-                )}
-              </div>
-
-              {/* Hero Stats */}
-              <div className="hero-stats-grid">
-                <div className="hero-stat-card">
-                  <div className="stat-number">142</div>
-                  <div className="stat-label">Active Job Postings Analyzed</div>
-                  <div className="stat-sub">Strict sample-size attribution (N=142)</div>
-                </div>
-                <div className="hero-stat-card">
-                  <div className="stat-number">9</div>
-                  <div className="stat-label">Canonical Skills Tracked</div>
-                  <div className="stat-sub">Ontology-mapped with synonym aliases</div>
-                </div>
-                <div className="hero-stat-card">
-                  <div className="stat-number">100%</div>
-                  <div className="stat-label">Practical Evidence Verified</div>
-                  <div className="stat-sub">Live SQL & async logic execution</div>
-                </div>
-                <div className="hero-stat-card">
-                  <div className="stat-number">W × D × (1 - P)</div>
-                  <div className="stat-label">Deterministic Gap Formula</div>
-                  <div className="stat-sub">Transparent mathematical prioritization</div>
-                </div>
-              </div>
-            </section>
-
-            {/* 4-Step Architecture Pipeline */}
-            <section className="pipeline-section">
-              <h2 className="section-heading">How SkillBridge Works</h2>
-              <p className="section-subheading">A closed-loop evidence pipeline designed for early-career software engineers</p>
-
-              <div className="pipeline-grid">
-                <div className="pipeline-card">
-                  <div className="pipeline-step-badge">01</div>
-                  <div className="pipeline-icon" style={{ color: '#38bdf8' }}><TrendingUp size={28} /></div>
-                  <h3>Market Demand Ingestion</h3>
-                  <p>We analyze real job postings to measure empirical demand frequencies and role requirements with sample-attributed confidence.</p>
-                  <button className="card-link-btn" onClick={() => setActiveTab('market')}>View Market Data &rarr;</button>
-                </div>
-
-                <div className="pipeline-card">
-                  <div className="pipeline-step-badge">02</div>
-                  <div className="pipeline-icon" style={{ color: '#a855f7' }}><BrainCircuit size={28} /></div>
-                  <h3>Practical Diagnostic Sandbox</h3>
-                  <p>Complete multi-tier evaluations including SQL relational queries, JavaScript concurrency limits, and sub-skill diagnostics.</p>
-                  <button className="card-link-btn" onClick={() => { if (currentUser) setActiveTab('assessment'); else { setAuthMode('LOGIN'); setShowAuthModal(true); } }}>Test Capabilities &rarr;</button>
-                </div>
-
-                <div className="pipeline-card">
-                  <div className="pipeline-step-badge">03</div>
-                  <div className="pipeline-icon" style={{ color: '#f59e0b' }}><BarChart3 size={28} /></div>
-                  <h3>Deterministic Gap Ranking</h3>
-                  <p>Mathematical formula weighs role importance and market scarcity against verified competency to prioritize high-leverage gaps.</p>
-                  <button className="card-link-btn" onClick={() => { if (currentUser) setActiveTab('gaps'); else { setAuthMode('LOGIN'); setShowAuthModal(true); } }}>View Gaps &rarr;</button>
-                </div>
-
-                <div className="pipeline-card">
-                  <div className="pipeline-step-badge">04</div>
-                  <div className="pipeline-icon" style={{ color: '#22c55e' }}><ShieldCheck size={28} /></div>
-                  <h3>Verified Talent Passport</h3>
-                  <p>Cryptographically signed talent passport displaying verified execution badges, GitHub capstone signals, and explainable job matches.</p>
-                  <button className="card-link-btn" onClick={() => { if (currentUser) handleOpenPassport(); else { setAuthMode('LOGIN'); setShowAuthModal(true); } }}>View Passport &rarr;</button>
-                </div>
-              </div>
-            </section>
-
-            {/* Feature Comparison / Highlights */}
-            <section className="features-preview-section">
-              <div className="feature-highlight-card">
-                <div>
-                  <span className="badge badge-preferred" style={{ marginBottom: '0.75rem' }}>RESEARCH INTELLIGENCE</span>
-                  <h3>Academic Curriculum vs. Industry Demand Gap</h3>
-                  <p style={{ marginTop: '0.5rem' }}>
-                    Universities often emphasize theoretical automata and compilers while under-indexing on production REST architecture, Docker containerization, and ORM performance. Our analyzer benchmarks academic syllabi directly against market requirements.
-                  </p>
-                </div>
-                <button className="btn btn-secondary" onClick={() => setActiveTab('curriculum')} style={{ marginTop: '1.25rem', alignSelf: 'flex-start' }}>
-                  <GraduationCap size={16} /> Open Curriculum Analyzer
-                </button>
-              </div>
-
-              <div className="feature-highlight-card">
-                <div>
-                  <span className="badge badge-strength" style={{ marginBottom: '0.75rem' }}>PRACTICAL VALIDATION</span>
-                  <h3>In-Memory Execution Sandboxes</h3>
-                  <p style={{ marginTop: '0.5rem' }}>
-                    Forget standard multiple-choice guessing. SkillBridge features an interactive SQL sandbox running against live relational test tables and an async execution worker for concurrency limit verification.
-                  </p>
-                </div>
-                <button className="btn btn-secondary" onClick={() => { if (currentUser) setActiveTab('sandbox'); else { setAuthMode('LOGIN'); setShowAuthModal(true); } }} style={{ marginTop: '1.25rem', alignSelf: 'flex-start' }}>
-                  <Code2 size={16} /> Try Execution Sandbox
-                </button>
-              </div>
-            </section>
-
-            {/* Call to Action Bar */}
-            <section className="cta-banner">
-              <h2>Ready to Benchmark Your Engineering Competencies?</h2>
-              <p>Sign in to test your skills, receive personalized project roadmaps, and generate your printable Skill Passport.</p>
-              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '1.5rem', flexWrap: 'wrap' }}>
-                {!currentUser ? (
-                  <>
-                    <button className="btn btn-primary" onClick={() => { setAuthMode('REGISTER'); setShowAuthModal(true); }}>
-                      <UserPlus size={18} /> Create Free Account
-                    </button>
-                    <button className="btn btn-secondary" onClick={() => { setAuthMode('LOGIN'); setShowAuthModal(true); }}>
-                      <LogIn size={18} /> Sign In
-                    </button>
-                    <button className="btn btn-secondary" onClick={handleDemoLogin} style={{ borderColor: 'var(--accent-purple)', color: '#c084fc' }}>
-                      <Sparkles size={18} /> Continue as Demo Candidate
-                    </button>
-                  </>
-                ) : (
-                  <button className="btn btn-primary" onClick={() => setActiveTab('assessment')}>
-                    <BrainCircuit size={18} /> Open Diagnostic Center
-                  </button>
-                )}
-              </div>
-            </section>
+        <div className="stat-grid-3">
+          <div className="stat-card">
+            <div className="stat-label">Focus Region</div>
+            <div className="stat-value" style={{ fontSize: '1.3rem' }}>{role.marketContext.region}</div>
+            <div className="stat-sub">Dhaka & Regional Tech Hubs</div>
           </div>
-        )}
-
-        {/* TAB 1: MARKET DEMAND EXPLORER */}
-        {activeTab === 'market' && role && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            <div className="grid-3">
-              <div className="stat-box">
-                <div className="stat-label">Focus Region</div>
-                <div className="stat-value" style={{ fontSize: '1.25rem', marginTop: '0.25rem' }}>
-                  {role.marketContext.region}
-                </div>
-              </div>
-              <div className="stat-box">
-                <div className="stat-label">Experience Tier</div>
-                <div className="stat-value" style={{ fontSize: '1.25rem', marginTop: '0.25rem' }}>
-                  {role.marketContext.experienceLevel}
-                </div>
-              </div>
-              <div className="stat-box">
-                <div className="stat-label">Curated Sample Provenance</div>
-                <div className="stat-value" style={{ fontSize: '1.25rem', marginTop: '0.25rem', color: 'var(--accent-cyan)' }}>
-                  N = 142 Postings
-                </div>
-              </div>
-            </div>
-
-            <div className="card">
-              <div className="card-header">
-                <div>
-                  <h2 className="card-title">Skill Demand Distribution</h2>
-                  <p className="card-subtitle">
-                    Frequency of technologies required or preferred in Junior Backend job listings.
-                  </p>
-                </div>
-                <button className="btn btn-primary" onClick={() => setActiveTab('assessment')}>
-                  Test Your Skills <ArrowRight size={16} />
-                </button>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1rem' }}>
-                {role.roleSkills.map(rs => {
-                  const pct = Math.round(rs.marketDemandFrequency * 100);
-                  const isRequired = rs.required;
-                  return (
-                    <div key={rs.skillId} style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                          <span style={{ fontWeight: 600, fontSize: '1rem' }}>
-                            {rs.skill?.canonicalName || rs.skillId}
-                          </span>
-                          <span className={`badge ${isRequired ? 'badge-required' : 'badge-preferred'}`}>
-                            {isRequired ? 'Required' : 'Preferred'}
-                          </span>
-                        </div>
-                        <div style={{ fontWeight: 700, fontFamily: 'var(--font-mono)', color: isRequired ? '#a5b4fc' : '#67e8f9' }}>
-                          {pct}% of jobs
-                        </div>
-                      </div>
-
-                      <div className="progress-container">
-                        <div
-                          className={`progress-bar ${isRequired ? 'progress-indigo' : 'progress-cyan'}`}
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.35rem' }}>
-                        Target Proficiency: <strong>{rs.proficiencyTarget}</strong> • Role Weight: <strong>{rs.roleWeight * 100}%</strong>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+          <div className="stat-card">
+            <div className="stat-label">Experience Tier</div>
+            <div className="stat-value" style={{ fontSize: '1.3rem' }}>{role.marketContext.experienceLevel}</div>
+            <div className="stat-sub">0 - 2 Years Experience</div>
           </div>
-        )}
-
-        {/* TAB 2: CURRICULUM VS MARKET GAP ANALYZER */}
-        {activeTab === 'curriculum' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            <div className="card" style={{ background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(168, 85, 247, 0.05))' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                <GraduationCap size={22} color="#c084fc" />
-                <h2 className="card-title">Curriculum vs. Labor Market Intelligence</h2>
-              </div>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                Analyze the gap between university/bootcamp computer science syllabus and real-world backend engineering expectations.
-              </p>
-            </div>
-
-            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-              {curricula.map(c => (
-                <button
-                  key={c.id}
-                  className={`btn ${selectedCurriculumId === c.id ? 'btn-primary' : 'btn-secondary'}`}
-                  onClick={() => handleCurriculumChange(c.id)}
-                  style={{ fontSize: '0.85rem' }}
-                >
-                  <BookOpen size={14} /> {c.institutionName}
-                </button>
-              ))}
-            </div>
-
-            {curriculumAnalysis && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                <div className="grid-3">
-                  <div className="stat-box">
-                    <div className="stat-label">Syllabus Alignment Score</div>
-                    <div className="stat-value" style={{ color: curriculumAnalysis.marketAlignmentScore >= 65 ? '#6ee7b7' : '#fcd34d' }}>
-                      {curriculumAnalysis.marketAlignmentScore}%
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                      vs. Junior Backend Job Demand
-                    </div>
-                  </div>
-                  <div className="stat-box" style={{ gridColumn: 'span 2' }}>
-                    <div className="stat-label">Intelligence Summary</div>
-                    <p style={{ fontSize: '0.875rem', color: '#e2e8f0', marginTop: '0.25rem' }}>
-                      {curriculumAnalysis.summaryAnalysis}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid-2">
-                  <div className="card">
-                    <h3 className="card-title" style={{ color: '#6ee7b7', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-                      <CheckCircle2 size={18} /> Strong Academic Foundation
-                    </h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                      {curriculumAnalysis.strongAcademicAreas.map((item, idx) => (
-                        <div key={idx} style={{ background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.2)', padding: '0.85rem', borderRadius: '8px' }}>
-                          <strong style={{ color: '#a7f3d0', fontSize: '0.95rem' }}>{item.skill}</strong>
-                          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
-                            {item.reason}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="card">
-                    <h3 className="card-title" style={{ color: '#fda4af', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-                      <AlertCircle size={18} /> Missing Industry Requirements
-                    </h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                      {curriculumAnalysis.criticalMarketOmissions.map((item, idx) => (
-                        <div key={idx} style={{ background: 'rgba(244, 63, 94, 0.05)', border: '1px solid rgba(244, 63, 94, 0.2)', padding: '0.85rem', borderRadius: '8px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <strong style={{ color: '#fecdd3', fontSize: '0.95rem' }}>{item.skill}</strong>
-                            <span className="badge badge-critical" style={{ fontSize: '0.7rem' }}>
-                              Demanded by {item.marketDemand}% of Jobs
-                            </span>
-                          </div>
-                          <div style={{ fontSize: '0.75rem', color: '#fb7185', fontWeight: 600, marginTop: '0.2rem' }}>
-                            Academic Status: {item.academicStatus}
-                          </div>
-                          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.35rem' }}>
-                            Bridge Action: {item.recommendation}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+          <div className="stat-card">
+            <div className="stat-label">Sample Size</div>
+            <div className="stat-value" style={{ fontSize: '1.3rem', color: '#60a5fa' }}>N = 142 Postings</div>
+            <div className="stat-sub">Bdjobs, LinkedIn & GitHub</div>
           </div>
-        )}
+        </div>
 
-        {/* TAB 3: PRACTICAL DIAGNOSTIC ASSESSMENT */}
-        {activeTab === 'assessment' && (
-          !currentUser ? (
-            <AuthGate
-              featureName="Practical Diagnostic Assessment"
-              description="Benchmark your backend competencies through 6 multi-part diagnostic challenges with automated sub-skill scoring across HTTP architecture, SQL queries, and Node.js event-loop logic."
-            />
-          ) : assessment && (
+        <div className="card">
+          <div className="card-header">
             <div>
-            {!attemptResult ? (
-              <div className="card">
-                <div className="card-header">
-                  <div>
-                    <span className="badge badge-preferred" style={{ marginBottom: '0.5rem' }}>
-                      Diagnostic Assessment V1
-                    </span>
-                    <h2 className="card-title">{assessment.title}</h2>
-                    <p className="card-subtitle">{assessment.description}</p>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#fbbf24', fontSize: '0.9rem', fontWeight: 600 }}>
-                    <Clock size={16} /> {assessment.timeLimitMinutes} mins
-                  </div>
-                </div>
-
-                {assessment.questions && assessment.questions.length > 0 && (
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
-                      <span>Question {currentQuestionIdx + 1} of {assessment.questions.length}</span>
-                      <span>Sub-Skill: <strong>{assessment.questions[currentQuestionIdx].subSkill}</strong></span>
-                    </div>
-
-                    <div className="progress-container" style={{ marginBottom: '1.5rem' }}>
-                      <div
-                        className="progress-bar progress-emerald"
-                        style={{ width: `${((currentQuestionIdx + 1) / assessment.questions.length) * 100}%` }}
-                      />
-                    </div>
-
-                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                      <h3 style={{ fontSize: '1.05rem', fontWeight: 600, marginBottom: '0.75rem' }}>
-                        {assessment.questions[currentQuestionIdx].prompt}
-                      </h3>
-
-                      {assessment.questions[currentQuestionIdx].codeSnippet && (
-                        <pre className="code-block">
-                          <code>{assessment.questions[currentQuestionIdx].codeSnippet}</code>
-                        </pre>
-                      )}
-
-                      <div style={{ marginTop: '1.25rem' }}>
-                        {assessment.questions[currentQuestionIdx].options?.map((opt, i) => {
-                          const isSelected = userAnswers[assessment.questions![currentQuestionIdx].id] === opt;
-                          return (
-                            <button
-                              key={i}
-                              className={`option-btn ${isSelected ? 'selected' : ''}`}
-                              onClick={() => handleSelectAnswer(assessment.questions![currentQuestionIdx].id, opt)}
-                            >
-                              <span>{opt}</span>
-                              {isSelected && <CheckCircle2 size={16} color="#818cf8" />}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1.5rem' }}>
-                      <button
-                        className="btn btn-secondary"
-                        disabled={currentQuestionIdx === 0}
-                        onClick={() => setCurrentQuestionIdx(prev => Math.max(prev - 1, 0))}
-                      >
-                        Previous
-                      </button>
-
-                      {currentQuestionIdx < assessment.questions.length - 1 ? (
-                        <button
-                          className="btn btn-primary"
-                          onClick={() => setCurrentQuestionIdx(prev => prev + 1)}
-                        >
-                          Next Question <ChevronRight size={16} />
-                        </button>
-                      ) : (
-                        <button
-                          className="btn btn-primary"
-                          disabled={isSubmitting}
-                          onClick={handleSubmitAssessment}
-                          style={{ background: 'var(--accent-emerald)' }}
-                        >
-                          {isSubmitting ? 'Evaluating...' : 'Submit & Analyze Gaps'} <CheckCircle2 size={16} />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                <div className="card" style={{ textAlign: 'center', padding: '2.5rem' }}>
-                  <div style={{
-                    width: '80px',
-                    height: '80px',
-                    borderRadius: '50%',
-                    background: attemptResult.passed ? 'rgba(16, 185, 129, 0.15)' : 'rgba(244, 63, 94, 0.15)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    margin: '0 auto 1.25rem auto',
-                    border: `2px solid ${attemptResult.passed ? 'var(--accent-emerald)' : 'var(--accent-rose)'}`
-                  }}>
-                    <span style={{ fontSize: '1.75rem', fontWeight: 800, fontFamily: 'var(--font-mono)' }}>
-                      {attemptResult.score}%
-                    </span>
-                  </div>
-
-                  <h2 style={{ fontSize: '1.5rem', fontWeight: 700 }}>
-                    {attemptResult.passed ? 'Diagnostic Benchmark Achieved' : 'Diagnostic Completed — Areas Identified'}
-                  </h2>
-                  <p style={{ color: 'var(--text-secondary)', maxWidth: '600px', margin: '0.5rem auto 1.5rem auto' }}>
-                    Earned {attemptResult.totalPointsEarned} / {attemptResult.maxPoints} points across practical questions. Your verified evidence profile has been updated.
-                  </p>
-
-                  <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem' }}>
-                    <button className="btn btn-primary" onClick={() => setActiveTab('gaps')}>
-                      View Priority Gaps <BarChart3 size={16} />
-                    </button>
-                    <button className="btn btn-secondary" onClick={() => { setAttemptResult(null); setCurrentQuestionIdx(0); setUserAnswers({}); }}>
-                      Retake Test
-                    </button>
-                  </div>
-                </div>
-
-                <div className="card">
-                  <h3 className="card-title" style={{ marginBottom: '1rem' }}>Sub-Skill Diagnostic Breakdown</h3>
-                  <div className="grid-2">
-                    {attemptResult.subSkillScores?.map((sub, i) => (
-                      <div key={i} style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontWeight: 600 }}>{sub.subSkill}</span>
-                          <span className={`badge ${sub.status === 'STRENGTH' ? 'badge-strength' : sub.status === 'MODERATE' ? 'badge-gap' : 'badge-critical'}`}>
-                            {sub.status === 'STRENGTH' ? 'Strength' : sub.status === 'MODERATE' ? 'Moderate' : 'Needs Practice'}
-                          </span>
-                        </div>
-                        <div className="progress-container">
-                          <div
-                            className={`progress-bar ${sub.status === 'STRENGTH' ? 'progress-emerald' : sub.status === 'MODERATE' ? 'progress-amber' : 'progress-rose'}`}
-                            style={{ width: `${sub.percentage}%` }}
-                          />
-                        </div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                          {sub.earnedPoints} / {sub.totalPoints} points ({sub.percentage}%)
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )
-      )}
-
-        {/* TAB 4: CODE & SQL SANDBOX RUNNER */}
-        {activeTab === 'sandbox' && (
-          !currentUser ? (
-            <AuthGate
-              featureName="Interactive Code & SQL Sandbox Runner"
-              description="Write and execute live SQL queries and async JavaScript concurrency processors against automated evaluation suites to earn verified credentials."
-            />
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            <div className="card" style={{ background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(16, 185, 129, 0.05))' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                <Terminal size={20} color="#6ee7b7" />
-                <h2 className="card-title">Interactive Practical Execution Sandbox</h2>
-              </div>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                Solve real engineering queries and algorithmic problems against test datasets. Passing hands-on challenges elevates your skill evidence to <strong style={{ color: '#6ee7b7' }}>Verified (High Confidence)</strong>.
+              <h2 className="card-title">Required Backend Technologies by Frequency</h2>
+              <p className="card-subtitle">
+                How frequently each technology appears in actual job requirements for junior backend roles.
               </p>
             </div>
-
-            <div style={{ display: 'flex', gap: '0.75rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
-              {challenges.map((ch, idx) => (
-                <button
-                  key={ch.id}
-                  className={`btn ${selectedChallengeIdx === idx ? 'btn-primary' : 'btn-secondary'}`}
-                  onClick={() => handleSelectChallenge(idx)}
-                  style={{ whiteSpace: 'nowrap', fontSize: '0.85rem' }}
-                >
-                  {ch.type === 'SQL' ? <Database size={14} /> : <Code2 size={14} />}
-                  {ch.title}
-                </button>
-              ))}
-            </div>
-
-            {activeChallenge && (
-              <div className="grid-2">
-                <div className="card">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                    <span className="badge badge-preferred">{activeChallenge.type} Challenge</span>
-                    <span style={{ fontSize: '0.8rem', color: '#fbbf24', fontWeight: 600 }}>
-                      Difficulty: {activeChallenge.difficulty}
-                    </span>
-                  </div>
-
-                  <h3 style={{ fontSize: '1.15rem', fontWeight: 700, marginBottom: '0.5rem' }}>
-                    {activeChallenge.title}
-                  </h3>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1rem' }}>
-                    {activeChallenge.description}
-                  </p>
-
-                  {activeChallenge.schemaPreview && (
-                    <div style={{ marginTop: '1rem' }}>
-                      <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
-                        Database Schema
-                      </div>
-                      <pre className="code-block" style={{ fontSize: '0.8rem' }}>
-                        <code>{activeChallenge.schemaPreview}</code>
-                      </pre>
-                    </div>
-                  )}
-
-                  {activeChallenge.sampleDataDescription && (
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
-                      ℹ️ {activeChallenge.sampleDataDescription}
-                    </p>
-                  )}
-                </div>
-
-                <div className="card" style={{ display: 'flex', flexDirection: 'column' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                      Solution Editor ({activeChallenge.type})
-                    </span>
-                    <button
-                      className="btn btn-primary"
-                      disabled={isExecutingSandbox}
-                      onClick={handleRunSandbox}
-                      style={{ padding: '0.45rem 1rem', fontSize: '0.85rem', background: 'var(--accent-emerald)' }}
-                    >
-                      <Play size={14} /> {isExecutingSandbox ? 'Executing...' : 'Run & Verify'}
-                    </button>
-                  </div>
-
-                  <textarea
-                    value={sandboxCode}
-                    onChange={(e) => setSandboxCode(e.target.value)}
-                    style={{
-                      width: '100%',
-                      height: '240px',
-                      background: '#070b14',
-                      color: '#38bdf8',
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: '0.85rem',
-                      padding: '1rem',
-                      borderRadius: '8px',
-                      border: '1px solid var(--border-color)',
-                      resize: 'vertical',
-                      outline: 'none',
-                      lineHeight: '1.5'
-                    }}
-                  />
-
-                  {sandboxResult && (
-                    <div style={{ marginTop: '1rem', padding: '1rem', borderRadius: '8px', background: sandboxResult.passed ? 'rgba(16, 185, 129, 0.1)' : 'rgba(244, 63, 94, 0.1)', border: `1px solid ${sandboxResult.passed ? 'var(--accent-emerald)' : 'var(--accent-rose)'}` }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                        <span style={{ fontWeight: 700, color: sandboxResult.passed ? '#6ee7b7' : '#fda4af', fontSize: '0.9rem' }}>
-                          {sandboxResult.passed ? '✓ Tests Passed' : '✗ Tests Failed'}
-                        </span>
-                        <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>
-                          {sandboxResult.executionTimeMs}ms execution time
-                        </span>
-                      </div>
-
-                      <p style={{ fontSize: '0.85rem', color: '#e2e8f0', marginBottom: sandboxResult.outputRows ? '0.75rem' : 0 }}>
-                        {sandboxResult.message}
-                      </p>
-
-                      {sandboxResult.outputRows && (
-                        <div style={{ overflowX: 'auto', marginTop: '0.5rem' }}>
-                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', fontFamily: 'var(--font-mono)' }}>
-                            <thead>
-                              <tr style={{ background: 'rgba(255,255,255,0.05)', borderBottom: '1px solid var(--border-color)' }}>
-                                {Object.keys(sandboxResult.outputRows[0] || {}).map(k => (
-                                  <th key={k} style={{ padding: '0.4rem', textAlign: 'left', color: '#a5b4fc' }}>{k}</th>
-                                ))}
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {sandboxResult.outputRows.map((row: any, rIdx: number) => (
-                                <tr key={rIdx} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                                  {Object.values(row).map((val: any, cIdx: number) => (
-                                    <td key={cIdx} style={{ padding: '0.4rem' }}>{String(val)}</td>
-                                  ))}
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-
-                      {sandboxResult.testResults && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '0.5rem' }}>
-                          {sandboxResult.testResults.map((t: any, idx: number) => (
-                            <div key={idx} style={{ fontSize: '0.8rem', color: t.passed ? '#6ee7b7' : '#fda4af' }}>
-                              {t.passed ? '✓' : '✗'} {t.testName}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
+            {currentUser && (
+              <button className="btn btn-primary" onClick={() => setActiveTab('assessment')}>
+                Take Diagnostic Test <ArrowRight size={15} />
+              </button>
             )}
           </div>
-        )
-      )}
 
-        {/* TAB 5: SKILL GAP ENGINE */}
-        {activeTab === 'gaps' && (
-          !currentUser ? (
-            <AuthGate
-              featureName="Deterministic Skill Gap Engine"
-              description="Calculate your mathematical gap priority across canonical backend skills using transparent market weighting: Priority = Role Weight × Market Demand × (1 - Demonstrated Proficiency)."
-            />
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            <div className="card" style={{ background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(6, 182, 212, 0.05))' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                <Sparkles size={20} color="#a5b4fc" />
-                <h2 className="card-title">Deterministic Skill Gap Ranking</h2>
-              </div>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                Computed using the transparent formula: <code style={{ fontFamily: 'var(--font-mono)', background: 'rgba(0,0,0,0.3)', padding: '0.2rem 0.5rem', borderRadius: '4px' }}>Priority = Role_Weight × Market_Demand × (1 − Demonstrated_Proficiency)</code>
-              </p>
-            </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.15rem' }}>
+            {role.roleSkills.map(rs => {
+              const pct = Math.round(rs.marketDemandFrequency * 100);
+              const isRequired = rs.required;
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {gaps.map(gap => {
-                const profPercentage = Math.round(gap.demonstratedProficiency * 100);
-
-                return (
-                  <div key={gap.id} className="card">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                          <h3 style={{ fontSize: '1.15rem', fontWeight: 700 }}>{gap.skillName}</h3>
-                          <span className={`badge ${gap.status === 'MAINTAIN' ? 'badge-strength' : gap.status === 'MINOR_GAP' ? 'badge-gap' : 'badge-critical'}`}>
-                            {gap.status === 'MAINTAIN' ? 'Competency Verified' : gap.status === 'MINOR_GAP' ? 'Moderate Priority Gap' : 'Critical Priority Gap'}
-                          </span>
-                        </div>
-                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: '0.5rem', maxWidth: '700px' }}>
-                          {gap.explanation}
-                        </p>
-                      </div>
-
-                      <div style={{ textAlign: 'right', minWidth: '150px' }}>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                          Gap Priority Score
-                        </div>
-                        <div style={{ fontSize: '1.5rem', fontWeight: 800, fontFamily: 'var(--font-mono)', color: gap.priorityScore > 0.4 ? '#fda4af' : gap.priorityScore > 0.2 ? '#fcd34d' : '#6ee7b7' }}>
-                          {gap.priorityScore.toFixed(3)}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)', display: 'flex', gap: '2rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                      <span>Role Weight: <strong>{Math.round(gap.roleWeight * 100)}%</strong></span>
-                      <span>Market Demand: <strong>{Math.round(gap.marketDemand * 100)}%</strong></span>
-                      <span>Demonstrated Proficiency: <strong>{profPercentage}%</strong></span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )
-      )}
-
-        {/* TAB 6: ACTION PLAN & CAPSTONE PROJECTS WITH GITHUB PORTFOLIO */}
-        {activeTab === 'actions' && (
-          !currentUser ? (
-            <AuthGate
-              featureName="Action Plan & GitHub Capstone Verification"
-              description="Submit your GitHub repository URLs to parse project signals and track structured capstone projects to bridge your gaps."
-            />
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-            <div className="card">
-              <div className="card-header">
-                <div>
-                  <h2 className="card-title">Multi-Skill Capstone Action Roadmap</h2>
-                  <p className="card-subtitle">
-                    Targeted projects designed to bridge multiple high-priority gaps simultaneously.
-                  </p>
-                </div>
-                <button className="btn btn-primary" onClick={() => setShowProjectModal(true)}>
-                  <PlusCircle size={16} /> Submit Project Repository
-                </button>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1rem' }}>
-                {recommendations.map(rec => (
-                  <div key={rec.id} style={{ background: 'rgba(255,255,255,0.02)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
-                          <span className="badge badge-critical">
-                            {rec.type.replace('_', ' ')}
-                          </span>
-                          {rec.status === 'COMPLETED' && (
-                            <span className="badge badge-strength">
-                              ✓ Completed & Verified
-                            </span>
-                          )}
-                        </div>
-                        <h3 style={{ fontSize: '1.15rem', fontWeight: 700 }}>{rec.title}</h3>
-                      </div>
-                      <span style={{ fontSize: '0.85rem', color: '#a5b4fc', fontFamily: 'var(--font-mono)' }}>
-                        ~{rec.estimatedHours} hrs effort
+              return (
+                <div key={rs.skillId}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ fontWeight: 600, fontSize: '0.925rem' }}>
+                        {rs.skill?.canonicalName || rs.skillId}
+                      </span>
+                      <span className={`badge ${isRequired ? 'badge-required' : 'badge-preferred'}`}>
+                        {isRequired ? 'Required' : 'Preferred'}
                       </span>
                     </div>
-
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1rem' }}>
-                      {rec.description}
-                    </p>
-
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
-                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                        {rec.targetSkillNames.map((name, i) => (
-                          <span key={i} style={{ background: 'rgba(99, 102, 241, 0.1)', color: '#c7d2fe', fontSize: '0.75rem', padding: '0.2rem 0.6rem', borderRadius: '4px', border: '1px solid rgba(99, 102, 241, 0.2)' }}>
-                            {name}
-                          </span>
-                        ))}
-                      </div>
-
-                      {rec.status !== 'COMPLETED' ? (
-                        <button className="btn btn-primary" onClick={() => setShowProjectModal(true)} style={{ padding: '0.45rem 0.9rem', fontSize: '0.85rem' }}>
-                          Submit Solution <FolderGit2 size={14} />
-                        </button>
-                      ) : (
-                        <span style={{ fontSize: '0.85rem', color: '#6ee7b7', fontWeight: 600 }}>
-                          ✓ Evidence linked to candidate profile
-                        </span>
-                      )}
+                    <div style={{ fontWeight: 700, fontFamily: 'var(--font-mono)', color: isRequired ? '#f87171' : '#60a5fa' }}>
+                      {pct}% of jobs
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
 
-            <div className="card">
-              <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                <FolderGit2 size={20} color="#a5b4fc" /> Verified Portfolio & Project Evidence
-              </h2>
-              <p className="card-subtitle" style={{ marginBottom: '1.25rem' }}>
-                Demonstrated real-world repository evidence linked to your SkillBridge profile.
-              </p>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {projects.map(proj => (
-                  <div key={proj.id} style={{ background: 'rgba(255,255,255,0.02)', padding: '1.25rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem' }}>
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>{proj.title}</h3>
-                          <span className="badge badge-strength">
-                            {proj.verificationStatus}
-                          </span>
-                        </div>
-                        <a href={proj.repoUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-cyan)', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.25rem', textDecoration: 'none' }}>
-                          <Github size={14} /> {proj.repoUrl} <ExternalLink size={12} />
-                        </a>
-                      </div>
-
-                      <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                        {proj.hasDocker && <span className="badge badge-preferred">Dockerfile</span>}
-                        {proj.hasTests && <span className="badge badge-strength">Automated Tests</span>}
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.05)', padding: '0.2rem 0.5rem', borderRadius: '4px' }}>
-                          ~{proj.commitCountEstimate} commits
-                        </span>
-                      </div>
-                    </div>
-
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', margin: '0.75rem 0' }}>
-                      {proj.description}
-                    </p>
-
-                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      {proj.detectedStack.map((tech, idx) => (
-                        <span key={idx} style={{ background: 'rgba(255,255,255,0.04)', color: '#e2e8f0', fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
-                          {tech}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )
-      )}
-
-        {/* TAB 7: EXPLAINABLE JOB MATCHING */}
-        {activeTab === 'jobs' && (
-          !currentUser ? (
-            <AuthGate
-              featureName="Explainable Job Compatibility Matches"
-              description="Inspect explainable matching algorithms that benchmark your verified competencies directly against live employer vacancies."
-            />
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            <div className="card">
-              <h2 className="card-title">Explainable Job Recommendations</h2>
-              <p className="card-subtitle">
-                Matches are computed directly against your demonstrated skill evidence with full requirement traceability.
-              </p>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1.5rem' }}>
-                {jobMatches.map(match => (
-                  <div key={match.job.id} style={{ background: 'rgba(255,255,255,0.02)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
-                      <div>
-                        <h3 style={{ fontSize: '1.2rem', fontWeight: 700 }}>{match.job.title}</h3>
-                        <div style={{ color: 'var(--accent-cyan)', fontSize: '0.9rem', fontWeight: 500, marginTop: '0.2rem' }}>
-                          {match.job.company} • <span style={{ color: 'var(--text-muted)' }}>{match.job.location}</span>
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <div style={{
-                          padding: '0.4rem 0.85rem',
-                          borderRadius: '8px',
-                          background: match.matchScore >= 70 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-                          border: `1px solid ${match.matchScore >= 70 ? 'var(--accent-emerald)' : 'var(--accent-amber)'}`,
-                          fontFamily: 'var(--font-mono)',
-                          fontWeight: 800,
-                          fontSize: '1.1rem'
-                        }}>
-                          {match.matchScore}% Match
-                        </div>
-                      </div>
-                    </div>
-
-                    <div style={{ background: 'rgba(0,0,0,0.25)', padding: '0.85rem', borderRadius: '8px', margin: '1rem 0', border: '1px solid rgba(255,255,255,0.04)' }}>
-                      <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.25rem' }}>
-                        Match Explanation
-                      </div>
-                      <div style={{ fontSize: '0.875rem', color: '#e2e8f0' }}>
-                        {match.explanation}
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-                      <div style={{ display: 'flex', gap: '1rem', fontSize: '0.8rem' }}>
-                        <div>
-                          <span style={{ color: 'var(--text-muted)' }}>Verified Matches: </span>
-                          <strong style={{ color: '#6ee7b7' }}>{match.matchedSkills.map(m => m.canonicalName).join(', ') || 'None yet'}</strong>
-                        </div>
-                      </div>
-
-                      <button className="btn btn-secondary" style={{ padding: '0.45rem 0.85rem', fontSize: '0.85rem' }}>
-                        Inspect Match Details
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )
-      )}
-
-        {/* TAB 8: ADMIN & RESEARCH CONSOLE */}
-        {activeTab === 'admin' && (
-          !currentUser ? (
-            <AuthGate
-              featureName="Admin & Research Console"
-              description="Sign in with administrative privileges to manage canonical skill aliases, tune role weights, and author diagnostic questions."
-            />
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            <div className="card" style={{ background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(245, 158, 11, 0.05))' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                <Sliders size={22} color="#fbbf24" />
-                <h2 className="card-title">Labor Market Ontology & Research Console</h2>
-              </div>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                Manage canonical skill ontologies, merge synonyms, tune role skill importance weights, and inspect ingestion coverage.
-              </p>
-            </div>
-
-            {/* Admin Overview Metrics */}
-            {adminOverview && (
-              <div className="grid-3">
-                <div className="stat-box">
-                  <div className="stat-label">Canonical Skills Tracked</div>
-                  <div className="stat-value">{adminOverview.canonicalSkillsCount}</div>
-                </div>
-                <div className="stat-box">
-                  <div className="stat-label">Synonym Aliases Mapped</div>
-                  <div className="stat-value" style={{ color: '#818cf8' }}>{adminOverview.totalAliasesCount}</div>
-                </div>
-                <div className="stat-box">
-                  <div className="stat-label">Ingested Job Postings</div>
-                  <div className="stat-value" style={{ color: '#38bdf8' }}>{adminOverview.totalJobsCount}</div>
-                </div>
-              </div>
-            )}
-
-            <div className="grid-2">
-              {/* Alias Merging Tool */}
-              <div className="card">
-                <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                  <Layers size={18} color="#a5b4fc" /> Skill Synonym & Alias Resolution
-                </h3>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1rem' }}>
-                  Map messy or colloquial skill names from raw job descriptions into single canonical ontology IDs.
-                </p>
-
-                <form onSubmit={handleAddAlias} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                  <div>
-                    <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.3rem' }}>
-                      Select Target Canonical Skill
-                    </label>
-                    <select
-                      value={selectedSkillForAlias}
-                      onChange={e => setSelectedSkillForAlias(e.target.value)}
-                      style={{ width: '100%', padding: '0.55rem', background: '#070b14', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.85rem', outline: 'none' }}
-                    >
-                      {skills.map(s => (
-                        <option key={s.id} value={s.id}>{s.canonicalName} ({s.category})</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.3rem' }}>
-                      New Alias / Synonym String
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. postgres-db or nodejs-backend"
-                      value={newAliasInput}
-                      onChange={e => setNewAliasInput(e.target.value)}
-                      style={{ width: '100%', padding: '0.55rem', background: '#070b14', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.85rem', outline: 'none' }}
+                  <div className="progress-container">
+                    <div
+                      className={`progress-bar ${isRequired ? 'progress-indigo' : 'progress-cyan'}`}
+                      style={{ width: `${pct}%` }}
                     />
                   </div>
 
-                  {aliasFeedback && (
-                    <div style={{ fontSize: '0.8rem', color: '#6ee7b7', fontWeight: 600 }}>
-                      {aliasFeedback}
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                    Target Level: <strong>{rs.proficiencyTarget}</strong> • Role Weight: <strong>{rs.roleWeight * 100}%</strong>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderCurriculumView = () => {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">University Syllabi vs. Market Reality</h1>
+            <p className="page-subtitle">
+              Benchmarking academic computer science courses against modern backend production expectations.
+            </p>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          {curricula.map(c => (
+            <button
+              key={c.id}
+              className={`btn ${selectedCurriculumId === c.id ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => handleCurriculumChange(c.id)}
+              style={{ fontSize: '0.825rem' }}
+            >
+              <BookOpen size={14} /> {c.institutionName}
+            </button>
+          ))}
+        </div>
+
+        {curriculumAnalysis && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div className="stat-grid-3">
+              <div className="stat-card">
+                <div className="stat-label">Syllabus Alignment Score</div>
+                <div className="stat-value" style={{ color: curriculumAnalysis.marketAlignmentScore >= 65 ? '#10b981' : '#f59e0b' }}>
+                  {curriculumAnalysis.marketAlignmentScore}%
+                </div>
+                <div className="stat-sub">Coverage of Junior Backend Skills</div>
+              </div>
+              <div className="stat-card" style={{ gridColumn: 'span 2' }}>
+                <div className="stat-label">Analysis Summary</div>
+                <p style={{ fontSize: '0.875rem', color: '#e5e7eb', marginTop: '0.4rem', lineHeight: 1.5 }}>
+                  {curriculumAnalysis.summaryAnalysis}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid-2">
+              <div className="card">
+                <h3 className="card-title" style={{ color: '#6ee7b7', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+                  <CheckCircle2 size={18} /> Strong Academic Foundation
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {curriculumAnalysis.strongAcademicAreas.map((item, idx) => (
+                    <div key={idx} style={{ background: '#0e141a', border: '1px solid #1c2b24', padding: '0.85rem', borderRadius: '6px' }}>
+                      <strong style={{ color: '#a7f3d0', fontSize: '0.9rem' }}>{item.skill}</strong>
+                      <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
+                        {item.reason}
+                      </p>
                     </div>
-                  )}
-
-                  <button type="submit" className="btn btn-primary" style={{ marginTop: '0.35rem', alignSelf: 'flex-start', padding: '0.45rem 0.9rem', fontSize: '0.85rem' }}>
-                    <PlusCircle size={14} /> Merge Alias into Ontology
-                  </button>
-                </form>
-
-                {/* Show Current Aliases */}
-                <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
-                  <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
-                    Current Aliases for {skills.find(s => s.id === selectedSkillForAlias)?.canonicalName || selectedSkillForAlias}:
-                  </div>
-                  <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                    {skills.find(s => s.id === selectedSkillForAlias)?.aliases.map((al, idx) => (
-                      <span key={idx} style={{ background: 'rgba(255,255,255,0.04)', color: '#94a3b8', fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
-                        {al}
-                      </span>
-                    ))}
-                  </div>
+                  ))}
                 </div>
               </div>
 
-              {/* Live Role Weight Tuner */}
               <div className="card">
-                <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                  <Sliders size={18} color="#fbbf24" /> Role Weight & Market Demand Tuner
+                <h3 className="card-title" style={{ color: '#fda4af', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+                  <AlertCircle size={18} /> Critical Market Omissions
                 </h3>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1rem' }}>
-                  Calibrate the mathematical weights ($Role\_Weight$ & $Market\_Demand$) for <strong>{role?.title}</strong>.
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {curriculumAnalysis.criticalMarketOmissions.map((item, idx) => (
+                    <div key={idx} style={{ background: '#160e12', border: '1px solid #331d25', padding: '0.85rem', borderRadius: '6px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <strong style={{ color: '#fecdd3', fontSize: '0.9rem' }}>{item.skill}</strong>
+                        <span className="badge badge-critical" style={{ fontSize: '0.675rem' }}>
+                          Demanded by {item.marketDemand}% of Jobs
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#fb7185', fontWeight: 600, marginTop: '0.25rem' }}>
+                        Academic Status: {item.academicStatus}
+                      </div>
+                      <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.35rem' }}>
+                        Recommendation: {item.recommendation}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderAssessmentView = () => {
+    if (!assessment) return null;
+
+    if (attemptResult) {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <div className="page-header">
+            <div>
+              <h1 className="page-title">Diagnostic Test Results</h1>
+              <p className="page-subtitle">Your benchmark score across Node.js, SQL, and HTTP architecture.</p>
+            </div>
+          </div>
+
+          <div className="card" style={{ textAlign: 'center', padding: '2.5rem' }}>
+            <div style={{
+              width: '72px',
+              height: '72px',
+              borderRadius: '50%',
+              background: attemptResult.passed ? 'rgba(16, 185, 129, 0.15)' : 'rgba(244, 63, 94, 0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 1rem auto',
+              border: `2px solid ${attemptResult.passed ? '#10b981' : '#f43f5e'}`
+            }}>
+              <span style={{ fontSize: '1.6rem', fontWeight: 800, fontFamily: 'var(--font-mono)' }}>
+                {attemptResult.score}%
+              </span>
+            </div>
+
+            <h2 style={{ fontSize: '1.35rem', fontWeight: 700 }}>
+              {attemptResult.passed ? 'Benchmark Achieved' : 'Benchmark Completed — Focus Areas Identified'}
+            </h2>
+            <p style={{ color: 'var(--text-secondary)', maxWidth: '500px', margin: '0.5rem auto 1.5rem auto', fontSize: '0.9rem' }}>
+              Earned {attemptResult.totalPointsEarned} of {attemptResult.maxPoints} points across practical questions. Your verified skill profile has been updated.
+            </p>
+
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem' }}>
+              <button className="btn btn-primary" onClick={() => setActiveTab('gaps')}>
+                View My Skill Gaps <BarChart3 size={15} />
+              </button>
+              <button className="btn btn-secondary" onClick={() => { setAttemptResult(null); setCurrentQuestionIdx(0); setUserAnswers({}); }}>
+                <RotateCcw size={14} /> Retake Test
+              </button>
+            </div>
+          </div>
+
+          <div className="card">
+            <h3 className="card-title" style={{ marginBottom: '1rem' }}>Sub-Skill Breakdown</h3>
+            <div className="grid-2">
+              {attemptResult.subSkillScores?.map((sub, i) => (
+                <div key={i} style={{ background: '#0e1118', padding: '1rem', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>{sub.subSkill}</span>
+                    <span className={`badge ${sub.status === 'STRENGTH' ? 'badge-strength' : sub.status === 'MODERATE' ? 'badge-gap' : 'badge-critical'}`}>
+                      {sub.status === 'STRENGTH' ? 'Strength' : sub.status === 'MODERATE' ? 'Moderate' : 'Needs Work'}
+                    </span>
+                  </div>
+                  <div className="progress-container">
+                    <div
+                      className={`progress-bar ${sub.status === 'STRENGTH' ? 'progress-emerald' : sub.status === 'MODERATE' ? 'progress-amber' : 'progress-rose'}`}
+                      style={{ width: `${sub.percentage}%` }}
+                    />
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                    {sub.earnedPoints} / {sub.totalPoints} points ({sub.percentage}%)
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const questions = assessment.questions || [];
+    if (questions.length === 0) return null;
+
+    const currentQuestion = questions[currentQuestionIdx];
+    const isAnswered = currentQuestion && !!userAnswers[currentQuestion.id];
+    const isLastQuestion = currentQuestionIdx === questions.length - 1;
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">{assessment.title}</h1>
+            <p className="page-subtitle">6 multi-part questions testing practical Node.js, SQL, and HTTP engineering skills.</p>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#131722', border: '1px solid var(--border-color)', padding: '0.45rem 0.85rem', borderRadius: '6px', fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}>
+            <Clock size={15} color="#93c5fd" />
+            <span>30:00</span>
+          </div>
+        </div>
+
+        <div className="card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+            <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>
+              QUESTION {currentQuestionIdx + 1} OF {questions.length}
+            </span>
+            <span className="badge badge-preferred">
+              {currentQuestion.points} POINTS
+            </span>
+          </div>
+
+          <div className="progress-container" style={{ marginBottom: '1.5rem' }}>
+            <div
+              className="progress-bar progress-indigo"
+              style={{ width: `${((currentQuestionIdx + 1) / questions.length) * 100}%` }}
+            />
+          </div>
+
+          <h2 style={{ fontSize: '1.15rem', fontWeight: 600, marginBottom: '1rem', color: '#f3f4f6' }}>
+            {currentQuestion.prompt}
+          </h2>
+
+          {currentQuestion.codeSnippet && (
+            <pre className="code-block" style={{ marginBottom: '1.25rem' }}>
+              <code>{currentQuestion.codeSnippet}</code>
+            </pre>
+          )}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
+            {currentQuestion.options?.map((opt, idx) => {
+              const optId = `opt_${idx}`;
+              const isSelected = userAnswers[currentQuestion.id] === optId;
+              return (
+                <button
+                  key={optId}
+                  className={`option-btn ${isSelected ? 'selected' : ''}`}
+                  onClick={() => handleAnswerSelect(currentQuestion.id, optId)}
+                >
+                  <span>{opt}</span>
+                  {isSelected && <Check size={16} color="#60a5fa" />}
+                </button>
+              );
+            })}
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2rem', paddingTop: '1.25rem', borderTop: '1px solid var(--border-color)' }}>
+            <button
+              className="btn btn-secondary"
+              disabled={currentQuestionIdx === 0}
+              onClick={() => setCurrentQuestionIdx(prev => prev - 1)}
+            >
+              Previous
+            </button>
+
+            {isLastQuestion ? (
+              <button
+                className="btn btn-primary"
+                disabled={!isAnswered || isSubmittingAssessment}
+                onClick={handleSubmitAssessment}
+              >
+                {isSubmittingAssessment ? 'Grading Answers...' : 'Submit Assessment'}
+              </button>
+            ) : (
+              <button
+                className="btn btn-primary"
+                disabled={!isAnswered}
+                onClick={() => setCurrentQuestionIdx(prev => prev + 1)}
+              >
+                Next Question <ArrowRight size={15} />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderSandboxView = () => {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">SQL & Code Sandbox</h1>
+            <p className="page-subtitle">
+              Solve real engineering queries and algorithmic problems against test datasets. Passing hands-on challenges elevates your skill evidence to Verified.
+            </p>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.25rem' }}>
+          {challenges.map((ch, idx) => (
+            <button
+              key={ch.id}
+              className={`btn ${selectedChallengeIdx === idx ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => handleSelectChallenge(idx)}
+              style={{ fontSize: '0.825rem' }}
+            >
+              {ch.type === 'SQL' ? <Database size={13} /> : <Code2 size={13} />}
+              <span>{ch.title}</span>
+            </button>
+          ))}
+        </div>
+
+        {activeChallenge && (
+          <div className="grid-2">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div className="card">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                  <span className="badge badge-preferred">{activeChallenge.type}</span>
+                  <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>
+                    Difficulty: {activeChallenge.difficulty}
+                  </span>
+                </div>
+                <h2 className="card-title" style={{ fontSize: '1.1rem', marginBottom: '0.5rem' }}>
+                  {activeChallenge.title}
+                </h2>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', lineHeight: 1.55 }}>
+                  {activeChallenge.description}
                 </p>
 
-                {role && role.roleSkills && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    <div>
-                      <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.3rem' }}>
-                        Choose Role Skill to Calibrate
-                      </label>
-                      <select
-                        value={editingSkillWeight?.skillId}
-                        onChange={e => {
-                          const rs = role.roleSkills.find(r => r.skillId === e.target.value);
-                          if (rs) {
-                            setEditingSkillWeight({
-                              skillId: rs.skillId,
-                              roleWeight: rs.roleWeight,
-                              marketDemandFrequency: rs.marketDemandFrequency
-                            });
-                          }
-                        }}
-                        style={{ width: '100%', padding: '0.55rem', background: '#070b14', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.85rem', outline: 'none' }}
-                      >
-                        {role.roleSkills.map(rs => (
-                          <option key={rs.skillId} value={rs.skillId}>
-                            {rs.skill?.canonicalName || rs.skillId}
-                          </option>
-                        ))}
-                      </select>
+                {activeChallenge.schemaContext && (
+                  <div style={{ marginTop: '1.25rem' }}>
+                    <div style={{ fontSize: '0.725rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
+                      Schema Tables
+                    </div>
+                    <pre className="code-block" style={{ fontSize: '0.75rem' }}>
+                      <code>{activeChallenge.schemaContext}</code>
+                    </pre>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div className="card">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                    {activeChallenge.type === 'SQL' ? 'Query Editor' : 'Code Editor'}
+                  </span>
+                  <button
+                    className="btn btn-primary"
+                    disabled={isRunningSandbox}
+                    onClick={handleRunSandbox}
+                    style={{ padding: '0.4rem 0.85rem', fontSize: '0.825rem' }}
+                  >
+                    <Play size={14} /> {isRunningSandbox ? 'Running Tests...' : 'Run Solution'}
+                  </button>
+                </div>
+
+                <textarea
+                  value={sandboxCode}
+                  onChange={e => setSandboxCode(e.target.value)}
+                  style={{
+                    width: '100%',
+                    height: '240px',
+                    background: '#080a0e',
+                    color: '#93c5fa',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '6px',
+                    padding: '0.85rem',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '0.825rem',
+                    lineHeight: 1.5,
+                    resize: 'vertical'
+                  }}
+                />
+
+                {sandboxResult && (
+                  <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                      {sandboxResult.passed ? (
+                        <CheckCircle2 size={16} color="#10b981" />
+                      ) : (
+                        <AlertCircle size={16} color="#f43f5e" />
+                      )}
+                      <span style={{ fontWeight: 600, fontSize: '0.85rem', color: sandboxResult.passed ? '#6ee7b7' : '#fda4af' }}>
+                        {sandboxResult.passed ? 'All Test Assertions Passed' : 'Tests Failed'}
+                      </span>
                     </div>
 
-                    {editingSkillWeight && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                        <div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.2rem' }}>
-                            <span>Role Weight (Importance in Backend Engineering)</span>
-                            <strong style={{ color: '#a5b4fc', fontFamily: 'var(--font-mono)' }}>{Math.round(editingSkillWeight.roleWeight * 100)}%</strong>
-                          </div>
-                          <input
-                            type="range"
-                            min="0.10"
-                            max="1.00"
-                            step="0.05"
-                            value={editingSkillWeight.roleWeight}
-                            onChange={e => setEditingSkillWeight({ ...editingSkillWeight, roleWeight: parseFloat(e.target.value) })}
-                            style={{ width: '100%', accentColor: 'var(--accent-primary)' }}
-                          />
-                        </div>
+                    {sandboxResult.error && (
+                      <p style={{ color: '#fda4af', fontSize: '0.8rem' }}>{sandboxResult.error}</p>
+                    )}
 
-                        <div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.2rem' }}>
-                            <span>Observed Market Demand Frequency</span>
-                            <strong style={{ color: '#38bdf8', fontFamily: 'var(--font-mono)' }}>{Math.round(editingSkillWeight.marketDemandFrequency * 100)}%</strong>
+                    {sandboxResult.testResults && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '0.5rem' }}>
+                        {sandboxResult.testResults.map((t: any, idx: number) => (
+                          <div key={idx} style={{ fontSize: '0.8rem', color: t.passed ? '#6ee7b7' : '#fda4af' }}>
+                            {t.passed ? '✓' : '✗'} {t.testName}
                           </div>
-                          <input
-                            type="range"
-                            min="0.10"
-                            max="1.00"
-                            step="0.05"
-                            value={editingSkillWeight.marketDemandFrequency}
-                            onChange={e => setEditingSkillWeight({ ...editingSkillWeight, marketDemandFrequency: parseFloat(e.target.value) })}
-                            style={{ width: '100%', accentColor: 'var(--accent-cyan)' }}
-                          />
-                        </div>
-
-                        {weightSaveSuccess && (
-                          <div style={{ fontSize: '0.8rem', color: '#6ee7b7', fontWeight: 600 }}>
-                            ✓ Role weights updated! Gap Engine priority scores recalculated.
-                          </div>
-                        )}
-
-                        <button
-                          type="button"
-                          className="btn btn-primary"
-                          onClick={handleSaveRoleWeights}
-                          style={{ alignSelf: 'flex-start', padding: '0.45rem 0.9rem', fontSize: '0.85rem', background: 'var(--accent-emerald)' }}
-                        >
-                          <Save size={14} /> Save Weights & Recalculate Gaps
-                        </button>
+                        ))}
                       </div>
                     )}
                   </div>
@@ -1778,69 +968,669 @@ ${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 
               </div>
             </div>
           </div>
-        )
-      )}
+        )}
       </div>
+    );
+  };
 
-      {/* MODAL 1: SUBMIT PROJECT REPO */}
-      {showProjectModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '1rem' }}>
-          <div className="card" style={{ maxWidth: '560px', width: '100%', background: '#0d1322', border: '1px solid var(--border-active)' }}>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>
-              Submit Capstone Project Repository
-            </h3>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
-              Provide your GitHub repository URL. The system will parse project signals and attach verified project evidence to your skill profile.
+  const renderGapsView = () => {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">My Skill Gaps & Prioritization</h1>
+            <p className="page-subtitle">
+              Gaps prioritized mathematically using role weight, market demand frequency, and demonstrated proficiency:
+              Priority = Role Weight × Market Demand × (1 - Demonstrated Proficiency).
             </p>
+          </div>
+        </div>
 
-            <form onSubmit={handleSubmitProject} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {gaps.map(gap => {
+            const profPercentage = Math.round(gap.demonstratedProficiency * 100);
+            return (
+              <div key={gap.skillId} className="card">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+                  <div style={{ flex: 1, minWidth: '240px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
+                      <h3 style={{ fontSize: '1.05rem', fontWeight: 600 }}>{gap.skillName}</h3>
+                      <span className={`badge ${gap.status === 'MAJOR_GAP' ? 'badge-critical' : gap.status === 'MINOR_GAP' ? 'badge-gap' : 'badge-strength'}`}>
+                        {gap.status === 'MAJOR_GAP' ? 'Critical Gap' : gap.status === 'MINOR_GAP' ? 'Moderate Gap' : 'Target Achieved'}
+                      </span>
+                    </div>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.825rem' }}>
+                      {gap.explanation}
+                    </p>
+                  </div>
+
+                  <div style={{ textAlign: 'right', minWidth: '130px' }}>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                      Priority Score
+                    </div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: 800, fontFamily: 'var(--font-mono)', color: gap.priorityScore > 0.4 ? '#fda4af' : gap.priorityScore > 0.2 ? '#fcd34d' : '#6ee7b7' }}>
+                      {gap.priorityScore.toFixed(3)}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ marginTop: '0.85rem', paddingTop: '0.85rem', borderTop: '1px solid var(--border-color)', display: 'flex', gap: '1.5rem', fontSize: '0.775rem', color: 'var(--text-secondary)' }}>
+                  <span>Role Weight: <strong>{Math.round(gap.roleWeight * 100)}%</strong></span>
+                  <span>Market Demand: <strong>{Math.round(gap.marketDemand * 100)}%</strong></span>
+                  <span>Demonstrated: <strong>{profPercentage}%</strong></span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  const renderActionsView = () => {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">Recommended Projects to Build</h1>
+            <p className="page-subtitle">
+              Targeted projects designed to bridge multiple high-priority gaps simultaneously. Submit your GitHub repository URL for automated signal extraction.
+            </p>
+          </div>
+          <button className="btn btn-primary" onClick={() => setShowProjectModal(true)}>
+            <PlusCircle size={15} /> Submit GitHub Project
+          </button>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {recommendations.map(rec => (
+            <div key={rec.id} className="card">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                <div>
+                  <h3 style={{ fontSize: '1.05rem', fontWeight: 600 }}>{rec.title}</h3>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', marginTop: '0.2rem' }}>
+                    Type: {rec.type} • Est. Time: {rec.estimatedHours} hours
+                  </div>
+                </div>
+                <button className="btn btn-secondary" onClick={() => setShowProjectModal(true)} style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem' }}>
+                  <FolderGit2 size={13} /> Submit Solution
+                </button>
+              </div>
+
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '0.5rem 0' }}>
+                {rec.description}
+              </p>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Target Skills:</span>
+                {rec.targetSkillNames?.map((skillName, idx) => (
+                  <span key={idx} className="badge badge-preferred" style={{ fontSize: '0.675rem' }}>
+                    {skillName}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="card">
+          <div className="card-header">
+            <div>
+              <h2 className="card-title">Verified Project Portfolio</h2>
+              <p className="card-subtitle">
+                GitHub repositories submitted and scanned for Dockerfiles, tests, and database migrations.
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {userProjects.map(proj => (
+              <div key={proj.id} style={{ background: '#0e1118', padding: '1rem', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <a href={proj.repoUrl} target="_blank" rel="noreferrer" style={{ color: '#60a5fa', fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.4rem', textDecoration: 'none' }}>
+                    <Github size={14} /> {proj.title} <ExternalLink size={12} />
+                  </a>
+                  <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>
+                    ~{proj.commitCountEstimate} commits
+                  </span>
+                </div>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', margin: '0.5rem 0' }}>
+                  {proj.description}
+                </p>
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                  {proj.detectedStack.map((tech, idx) => (
+                    <span key={idx} style={{ background: '#1c2336', color: '#93c5fd', fontSize: '0.7rem', padding: '0.15rem 0.45rem', borderRadius: '4px' }}>
+                      {tech}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderJobsView = () => {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">Matching Backend Jobs</h1>
+            <p className="page-subtitle">
+              Compatibility scores computed directly against your demonstrated skill evidence with full requirement traceability.
+            </p>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {jobMatches.map(match => (
+            <div key={match.job.id} className="card">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+                <div>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 700 }}>{match.job.title}</h3>
+                  <div style={{ color: '#60a5fa', fontSize: '0.85rem', fontWeight: 500, marginTop: '0.15rem' }}>
+                    {match.job.company} • <span style={{ color: 'var(--text-muted)' }}>{match.job.location}</span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div style={{
+                    padding: '0.35rem 0.75rem',
+                    borderRadius: '6px',
+                    fontFamily: 'var(--font-mono)',
+                    fontWeight: 700,
+                    fontSize: '1.1rem',
+                    background: match.matchScore >= 0.7 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+                    color: match.matchScore >= 0.7 ? '#6ee7b7' : '#93c5fd',
+                    border: `1px solid ${match.matchScore >= 0.7 ? 'rgba(16, 185, 129, 0.3)' : 'rgba(59, 130, 246, 0.3)'}`
+                  }}>
+                    {Math.round(match.matchScore * 100)}% Match
+                  </div>
+                </div>
+              </div>
+
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '0.75rem 0' }}>
+                {match.job.description}
+              </p>
+
+              <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                <div style={{ fontSize: '0.775rem' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Verified Matches: </span>
+                  <strong style={{ color: '#6ee7b7' }}>{match.matchedSkills.map(m => m.canonicalName).join(', ') || 'None yet'}</strong>
+                </div>
+
+                <button className="btn btn-secondary" style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }}>
+                  View Role Details
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const renderAdminView = () => {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">Admin & Ontology Console</h1>
+            <p className="page-subtitle">
+              Manage canonical skill ontologies, merge synonyms, tune role skill importance weights, and inspect ingestion coverage.
+            </p>
+          </div>
+        </div>
+
+        {adminOverview && (
+          <div className="stat-grid-3">
+            <div className="stat-card">
+              <div className="stat-label">Total Jobs Ingested</div>
+              <div className="stat-value">{adminOverview.totalJobsIngested}</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label">Canonical Skills</div>
+              <div className="stat-value">{adminOverview.canonicalSkillsCount}</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label">Recognized Aliases</div>
+              <div className="stat-value">{adminOverview.aliasMappingsCount}</div>
+            </div>
+          </div>
+        )}
+
+        <div className="grid-2">
+          <div className="card">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+              <Sliders size={18} color="#60a5fa" />
+              <h2 className="card-title">Add Skill Alias Mapping</h2>
+            </div>
+            <form onSubmit={handleCreateAlias} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>
-                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.35rem' }}>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>
+                  Raw Job Alias / Synonym
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Postgres, PSQL, Node"
+                  value={aliasForm.rawAlias}
+                  onChange={e => setAliasForm({ ...aliasForm, rawAlias: e.target.value })}
+                  style={{ width: '100%', padding: '0.65rem', background: '#0a0c10', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.85rem' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>
+                  Maps To Canonical Skill
+                </label>
+                <select
+                  value={aliasForm.canonicalSkillId}
+                  onChange={e => setAliasForm({ ...aliasForm, canonicalSkillId: e.target.value })}
+                  style={{ width: '100%', padding: '0.65rem', background: '#0a0c10', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.85rem' }}
+                >
+                  <option value="">Select canonical skill...</option>
+                  {skills.map(s => (
+                    <option key={s.id} value={s.id}>{s.canonicalName}</option>
+                  ))}
+                </select>
+              </div>
+
+              <button type="submit" className="btn btn-primary" style={{ marginTop: '0.5rem' }}>
+                Add Synonym Mapping
+              </button>
+
+              {aliasSaveSuccess && (
+                <div style={{ color: '#6ee7b7', fontSize: '0.8rem' }}>✓ Alias mapping registered.</div>
+              )}
+            </form>
+          </div>
+
+          <div className="card">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+              <Sliders size={18} color="#f59e0b" />
+              <h2 className="card-title">Role Skill Importance Tuner</h2>
+            </div>
+            {role && editingSkillWeight && (
+              <form onSubmit={handleUpdateRoleWeight} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>
+                    Select Role Skill
+                  </label>
+                  <select
+                    value={editingSkillWeight.skillId}
+                    onChange={e => {
+                      const found = role.roleSkills.find(rs => rs.skillId === e.target.value);
+                      if (found) {
+                        setEditingSkillWeight({
+                          skillId: found.skillId,
+                          roleWeight: found.roleWeight,
+                          marketDemandFrequency: found.marketDemandFrequency
+                        });
+                      }
+                    }}
+                    style={{ width: '100%', padding: '0.65rem', background: '#0a0c10', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.85rem' }}
+                  >
+                    {role.roleSkills.map(rs => (
+                      <option key={rs.skillId} value={rs.skillId}>
+                        {rs.skill?.canonicalName || rs.skillId}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.3rem' }}>
+                    <span>Role Importance Weight:</span>
+                    <strong>{Math.round(editingSkillWeight.roleWeight * 100)}%</strong>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={editingSkillWeight.roleWeight}
+                    onChange={e => setEditingSkillWeight({ ...editingSkillWeight, roleWeight: parseFloat(e.target.value) })}
+                    style={{ width: '100%' }}
+                  />
+                </div>
+
+                <button type="submit" className="btn btn-primary" style={{ marginTop: '0.5rem' }}>
+                  Save Updated Weight
+                </button>
+
+                {weightSaveSuccess && (
+                  <div style={{ color: '#6ee7b7', fontSize: '0.8rem' }}>✓ Role weight updated and gaps recalculated.</div>
+                )}
+              </form>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderPublicHome = () => {
+    return (
+      <div>
+        <div className="dev-hero">
+          <div className="dev-hero-tag">
+            <Database size={13} /> 142 Junior Backend Jobs Analyzed in Bangladesh
+          </div>
+          <h1 className="dev-hero-title">
+            Real job requirements vs what you can actually build.
+          </h1>
+          <p className="dev-hero-desc">
+            We analyzed 142 junior backend engineer job postings in Dhaka and regional tech hubs. Test your SQL and Node.js skills in live sandboxes, see your exact gaps, and build projects that hire.
+          </p>
+
+          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button className="btn btn-primary" onClick={handleDemoLogin} style={{ padding: '0.65rem 1.25rem', fontSize: '0.9rem' }}>
+              <Sparkles size={16} /> Continue as Demo Candidate (1-Click)
+            </button>
+            <button className="btn btn-secondary" onClick={() => setPublicView('market')} style={{ padding: '0.65rem 1.25rem', fontSize: '0.9rem' }}>
+              <TrendingUp size={16} /> View Market Demand
+            </button>
+            <button className="btn btn-secondary" onClick={() => setPublicView('curriculum')} style={{ padding: '0.65rem 1.25rem', fontSize: '0.9rem' }}>
+              <GraduationCap size={16} /> University vs Reality
+            </button>
+          </div>
+
+          <div className="stat-grid-3" style={{ marginTop: '2.5rem', textAlign: 'left' }}>
+            <div className="stat-card">
+              <div className="stat-label">Active Job Postings</div>
+              <div className="stat-value">142</div>
+              <div className="stat-sub">Scraped from Bdjobs, LinkedIn & GitHub</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label">Canonical Backend Skills</div>
+              <div className="stat-value">9</div>
+              <div className="stat-sub">Mapped with all alias synonyms</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label">Practical Validation</div>
+              <div className="stat-value">100%</div>
+              <div className="stat-sub">Live SQL & concurrency test cases</div>
+            </div>
+          </div>
+
+          <div className="dev-pipeline-grid">
+            <div className="dev-pipeline-card">
+              <div className="dev-pipeline-step">01 / MARKET DATA</div>
+              <h3>Real Job Demands</h3>
+              <p>Frequencies of technologies required by companies in Bangladesh. Know whether Docker or Redis is asked for more often.</p>
+            </div>
+            <div className="dev-pipeline-card">
+              <div className="dev-pipeline-step">02 / PRACTICAL TEST</div>
+              <h3>Live Coding & SQL</h3>
+              <p>Not multiple-choice guessing. Write real queries and solve async concurrency puzzles evaluated against test cases.</p>
+            </div>
+            <div className="dev-pipeline-card">
+              <div className="dev-pipeline-step">03 / GAP ANALYSIS</div>
+              <h3>What to Learn Next</h3>
+              <p>Transparent gap priorities based on role importance and employer demand. Focus on the high-leverage missing skills.</p>
+            </div>
+            <div className="dev-pipeline-card">
+              <div className="dev-pipeline-step">04 / PROOF OF SKILL</div>
+              <h3>Verified Talent Passport</h3>
+              <p>Submit your GitHub repo for automated checks and export a printable, verifiable skills report for your resume.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ==========================================
+  // MAIN RETURN
+  // ==========================================
+
+  return (
+    <div>
+      {/* CASE A: LOGGED IN CANDIDATE -> FULL SIDEBAR APP LAYOUT */}
+      {currentUser ? (
+        <div className="app-shell">
+          {/* Vertical Sidebar */}
+          <aside className="app-sidebar">
+            <div className="sidebar-header">
+              <div>
+                <div className="brand">
+                  <span>SkillBridge</span>
+                  <span className="brand-badge-pill">TRACK</span>
+                </div>
+                <div className="sidebar-track-pill">
+                  <span>{role?.title || 'Junior Backend Engineer'}</span>
+                </div>
+              </div>
+            </div>
+
+            <nav className="sidebar-nav">
+              <div>
+                <div className="sidebar-section-title">Market Intelligence</div>
+                <button
+                  className={`sidebar-item ${activeTab === 'market' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('market')}
+                >
+                  <TrendingUp size={16} /> Job Market Demand
+                </button>
+                <button
+                  className={`sidebar-item ${activeTab === 'curriculum' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('curriculum')}
+                >
+                  <GraduationCap size={16} /> University Syllabi Gap
+                </button>
+              </div>
+
+              <div>
+                <div className="sidebar-section-title">Practical Tests</div>
+                <button
+                  className={`sidebar-item ${activeTab === 'assessment' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('assessment')}
+                >
+                  <BrainCircuit size={16} /> Diagnostic Test
+                </button>
+                <button
+                  className={`sidebar-item ${activeTab === 'sandbox' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('sandbox')}
+                >
+                  <Terminal size={16} /> SQL & Code Sandbox
+                </button>
+              </div>
+
+              <div>
+                <div className="sidebar-section-title">Career Roadmap</div>
+                <button
+                  className={`sidebar-item ${activeTab === 'gaps' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('gaps')}
+                >
+                  <BarChart3 size={16} /> My Skill Gaps
+                </button>
+                <button
+                  className={`sidebar-item ${activeTab === 'actions' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('actions')}
+                >
+                  <Rocket size={16} /> Projects to Build
+                </button>
+                <button
+                  className={`sidebar-item ${activeTab === 'jobs' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('jobs')}
+                >
+                  <Briefcase size={16} /> Matching Jobs
+                </button>
+              </div>
+
+              <div>
+                <div className="sidebar-section-title">System</div>
+                <button
+                  className={`sidebar-item ${activeTab === 'admin' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('admin')}
+                >
+                  <Sliders size={16} /> Admin & Weights
+                </button>
+              </div>
+            </nav>
+
+            <div className="sidebar-footer">
+              <div className="sidebar-user-card">
+                <div className="sidebar-avatar">
+                  {(currentProfile?.fullName || currentUser.email).substring(0, 2).toUpperCase()}
+                </div>
+                <div className="sidebar-user-info">
+                  <div className="sidebar-user-name">
+                    {currentProfile?.fullName || currentUser.email.split('@')[0]}
+                  </div>
+                  <div className="sidebar-user-role">
+                    {currentUser.email === 'candidate@skillbridge.org' ? 'Demo Candidate' : 'Active Candidate'}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button
+                  className="btn btn-secondary"
+                  onClick={handleOpenPassport}
+                  style={{ flex: 1, padding: '0.45rem 0.5rem', fontSize: '0.75rem' }}
+                >
+                  <FileText size={14} /> Skill Passport
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  onClick={handleLogout}
+                  title="Sign Out"
+                  style={{ padding: '0.45rem 0.6rem' }}
+                >
+                  <LogOut size={14} />
+                </button>
+              </div>
+            </div>
+          </aside>
+
+          {/* Main Content Area */}
+          <main className="app-main">
+            {activeTab === 'market' && renderMarketView()}
+            {activeTab === 'curriculum' && renderCurriculumView()}
+            {activeTab === 'assessment' && renderAssessmentView()}
+            {activeTab === 'sandbox' && renderSandboxView()}
+            {activeTab === 'gaps' && renderGapsView()}
+            {activeTab === 'actions' && renderActionsView()}
+            {activeTab === 'jobs' && renderJobsView()}
+            {activeTab === 'admin' && renderAdminView()}
+          </main>
+        </div>
+      ) : (
+        /* CASE B: PUBLIC VISITOR (UNAUTHENTICATED) -> CLEAN TOP NAV & LANDING */
+        <div>
+          <header className="public-navbar">
+            <div className="public-nav-container">
+              <a href="#" className="brand" onClick={(e) => { e.preventDefault(); setPublicView('home'); }}>
+                <span>SkillBridge</span>
+                <span className="brand-badge-pill">BENCHMARK</span>
+              </a>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <button
+                  className={`btn btn-ghost ${publicView === 'market' ? 'active' : ''}`}
+                  onClick={() => setPublicView('market')}
+                >
+                  <TrendingUp size={15} /> Job Demand (N=142)
+                </button>
+                <button
+                  className={`btn btn-ghost ${publicView === 'curriculum' ? 'active' : ''}`}
+                  onClick={() => setPublicView('curriculum')}
+                >
+                  <GraduationCap size={15} /> University Syllabi
+                </button>
+
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => { setAuthMode('LOGIN'); setShowAuthModal(true); }}
+                >
+                  <LogIn size={15} /> Sign In
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleDemoLogin}
+                >
+                  <Sparkles size={15} /> Try Demo (1-Click)
+                </button>
+              </div>
+            </div>
+          </header>
+
+          <div className="public-container">
+            {publicView === 'home' && renderPublicHome()}
+            {publicView === 'market' && renderMarketView()}
+            {publicView === 'curriculum' && renderCurriculumView()}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: SUBMIT PROJECT GITHUB REPOSITORY */}
+      {showProjectModal && (
+        <div className="modal-backdrop">
+          <div className="modal-box">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 700 }}>Submit Project Repository</h2>
+              <button className="btn btn-ghost" onClick={() => setShowProjectModal(false)} style={{ padding: '0.25rem' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleProjectSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>
                   Project Title
                 </label>
                 <input
                   type="text"
-                  required
-                  placeholder="e.g. Production Task Management REST API"
+                  placeholder="e.g. Scalable Multi-Tenant REST API"
                   value={projectForm.title}
                   onChange={e => setProjectForm({ ...projectForm, title: e.target.value })}
-                  style={{ width: '100%', padding: '0.65rem', background: '#070b14', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.9rem', outline: 'none' }}
+                  required
+                  style={{ width: '100%', padding: '0.65rem', background: '#0a0c10', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.85rem' }}
                 />
               </div>
 
               <div>
-                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.35rem' }}>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>
                   GitHub Repository URL
                 </label>
                 <input
                   type="url"
-                  required
-                  placeholder="https://github.com/username/project-repo"
+                  placeholder="https://github.com/username/repo-name"
                   value={projectForm.repoUrl}
                   onChange={e => setProjectForm({ ...projectForm, repoUrl: e.target.value })}
-                  style={{ width: '100%', padding: '0.65rem', background: '#070b14', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.9rem', outline: 'none' }}
+                  required
+                  style={{ width: '100%', padding: '0.65rem', background: '#0a0c10', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.85rem' }}
                 />
               </div>
 
               <div>
-                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.35rem' }}>
-                  Description & Implementation Highlights
+                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>
+                  Brief Technical Architecture Summary
                 </label>
                 <textarea
-                  rows={3}
-                  placeholder="Mention used technologies (e.g. Node.js, PostgreSQL, Docker, Jest tests, JWT auth)..."
+                  placeholder="Implemented PostgreSQL connection pooling, Redis caching layer, Docker containerization..."
                   value={projectForm.description}
                   onChange={e => setProjectForm({ ...projectForm, description: e.target.value })}
-                  style={{ width: '100%', padding: '0.65rem', background: '#070b14', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.9rem', outline: 'none', resize: 'vertical' }}
+                  rows={3}
+                  style={{ width: '100%', padding: '0.65rem', background: '#0a0c10', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.85rem', resize: 'vertical' }}
                 />
               </div>
+
+              {projectSuccessMsg && (
+                <div style={{ color: '#6ee7b7', fontSize: '0.85rem', background: 'rgba(16, 185, 129, 0.1)', padding: '0.75rem', borderRadius: '6px' }}>
+                  {projectSuccessMsg}
+                </div>
+              )}
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowProjectModal(false)}>
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={isSubmittingProject}>
-                  {isSubmittingProject ? 'Verifying...' : 'Verify & Submit'}
+                  {isSubmittingProject ? 'Scanning Signals...' : 'Verify Repository'}
                 </button>
               </div>
             </form>
@@ -1848,137 +1638,91 @@ ${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 
         </div>
       )}
 
-      {/* MODAL 2: TALENT PASSPORT / CAREER REPORT */}
+      {/* MODAL: SKILL PASSPORT */}
       {showPassportModal && passportData && (
-        <div className="passport-modal-container" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 110, padding: '1rem', overflowY: 'auto' }}>
-          <div className="passport-modal-content card" style={{ maxWidth: '800px', width: '100%', maxHeight: '90vh', overflowY: 'auto', background: '#0b101e', border: '1px solid var(--border-active)', padding: '2rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border-color)', paddingBottom: '1.25rem', marginBottom: '1.5rem' }}>
+        <div className="modal-backdrop">
+          <div className="modal-box passport-modal-content" style={{ maxWidth: '680px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
               <div>
-                <span className="badge badge-preferred" style={{ marginBottom: '0.4rem' }}>
-                  Official SkillBridge Talent Passport
-                </span>
-                <h2 style={{ fontSize: '1.5rem', fontWeight: 800 }}>{passportData.candidate.name}</h2>
-                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                  Target Role: <strong style={{ color: '#a5b4fc' }}>{passportData.candidate.targetRole}</strong> • ID: <code style={{ fontFamily: 'var(--font-mono)' }}>{passportData.passportId}</code>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Verified Skills Passport</h2>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                  ID: {passportData.passportId || passportData.candidate?.candidateId || 'SKILLBRIDGE-VERIFIED'}
                 </div>
               </div>
-
               <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button className="btn btn-secondary" onClick={() => window.print()} style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem' }}>
-                  <Printer size={14} /> Print / Save PDF
+                <button className="btn btn-secondary" onClick={() => window.print()} title="Print or Save as PDF" style={{ padding: '0.4rem 0.6rem' }}>
+                  <Printer size={15} /> Print
                 </button>
-                <button className="btn btn-secondary" onClick={handleCopyMarkdown} style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem' }}>
-                  {copiedMarkdown ? <Check size={14} color="#6ee7b7" /> : <Copy size={14} />} {copiedMarkdown ? 'Copied' : 'Copy MD'}
+                <button className="btn btn-secondary" onClick={handleCopyPassportMarkdown} title="Copy Markdown" style={{ padding: '0.4rem 0.6rem' }}>
+                  {copySuccess ? <Check size={15} color="#10b981" /> : <Copy size={15} />}
                 </button>
-                <button className="btn btn-secondary" onClick={() => setShowPassportModal(false)} style={{ padding: '0.4rem 0.6rem' }}>
-                  <X size={16} />
+                <button className="btn btn-ghost" onClick={() => setShowPassportModal(false)} style={{ padding: '0.4rem' }}>
+                  <X size={18} />
                 </button>
               </div>
             </div>
 
-            <div className="grid-3" style={{ marginBottom: '1.5rem' }}>
-              <div className="stat-box">
-                <div className="stat-label">Role Alignment Index</div>
-                <div className="stat-value" style={{ color: '#6ee7b7' }}>
-                  {passportData.metrics.overallAlignment}%
+            <div style={{ background: '#090b10', padding: '1.25rem', borderRadius: '8px', border: '1px solid var(--border-color)', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>{passportData.candidate?.name || passportData.candidate?.fullName || 'Candidate'}</h3>
+                  <div style={{ fontSize: '0.85rem', color: '#60a5fa' }}>{passportData.candidate?.targetRole || 'Junior Backend Engineer'}</div>
                 </div>
-              </div>
-              <div className="stat-box">
-                <div className="stat-label">Verified Competencies</div>
-                <div className="stat-value">
-                  {passportData.metrics.verifiedSkillsCount} / {passportData.metrics.totalTrackedSkills}
-                </div>
-              </div>
-              <div className="stat-box">
-                <div className="stat-label">Submitted Projects</div>
-                <div className="stat-value">
-                  {passportData.metrics.submittedProjectsCount}
-                </div>
-              </div>
-            </div>
-
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.75rem' }}>
-              Demonstrated Skill Evidence Records
-            </h3>
-            <div style={{ overflowX: 'auto', marginBottom: '1.5rem' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-                <thead>
-                  <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border-color)' }}>
-                    <th style={{ padding: '0.6rem', textAlign: 'left' }}>Skill</th>
-                    <th style={{ padding: '0.6rem', textAlign: 'left' }}>Category</th>
-                    <th style={{ padding: '0.6rem', textAlign: 'left' }}>Evidence Source</th>
-                    <th style={{ padding: '0.6rem', textAlign: 'right' }}>Proficiency</th>
-                    <th style={{ padding: '0.6rem', textAlign: 'right' }}>Confidence</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {passportData.evidence.map((ev: any) => (
-                    <tr key={ev.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                      <td style={{ padding: '0.6rem', fontWeight: 600 }}>{ev.skillName}</td>
-                      <td style={{ padding: '0.6rem', color: 'var(--text-secondary)' }}>{ev.category}</td>
-                      <td style={{ padding: '0.6rem' }}>
-                        <span className="badge badge-preferred" style={{ fontSize: '0.7rem' }}>
-                          {ev.sourceType}
-                        </span>
-                      </td>
-                      <td style={{ padding: '0.6rem', textAlign: 'right', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
-                        {Math.round(ev.proficiencyScore * 100)}%
-                      </td>
-                      <td style={{ padding: '0.6rem', textAlign: 'right' }}>
-                        <span className={`badge ${ev.confidence === 'HIGH' ? 'badge-strength' : 'badge-gap'}`} style={{ fontSize: '0.7rem' }}>
-                          {ev.confidence}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.75rem' }}>
-              Prescribed Next Capstone Action Items
-            </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {passportData.recommendations.map((rec: any) => (
-                <div key={rec.id} style={{ background: 'rgba(255,255,255,0.02)', padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <strong style={{ fontSize: '0.9rem' }}>{rec.title}</strong>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                      Targets: {rec.targetSkillNames.join(', ')} • ~{rec.estimatedHours} hrs effort
-                    </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Target Alignment</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#10b981', fontFamily: 'var(--font-mono)' }}>
+                    {passportData.metrics?.targetRoleAlignment ?? passportData.alignmentScore ?? 74}%
                   </div>
-                  <span className={`badge ${rec.status === 'COMPLETED' ? 'badge-strength' : 'badge-gap'}`}>
-                    {rec.status}
-                  </span>
                 </div>
-              ))}
+              </div>
             </div>
 
-            <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)', textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              Verified by SkillBridge Labor Market Intelligence System • All scores backed by deterministic practical evaluations and source traceability.
+            <div style={{ marginBottom: '1.25rem' }}>
+              <h4 style={{ fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+                Demonstrated Competencies
+              </h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {(passportData.evidence || passportData.competencies || []).map((comp: any, idx: number) => {
+                  const score = comp.proficiencyScore ?? comp.proficiency ?? 0;
+                  return (
+                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#0e1118', padding: '0.75rem', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                      <div>
+                        <strong style={{ fontSize: '0.875rem' }}>{comp.skillName || comp.skill || comp.skillId}</strong>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>via {comp.sourceType || comp.provenance || 'PRACTICAL_EVALUATION'}</div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span className="badge badge-strength">{score >= 0.7 ? 'Proficient' : 'Competent'}</span>
+                        <span style={{ fontSize: '0.8rem', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{Math.round(score * 100)}%</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              <span>Verified by SkillBridge Labor Platform</span>
+              <span>Issued: {new Date().toLocaleDateString()}</span>
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL: AUTH (LOGIN & REGISTER) */}
+      {/* MODAL: AUTHENTICATION (SIGN IN / REGISTER) */}
       {showAuthModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 120, padding: '1rem' }}>
-          <div className="card" style={{ maxWidth: '440px', width: '100%', background: '#0b101e', border: '1px solid var(--border-active)', padding: '2rem' }}>
+        <div className="modal-backdrop">
+          <div className="modal-box">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <KeyRound size={20} color="#818cf8" />
-                <h3 style={{ fontSize: '1.3rem', fontWeight: 700 }}>
-                  {authMode === 'LOGIN' ? 'Sign In to SkillBridge' : 'Create Candidate Account'}
-                </h3>
-              </div>
-              <button className="btn btn-secondary" onClick={() => setShowAuthModal(false)} style={{ padding: '0.3rem 0.5rem' }}>
-                <X size={16} />
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>
+                {authMode === 'LOGIN' ? 'Sign In' : 'Create Account'}
+              </h2>
+              <button className="btn btn-ghost" onClick={() => setShowAuthModal(false)} style={{ padding: '0.25rem' }}>
+                <X size={18} />
               </button>
             </div>
 
             {authError && (
-              <div style={{ background: 'rgba(244, 63, 94, 0.1)', border: '1px solid var(--accent-rose)', color: '#fda4af', padding: '0.65rem', borderRadius: '6px', fontSize: '0.85rem', marginBottom: '1rem' }}>
+              <div style={{ color: '#fda4af', background: 'rgba(244, 63, 94, 0.1)', padding: '0.75rem', borderRadius: '6px', fontSize: '0.825rem', marginBottom: '1rem', border: '1px solid rgba(244, 63, 94, 0.2)' }}>
                 {authError}
               </div>
             )}
@@ -1986,108 +1730,71 @@ ${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 
             <form onSubmit={handleAuthSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {authMode === 'REGISTER' && (
                 <div>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.35rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>
                     Full Name
                   </label>
-                  <div style={{ position: 'relative' }}>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Shakib Al Hasan"
-                      value={authForm.fullName}
-                      onChange={e => setAuthForm({ ...authForm, fullName: e.target.value })}
-                      style={{ width: '100%', padding: '0.65rem 0.65rem 0.65rem 2.25rem', background: '#070b14', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.9rem', outline: 'none' }}
-                    />
-                    <UserIcon size={14} color="var(--text-muted)" style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)' }} />
-                  </div>
+                  <input
+                    type="text"
+                    placeholder="Ayman Rahman"
+                    value={authForm.fullName}
+                    onChange={e => setAuthForm({ ...authForm, fullName: e.target.value })}
+                    required
+                    style={{ width: '100%', padding: '0.65rem', background: '#0a0c10', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.85rem' }}
+                  />
                 </div>
               )}
 
               <div>
-                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.35rem' }}>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>
                   Email Address
                 </label>
-                <div style={{ position: 'relative' }}>
-                  <input
-                    type="email"
-                    required
-                    placeholder="name@example.com"
-                    value={authForm.email}
-                    onChange={e => setAuthForm({ ...authForm, email: e.target.value })}
-                    style={{ width: '100%', padding: '0.65rem 0.65rem 0.65rem 2.25rem', background: '#070b14', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.9rem', outline: 'none' }}
-                  />
-                  <Mail size={14} color="var(--text-muted)" style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)' }} />
-                </div>
+                <input
+                  type="email"
+                  placeholder="engineer@domain.com"
+                  value={authForm.email}
+                  onChange={e => setAuthForm({ ...authForm, email: e.target.value })}
+                  required
+                  style={{ width: '100%', padding: '0.65rem', background: '#0a0c10', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.85rem' }}
+                />
               </div>
 
               <div>
-                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.35rem' }}>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>
                   Password
                 </label>
-                <div style={{ position: 'relative' }}>
-                  <input
-                    type="password"
-                    required
-                    minLength={8}
-                    placeholder="At least 8 characters"
-                    value={authForm.password}
-                    onChange={e => setAuthForm({ ...authForm, password: e.target.value })}
-                    style={{ width: '100%', padding: '0.65rem 0.65rem 0.65rem 2.25rem', background: '#070b14', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.9rem', outline: 'none' }}
-                  />
-                  <KeyRound size={14} color="var(--text-muted)" style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)' }} />
-                </div>
+                <input
+                  type="password"
+                  placeholder="••••••••"
+                  value={authForm.password}
+                  onChange={e => setAuthForm({ ...authForm, password: e.target.value })}
+                  required
+                  style={{ width: '100%', padding: '0.65rem', background: '#0a0c10', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.85rem' }}
+                />
               </div>
 
-              {authMode === 'REGISTER' && (
-                <div>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.35rem' }}>
-                    Target Career Role
-                  </label>
-                  <select
-                    value={authForm.targetRoleId}
-                    onChange={e => setAuthForm({ ...authForm, targetRoleId: e.target.value })}
-                    style={{ width: '100%', padding: '0.65rem', background: '#070b14', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.85rem', outline: 'none' }}
-                  >
-                    <option value="role_junior_backend">Junior Backend Engineer</option>
-                  </select>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={isAuthLoading}
-                style={{ width: '100%', padding: '0.75rem', marginTop: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
-              >
-                <UserCheck size={15} />
-                {isAuthLoading ? 'Please wait...' : authMode === 'LOGIN' ? 'Sign In' : 'Create Account'}
+              <button type="submit" className="btn btn-primary" disabled={isAuthLoading} style={{ marginTop: '0.5rem' }}>
+                {isAuthLoading ? 'Authenticating...' : authMode === 'LOGIN' ? 'Sign In' : 'Create Account'}
               </button>
-
-              <div style={{ position: 'relative', textAlign: 'center', margin: '0.5rem 0' }}>
-                <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: '1px', background: 'var(--border-color)' }} />
-                <span style={{ position: 'relative', background: '#0d1322', padding: '0 0.75rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>OR QUICK DEMO</span>
-              </div>
 
               <button
                 type="button"
                 className="btn btn-secondary"
                 onClick={handleDemoLogin}
-                disabled={isAuthLoading}
-                style={{ width: '100%', padding: '0.65rem', borderColor: 'rgba(168, 85, 247, 0.4)', color: '#c084fc', background: 'rgba(168, 85, 247, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', fontSize: '0.85rem' }}
+                style={{ borderColor: '#3b82f6', color: '#93c5fd', marginTop: '0.25rem' }}
               >
-                <Sparkles size={14} /> Continue as Demo Candidate (1-Click)
+                <Sparkles size={14} /> Try Demo Account (1-Click)
               </button>
             </form>
 
             <div style={{ marginTop: '1.25rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
               {authMode === 'LOGIN' ? (
                 <span>
-                  Don't have an account?{' '}
+                  Need an account?{' '}
                   <button
                     onClick={() => { setAuthMode('REGISTER'); setAuthError(''); }}
-                    style={{ background: 'transparent', border: 'none', color: '#818cf8', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
+                    style={{ background: 'transparent', border: 'none', color: '#60a5fa', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
                   >
-                    Register now
+                    Register
                   </button>
                 </span>
               ) : (
@@ -2095,7 +1802,7 @@ ${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 
                   Already registered?{' '}
                   <button
                     onClick={() => { setAuthMode('LOGIN'); setAuthError(''); }}
-                    style={{ background: 'transparent', border: 'none', color: '#818cf8', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
+                    style={{ background: 'transparent', border: 'none', color: '#60a5fa', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
                   >
                     Sign In
                   </button>
