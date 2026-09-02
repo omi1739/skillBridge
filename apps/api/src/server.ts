@@ -385,6 +385,20 @@ app.get('/api/me/report', (req: Request, res: Response) => {
   });
 });
 
+import { curriculumService } from './services/curriculum.service';
+
+// 11. Curriculum vs. Market Intelligence
+app.get('/api/curriculum/institutions', (req: Request, res: Response) => {
+  res.json(curriculumService.getCurricula());
+});
+
+app.get('/api/curriculum/analyze', (req: Request, res: Response) => {
+  const institutionId = (req.query.institutionId as string) || 'curr_bsc_cse';
+  const roleId = (req.query.roleId as string) || 'role_junior_backend';
+  const analysis = curriculumService.analyzeCurriculum(institutionId, roleId);
+  res.json(analysis);
+});
+
 // 7. Jobs & Explainable Matching
 app.get('/api/jobs', (req: Request, res: Response) => {
   res.json(Array.from(store.jobs.values()));

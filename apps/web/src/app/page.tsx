@@ -8,7 +8,9 @@ import {
   SkillGap,
   ActionRecommendation,
   JobMatchResult,
-  ProjectEvidence
+  ProjectEvidence,
+  CurriculumProfile,
+  CurriculumComparisonResult
 } from '@skillbridge/types';
 import {
   TrendingUp,
@@ -36,13 +38,16 @@ import {
   Printer,
   Copy,
   Check,
-  X
+  X,
+  GraduationCap,
+  BookOpen,
+  HelpCircle
 } from 'lucide-react';
 
 const API_BASE = 'http://localhost:4000/api';
 
 export default function SkillBridgeApp() {
-  const [activeTab, setActiveTab] = useState<'market' | 'assessment' | 'sandbox' | 'gaps' | 'actions' | 'jobs'>('market');
+  const [activeTab, setActiveTab] = useState<'market' | 'curriculum' | 'assessment' | 'sandbox' | 'gaps' | 'actions' | 'jobs'>('market');
   const [role, setRole] = useState<Role | null>(null);
   const [assessment, setAssessment] = useState<Assessment | null>(null);
   const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
@@ -61,6 +66,11 @@ export default function SkillBridgeApp() {
   const [sandboxCode, setSandboxCode] = useState<string>('');
   const [sandboxResult, setSandboxResult] = useState<any | null>(null);
   const [isExecutingSandbox, setIsExecutingSandbox] = useState(false);
+
+  // Curriculum states
+  const [curricula, setCurricula] = useState<CurriculumProfile[]>([]);
+  const [selectedCurriculumId, setSelectedCurriculumId] = useState<string>('curr_bsc_cse');
+  const [curriculumAnalysis, setCurriculumAnalysis] = useState<CurriculumComparisonResult | null>(null);
 
   // Project Submission Form states
   const [showProjectModal, setShowProjectModal] = useState(false);
@@ -121,8 +131,26 @@ export default function SkillBridgeApp() {
       })
       .catch(() => {});
 
+    fetch(`${API_BASE}/curriculum/institutions`)
+      .then(res => res.json())
+      .then(data => setCurricula(data))
+      .catch(() => {});
+
+    fetch(`${API_BASE}/curriculum/analyze?institutionId=curr_bsc_cse&roleId=role_junior_backend`)
+      .then(res => res.json())
+      .then(data => setCurriculumAnalysis(data))
+      .catch(() => {});
+
     refreshUserData();
   }, []);
+
+  const handleCurriculumChange = (currId: string) => {
+    setSelectedCurriculumId(currId);
+    fetch(`${API_BASE}/curriculum/analyze?institutionId=${currId}&roleId=role_junior_backend`)
+      .then(res => res.json())
+      .then(data => setCurriculumAnalysis(data))
+      .catch(() => {});
+  };
 
   const handleOpenPassport = async () => {
     try {
@@ -275,6 +303,12 @@ ${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 
               <TrendingUp size={16} /> Market Demand
             </button>
             <button
+              className={`nav-tab-btn ${activeTab === 'curriculum' ? 'active' : ''}`}
+              onClick={() => setActiveTab('curriculum')}
+            >
+              <GraduationCap size={16} /> Curriculum Gap
+            </button>
+            <button
               className={`nav-tab-btn ${activeTab === 'assessment' ? 'active' : ''}`}
               onClick={() => setActiveTab('assessment')}
             >
@@ -402,7 +436,103 @@ ${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 
           </div>
         )}
 
-        {/* TAB 2: PRACTICAL DIAGNOSTIC ASSESSMENT */}
+        {/* TAB 2: CURRICULUM VS MARKET GAP ANALYZER */}
+        {activeTab === 'curriculum' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div className="card" style={{ background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(168, 85, 247, 0.05))' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                <GraduationCap size={22} color="#c084fc" />
+                <h2 className="card-title">Curriculum vs. Labor Market Intelligence</h2>
+              </div>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                Analyze the gap between university/bootcamp computer science syllabus and real-world backend engineering expectations.
+              </p>
+            </div>
+
+            {/* Select Curriculum */}
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+              {curricula.map(c => (
+                <button
+                  key={c.id}
+                  className={`btn ${selectedCurriculumId === c.id ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => handleCurriculumChange(c.id)}
+                  style={{ fontSize: '0.85rem' }}
+                >
+                  <BookOpen size={14} /> {c.institutionName}
+                </button>
+              ))}
+            </div>
+
+            {curriculumAnalysis && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                {/* Summary Score */}
+                <div className="grid-3">
+                  <div className="stat-box">
+                    <div className="stat-label">Syllabus Alignment Score</div>
+                    <div className="stat-value" style={{ color: curriculumAnalysis.marketAlignmentScore >= 65 ? '#6ee7b7' : '#fcd34d' }}>
+                      {curriculumAnalysis.marketAlignmentScore}%
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                      vs. Junior Backend Job Demand
+                    </div>
+                  </div>
+                  <div className="stat-box" style={{ gridColumn: 'span 2' }}>
+                    <div className="stat-label">Intelligence Summary</div>
+                    <p style={{ fontSize: '0.875rem', color: '#e2e8f0', marginTop: '0.25rem' }}>
+                      {curriculumAnalysis.summaryAnalysis}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid-2">
+                  {/* Left: What University Taught Well */}
+                  <div className="card">
+                    <h3 className="card-title" style={{ color: '#6ee7b7', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+                      <CheckCircle2 size={18} /> Strong Academic Foundation
+                    </h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      {curriculumAnalysis.strongAcademicAreas.map((item, idx) => (
+                        <div key={idx} style={{ background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.2)', padding: '0.85rem', borderRadius: '8px' }}>
+                          <strong style={{ color: '#a7f3d0', fontSize: '0.95rem' }}>{item.skill}</strong>
+                          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
+                            {item.reason}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Right: Critical Market Omissions */}
+                  <div className="card">
+                    <h3 className="card-title" style={{ color: '#fda4af', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+                      <AlertCircle size={18} /> Missing Industry Requirements
+                    </h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      {curriculumAnalysis.criticalMarketOmissions.map((item, idx) => (
+                        <div key={idx} style={{ background: 'rgba(244, 63, 94, 0.05)', border: '1px solid rgba(244, 63, 94, 0.2)', padding: '0.85rem', borderRadius: '8px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <strong style={{ color: '#fecdd3', fontSize: '0.95rem' }}>{item.skill}</strong>
+                            <span className="badge badge-critical" style={{ fontSize: '0.7rem' }}>
+                              Demanded by {item.marketDemand}% of Jobs
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: '#fb7185', fontWeight: 600, marginTop: '0.2rem' }}>
+                            Academic Status: {item.academicStatus}
+                          </div>
+                          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.35rem' }}>
+                            Bridge Action: {item.recommendation}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 3: PRACTICAL DIAGNOSTIC ASSESSMENT */}
         {activeTab === 'assessment' && assessment && (
           <div>
             {!attemptResult ? (
@@ -557,7 +687,7 @@ ${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 
           </div>
         )}
 
-        {/* TAB 3: CODE & SQL SANDBOX RUNNER */}
+        {/* TAB 4: CODE & SQL SANDBOX RUNNER */}
         {activeTab === 'sandbox' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             <div className="card" style={{ background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(16, 185, 129, 0.05))' }}>
@@ -708,7 +838,7 @@ ${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 
           </div>
         )}
 
-        {/* TAB 4: SKILL GAP ENGINE */}
+        {/* TAB 5: SKILL GAP ENGINE */}
         {activeTab === 'gaps' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             <div className="card" style={{ background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(6, 182, 212, 0.05))' }}>
@@ -762,7 +892,7 @@ ${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 
           </div>
         )}
 
-        {/* TAB 5: ACTION PLAN & CAPSTONE PROJECTS WITH GITHUB PORTFOLIO */}
+        {/* TAB 6: ACTION PLAN & CAPSTONE PROJECTS WITH GITHUB PORTFOLIO */}
         {activeTab === 'actions' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
             <div className="card">
@@ -879,7 +1009,7 @@ ${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 
           </div>
         )}
 
-        {/* TAB 6: EXPLAINABLE JOB MATCHING */}
+        {/* TAB 7: EXPLAINABLE JOB MATCHING */}
         {activeTab === 'jobs' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             <div className="card">
@@ -1013,7 +1143,6 @@ ${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 
       {showPassportModal && passportData && (
         <div className="passport-modal-container" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 110, padding: '1rem', overflowY: 'auto' }}>
           <div className="passport-modal-content card" style={{ maxWidth: '800px', width: '100%', maxHeight: '90vh', overflowY: 'auto', background: '#0b101e', border: '1px solid var(--border-active)', padding: '2rem' }}>
-            {/* Passport Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border-color)', paddingBottom: '1.25rem', marginBottom: '1.5rem' }}>
               <div>
                 <span className="badge badge-preferred" style={{ marginBottom: '0.4rem' }}>
@@ -1038,7 +1167,6 @@ ${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 
               </div>
             </div>
 
-            {/* Passport Summary Metrics */}
             <div className="grid-3" style={{ marginBottom: '1.5rem' }}>
               <div className="stat-box">
                 <div className="stat-label">Role Alignment Index</div>
@@ -1060,7 +1188,6 @@ ${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 
               </div>
             </div>
 
-            {/* Verified Evidence Table */}
             <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.75rem' }}>
               Demonstrated Skill Evidence Records
             </h3>
@@ -1099,7 +1226,6 @@ ${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 
               </table>
             </div>
 
-            {/* Priority Actions */}
             <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.75rem' }}>
               Prescribed Next Capstone Action Items
             </h3>

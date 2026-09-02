@@ -165,6 +165,35 @@ export interface ProjectEvidence {
   submittedAt: string;
 }
 
+export interface CurriculumCoverageArea {
+  skillId: string;
+  canonicalName: string;
+  academicEmphasis: 'HIGH' | 'MODERATE' | 'THEORY_ONLY' | 'NOT_COVERED';
+  practicalHoursEstimate: number;
+  syllabusTopics: string[];
+}
+
+export interface CurriculumProfile {
+  id: string;
+  institutionName: string;
+  type: 'UNIVERSITY_DEGREE' | 'BOOTCAMP';
+  coverageAreas: CurriculumCoverageArea[];
+}
+
+export interface CurriculumComparisonResult {
+  institution: string;
+  targetRole: string;
+  marketAlignmentScore: number; // 0 to 100%
+  strongAcademicAreas: Array<{ skill: string; reason: string }>;
+  criticalMarketOmissions: Array<{
+    skill: string;
+    marketDemand: number;
+    academicStatus: string;
+    recommendation: string;
+  }>;
+  summaryAnalysis: string;
+}
+
 export interface JobListing {
   id: string;
   title: string;
