@@ -54,13 +54,15 @@ import {
   KeyRound,
   Mail,
   User as UserIcon,
-  UserCheck
+  UserCheck,
+  Lock,
+  Home
 } from 'lucide-react';
 
 const API_BASE = 'http://localhost:4000/api';
 
 export default function SkillBridgeApp() {
-  const [activeTab, setActiveTab] = useState<'market' | 'curriculum' | 'assessment' | 'sandbox' | 'gaps' | 'actions' | 'jobs' | 'admin'>('market');
+  const [activeTab, setActiveTab] = useState<'home' | 'market' | 'curriculum' | 'assessment' | 'sandbox' | 'gaps' | 'actions' | 'jobs' | 'admin'>('home');
 
   // Auth state
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -228,7 +230,7 @@ export default function SkillBridgeApp() {
       .then(data => setCurriculumAnalysis(data))
       .catch(() => {});
 
-    // Restore a persisted session if present, otherwise load the demo user.
+    // Restore a persisted session if present
     const savedToken = localStorage.getItem('skillbridge_token');
     const savedUser = localStorage.getItem('skillbridge_user');
     const savedProfile = localStorage.getItem('skillbridge_profile');
@@ -238,25 +240,36 @@ export default function SkillBridgeApp() {
         setCurrentProfile(JSON.parse(savedProfile));
         setAuthToken(savedToken);
       } catch {
-        loadDemoUser();
+        localStorage.removeItem('skillbridge_token');
+        localStorage.removeItem('skillbridge_user');
+        localStorage.removeItem('skillbridge_profile');
       }
-    } else {
-      loadDemoUser();
     }
 
     refreshUserData();
   }, []);
 
-  const loadDemoUser = () => {
-    fetch(`${API_BASE}/me?userId=demo_user_01`, { headers: authHeaders() })
-      .then(res => res.json())
-      .then(data => {
-        if (data.user && data.profile) {
-          setCurrentUser(data.user);
-          setCurrentProfile(data.profile);
-        }
-      })
-      .catch(() => {});
+  const handleDemoLogin = async () => {
+    setIsAuthLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/me?userId=demo_user_01`);
+      const data = await res.json();
+      if (data.user && data.profile) {
+        const token = 'demo_token_demo_user_01';
+        setCurrentUser(data.user);
+        setCurrentProfile(data.profile);
+        setAuthToken(token);
+        localStorage.setItem('skillbridge_token', token);
+        localStorage.setItem('skillbridge_user', JSON.stringify(data.user));
+        localStorage.setItem('skillbridge_profile', JSON.stringify(data.profile));
+        setShowAuthModal(false);
+        refreshUserData();
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsAuthLoading(false);
+    }
   };
 
   const handleAuthSubmit = async (e: React.FormEvent) => {
@@ -313,7 +326,7 @@ export default function SkillBridgeApp() {
     setCurrentUser(null);
     setCurrentProfile(null);
     setAuthToken(null);
-    loadDemoUser();
+    setActiveTab('home');
   };
 
   const handleCurriculumChange = (currId: string) => {
@@ -325,6 +338,11 @@ export default function SkillBridgeApp() {
   };
 
   const handleOpenPassport = async () => {
+    if (!currentUser) {
+      setAuthMode('LOGIN');
+      setShowAuthModal(true);
+      return;
+    }
     try {
       const res = await fetch(`${API_BASE}/me/report?userId=${activeUserId}`, { headers: authHeaders() });
       const data = await res.json();
@@ -504,17 +522,55 @@ ${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 
 
   const activeChallenge = challenges[selectedChallengeIdx];
 
+  const AuthGate = ({ featureName, description }: { featureName: string; description: string }) => (
+    <div className="card" style={{ textAlign: 'center', padding: '4rem 2rem', margin: '2rem 0', background: 'linear-gradient(180deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%)', border: '1px solid rgba(99, 102, 241, 0.3)' }}>
+      <div style={{ width: '68px', height: '68px', borderRadius: '50%', background: 'rgba(99, 102, 241, 0.15)', border: '1px solid rgba(99, 102, 241, 0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem', color: '#818cf8' }}>
+        <Lock size={32} />
+      </div>
+      <div className="badge badge-accent" style={{ marginBottom: '1rem', background: 'rgba(99, 102, 241, 0.15)', color: '#a5b4fc' }}>
+        AUTHENTICATION REQUIRED
+      </div>
+      <h2 style={{ fontSize: '1.85rem', fontWeight: 800, marginBottom: '0.75rem', color: '#f8fafc' }}>
+        Sign In to Access {featureName}
+      </h2>
+      <p style={{ color: 'var(--text-secondary)', maxWidth: '580px', margin: '0 auto 2rem', lineHeight: 1.6, fontSize: '1rem' }}>
+        {description}
+      </p>
+      <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+        <button className="btn btn-primary" onClick={() => { setAuthMode('LOGIN'); setShowAuthModal(true); }}>
+          <LogIn size={16} /> Sign In
+        </button>
+        <button className="btn btn-secondary" onClick={() => { setAuthMode('REGISTER'); setShowAuthModal(true); }}>
+          <UserPlus size={16} /> Create Free Account
+        </button>
+        <button
+          className="btn btn-secondary"
+          onClick={handleDemoLogin}
+          style={{ borderColor: 'rgba(168, 85, 247, 0.4)', color: '#c084fc', background: 'rgba(168, 85, 247, 0.1)' }}
+        >
+          <Sparkles size={16} /> Continue as Demo Candidate (1-Click)
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <div>
       {/* Top Navbar */}
       <header className="navbar">
         <div className="container nav-container">
-          <a href="#" className="brand">
+          <a href="#" className="brand" onClick={(e) => { e.preventDefault(); setActiveTab('home'); }}>
             <span className="brand-badge">PROTOTYPE</span>
             <span>SkillBridge</span>
           </a>
 
           <nav className="nav-tabs">
+            <button
+              className={`nav-tab-btn ${activeTab === 'home' ? 'active' : ''}`}
+              onClick={() => setActiveTab('home')}
+            >
+              <Home size={16} /> Home
+            </button>
             <button
               className={`nav-tab-btn ${activeTab === 'market' ? 'active' : ''}`}
               onClick={() => setActiveTab('market')}
@@ -532,36 +588,42 @@ ${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 
               onClick={() => setActiveTab('assessment')}
             >
               <BrainCircuit size={16} /> Diagnostic Test
+              {!currentUser && <Lock size={11} style={{ opacity: 0.5, marginLeft: '0.2rem' }} />}
             </button>
             <button
               className={`nav-tab-btn ${activeTab === 'sandbox' ? 'active' : ''}`}
               onClick={() => setActiveTab('sandbox')}
             >
               <Code2 size={16} /> Code & SQL Sandbox
+              {!currentUser && <Lock size={11} style={{ opacity: 0.5, marginLeft: '0.2rem' }} />}
             </button>
             <button
               className={`nav-tab-btn ${activeTab === 'gaps' ? 'active' : ''}`}
               onClick={() => setActiveTab('gaps')}
             >
               <BarChart3 size={16} /> Gap Engine
+              {!currentUser && <Lock size={11} style={{ opacity: 0.5, marginLeft: '0.2rem' }} />}
             </button>
             <button
               className={`nav-tab-btn ${activeTab === 'actions' ? 'active' : ''}`}
               onClick={() => setActiveTab('actions')}
             >
-              <Rocket size={16} /> Action Plan & Portfolio
+              <Rocket size={16} /> Action Plan
+              {!currentUser && <Lock size={11} style={{ opacity: 0.5, marginLeft: '0.2rem' }} />}
             </button>
             <button
               className={`nav-tab-btn ${activeTab === 'jobs' ? 'active' : ''}`}
               onClick={() => setActiveTab('jobs')}
             >
               <Briefcase size={16} /> Job Match
+              {!currentUser && <Lock size={11} style={{ opacity: 0.5, marginLeft: '0.2rem' }} />}
             </button>
             <button
               className={`nav-tab-btn ${activeTab === 'admin' ? 'active' : ''}`}
               onClick={() => setActiveTab('admin')}
             >
               <Sliders size={16} /> Admin & Research
+              {!currentUser && <Lock size={11} style={{ opacity: 0.5, marginLeft: '0.2rem' }} />}
             </button>
           </nav>
 
@@ -597,6 +659,7 @@ ${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 
 
             <button className="btn btn-secondary" onClick={handleOpenPassport} style={{ fontSize: '0.85rem', padding: '0.45rem 0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <FileText size={15} color="#818cf8" /> Skill Passport
+              {!currentUser && <Lock size={11} style={{ opacity: 0.5 }} />}
             </button>
           </div>
         </div>
@@ -604,18 +667,179 @@ ${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 
 
       {/* Main Content Area */}
       <div className="container" style={{ paddingBottom: '5rem' }}>
-        {/* Hero Header */}
-        <section className="hero">
-          <div className="hero-pill">
-            <ShieldCheck size={14} /> Evidence-Based Labor Market Intelligence
+        {/* Hero Header for Non-Home Tabs */}
+        {activeTab !== 'home' && (
+          <section className="hero">
+            <div className="hero-pill">
+              <ShieldCheck size={14} /> Evidence-Based Labor Market Intelligence
+            </div>
+            <h1 className="hero-title">
+              Target Role: <span className="hero-gradient">{role?.title || 'Junior Backend Engineer'}</span>
+            </h1>
+            <p className="hero-subtitle">
+              Curated market requirements for Bangladesh & emerging hubs. Compare your verified diagnostic evidence against industry demand.
+            </p>
+          </section>
+        )}
+
+        {/* TAB 0: HOME / LANDING PAGE */}
+        {activeTab === 'home' && (
+          <div className="home-container">
+            {/* Hero Section */}
+            <section className="hero-section">
+              <div className="hero-badge">
+                <Sparkles size={14} /> Evidence-Based Labor Market Intelligence v2.0
+              </div>
+              <h1 className="hero-title">
+                Bridge the Gap Between Your Skills and Real Industry Demand
+              </h1>
+              <p className="hero-subtitle">
+                SkillBridge replaces arbitrary self-assessments with empirical labor market frequencies, practical SQL & coding execution sandboxes, and deterministic mathematical gap rankings.
+              </p>
+
+              <div className="hero-actions">
+                {currentUser ? (
+                  <button className="btn btn-primary" onClick={() => setActiveTab('assessment')}>
+                    <BrainCircuit size={18} /> Take Practical Diagnostic
+                  </button>
+                ) : (
+                  <button className="btn btn-primary" onClick={() => { setAuthMode('REGISTER'); setShowAuthModal(true); }}>
+                    <Rocket size={18} /> Get Started Free
+                  </button>
+                )}
+                <button className="btn btn-secondary" onClick={() => setActiveTab('market')}>
+                  <TrendingUp size={18} /> Explore Market Demand
+                </button>
+                <button className="btn btn-secondary" onClick={() => setActiveTab('curriculum')}>
+                  <GraduationCap size={18} /> Academic vs Market Gap
+                </button>
+                {!currentUser && (
+                  <button className="btn btn-secondary" onClick={handleDemoLogin} style={{ borderColor: 'rgba(168, 85, 247, 0.4)', color: '#c084fc', background: 'rgba(168, 85, 247, 0.08)' }}>
+                    <Sparkles size={16} /> 1-Click Demo Access
+                  </button>
+                )}
+              </div>
+
+              {/* Hero Stats */}
+              <div className="hero-stats-grid">
+                <div className="hero-stat-card">
+                  <div className="stat-number">142</div>
+                  <div className="stat-label">Active Job Postings Analyzed</div>
+                  <div className="stat-sub">Strict sample-size attribution (N=142)</div>
+                </div>
+                <div className="hero-stat-card">
+                  <div className="stat-number">9</div>
+                  <div className="stat-label">Canonical Skills Tracked</div>
+                  <div className="stat-sub">Ontology-mapped with synonym aliases</div>
+                </div>
+                <div className="hero-stat-card">
+                  <div className="stat-number">100%</div>
+                  <div className="stat-label">Practical Evidence Verified</div>
+                  <div className="stat-sub">Live SQL & async logic execution</div>
+                </div>
+                <div className="hero-stat-card">
+                  <div className="stat-number">W × D × (1 - P)</div>
+                  <div className="stat-label">Deterministic Gap Formula</div>
+                  <div className="stat-sub">Transparent mathematical prioritization</div>
+                </div>
+              </div>
+            </section>
+
+            {/* 4-Step Architecture Pipeline */}
+            <section className="pipeline-section">
+              <h2 className="section-heading">How SkillBridge Works</h2>
+              <p className="section-subheading">A closed-loop evidence pipeline designed for early-career software engineers</p>
+
+              <div className="pipeline-grid">
+                <div className="pipeline-card">
+                  <div className="pipeline-step-badge">01</div>
+                  <div className="pipeline-icon" style={{ color: '#38bdf8' }}><TrendingUp size={28} /></div>
+                  <h3>Market Demand Ingestion</h3>
+                  <p>We analyze real job postings to measure empirical demand frequencies and role requirements with sample-attributed confidence.</p>
+                  <button className="card-link-btn" onClick={() => setActiveTab('market')}>View Market Data &rarr;</button>
+                </div>
+
+                <div className="pipeline-card">
+                  <div className="pipeline-step-badge">02</div>
+                  <div className="pipeline-icon" style={{ color: '#a855f7' }}><BrainCircuit size={28} /></div>
+                  <h3>Practical Diagnostic Sandbox</h3>
+                  <p>Complete multi-tier evaluations including SQL relational queries, JavaScript concurrency limits, and sub-skill diagnostics.</p>
+                  <button className="card-link-btn" onClick={() => { if (currentUser) setActiveTab('assessment'); else { setAuthMode('LOGIN'); setShowAuthModal(true); } }}>Test Capabilities &rarr;</button>
+                </div>
+
+                <div className="pipeline-card">
+                  <div className="pipeline-step-badge">03</div>
+                  <div className="pipeline-icon" style={{ color: '#f59e0b' }}><BarChart3 size={28} /></div>
+                  <h3>Deterministic Gap Ranking</h3>
+                  <p>Mathematical formula weighs role importance and market scarcity against verified competency to prioritize high-leverage gaps.</p>
+                  <button className="card-link-btn" onClick={() => { if (currentUser) setActiveTab('gaps'); else { setAuthMode('LOGIN'); setShowAuthModal(true); } }}>View Gaps &rarr;</button>
+                </div>
+
+                <div className="pipeline-card">
+                  <div className="pipeline-step-badge">04</div>
+                  <div className="pipeline-icon" style={{ color: '#22c55e' }}><ShieldCheck size={28} /></div>
+                  <h3>Verified Talent Passport</h3>
+                  <p>Cryptographically signed talent passport displaying verified execution badges, GitHub capstone signals, and explainable job matches.</p>
+                  <button className="card-link-btn" onClick={() => { if (currentUser) handleOpenPassport(); else { setAuthMode('LOGIN'); setShowAuthModal(true); } }}>View Passport &rarr;</button>
+                </div>
+              </div>
+            </section>
+
+            {/* Feature Comparison / Highlights */}
+            <section className="features-preview-section">
+              <div className="feature-highlight-card">
+                <div>
+                  <span className="badge badge-preferred" style={{ marginBottom: '0.75rem' }}>RESEARCH INTELLIGENCE</span>
+                  <h3>Academic Curriculum vs. Industry Demand Gap</h3>
+                  <p style={{ marginTop: '0.5rem' }}>
+                    Universities often emphasize theoretical automata and compilers while under-indexing on production REST architecture, Docker containerization, and ORM performance. Our analyzer benchmarks academic syllabi directly against market requirements.
+                  </p>
+                </div>
+                <button className="btn btn-secondary" onClick={() => setActiveTab('curriculum')} style={{ marginTop: '1.25rem', alignSelf: 'flex-start' }}>
+                  <GraduationCap size={16} /> Open Curriculum Analyzer
+                </button>
+              </div>
+
+              <div className="feature-highlight-card">
+                <div>
+                  <span className="badge badge-strength" style={{ marginBottom: '0.75rem' }}>PRACTICAL VALIDATION</span>
+                  <h3>In-Memory Execution Sandboxes</h3>
+                  <p style={{ marginTop: '0.5rem' }}>
+                    Forget standard multiple-choice guessing. SkillBridge features an interactive SQL sandbox running against live relational test tables and an async execution worker for concurrency limit verification.
+                  </p>
+                </div>
+                <button className="btn btn-secondary" onClick={() => { if (currentUser) setActiveTab('sandbox'); else { setAuthMode('LOGIN'); setShowAuthModal(true); } }} style={{ marginTop: '1.25rem', alignSelf: 'flex-start' }}>
+                  <Code2 size={16} /> Try Execution Sandbox
+                </button>
+              </div>
+            </section>
+
+            {/* Call to Action Bar */}
+            <section className="cta-banner">
+              <h2>Ready to Benchmark Your Engineering Competencies?</h2>
+              <p>Sign in to test your skills, receive personalized project roadmaps, and generate your printable Skill Passport.</p>
+              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '1.5rem', flexWrap: 'wrap' }}>
+                {!currentUser ? (
+                  <>
+                    <button className="btn btn-primary" onClick={() => { setAuthMode('REGISTER'); setShowAuthModal(true); }}>
+                      <UserPlus size={18} /> Create Free Account
+                    </button>
+                    <button className="btn btn-secondary" onClick={() => { setAuthMode('LOGIN'); setShowAuthModal(true); }}>
+                      <LogIn size={18} /> Sign In
+                    </button>
+                    <button className="btn btn-secondary" onClick={handleDemoLogin} style={{ borderColor: 'var(--accent-purple)', color: '#c084fc' }}>
+                      <Sparkles size={18} /> Continue as Demo Candidate
+                    </button>
+                  </>
+                ) : (
+                  <button className="btn btn-primary" onClick={() => setActiveTab('assessment')}>
+                    <BrainCircuit size={18} /> Open Diagnostic Center
+                  </button>
+                )}
+              </div>
+            </section>
           </div>
-          <h1 className="hero-title">
-            Target Role: <span className="hero-gradient">{role?.title || 'Junior Backend Engineer'}</span>
-          </h1>
-          <p className="hero-subtitle">
-            Curated market requirements for Bangladesh & emerging hubs. Compare your verified diagnostic evidence against industry demand.
-          </p>
-        </section>
+        )}
 
         {/* TAB 1: MARKET DEMAND EXPLORER */}
         {activeTab === 'market' && role && (
@@ -785,8 +1009,14 @@ ${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 
         )}
 
         {/* TAB 3: PRACTICAL DIAGNOSTIC ASSESSMENT */}
-        {activeTab === 'assessment' && assessment && (
-          <div>
+        {activeTab === 'assessment' && (
+          !currentUser ? (
+            <AuthGate
+              featureName="Practical Diagnostic Assessment"
+              description="Benchmark your backend competencies through 6 multi-part diagnostic challenges with automated sub-skill scoring across HTTP architecture, SQL queries, and Node.js event-loop logic."
+            />
+          ) : assessment && (
+            <div>
             {!attemptResult ? (
               <div className="card">
                 <div className="card-header">
@@ -937,11 +1167,18 @@ ${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 
               </div>
             )}
           </div>
-        )}
+        )
+      )}
 
         {/* TAB 4: CODE & SQL SANDBOX RUNNER */}
         {activeTab === 'sandbox' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          !currentUser ? (
+            <AuthGate
+              featureName="Interactive Code & SQL Sandbox Runner"
+              description="Write and execute live SQL queries and async JavaScript concurrency processors against automated evaluation suites to earn verified credentials."
+            />
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             <div className="card" style={{ background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(16, 185, 129, 0.05))' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
                 <Terminal size={20} color="#6ee7b7" />
@@ -1088,11 +1325,18 @@ ${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 
               </div>
             )}
           </div>
-        )}
+        )
+      )}
 
         {/* TAB 5: SKILL GAP ENGINE */}
         {activeTab === 'gaps' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          !currentUser ? (
+            <AuthGate
+              featureName="Deterministic Skill Gap Engine"
+              description="Calculate your mathematical gap priority across canonical backend skills using transparent market weighting: Priority = Role Weight × Market Demand × (1 - Demonstrated Proficiency)."
+            />
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             <div className="card" style={{ background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(6, 182, 212, 0.05))' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
                 <Sparkles size={20} color="#a5b4fc" />
@@ -1142,11 +1386,18 @@ ${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 
               })}
             </div>
           </div>
-        )}
+        )
+      )}
 
         {/* TAB 6: ACTION PLAN & CAPSTONE PROJECTS WITH GITHUB PORTFOLIO */}
         {activeTab === 'actions' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+          !currentUser ? (
+            <AuthGate
+              featureName="Action Plan & GitHub Capstone Verification"
+              description="Submit your GitHub repository URLs to parse project signals and track structured capstone projects to bridge your gaps."
+            />
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
             <div className="card">
               <div className="card-header">
                 <div>
@@ -1259,11 +1510,18 @@ ${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 
               </div>
             </div>
           </div>
-        )}
+        )
+      )}
 
         {/* TAB 7: EXPLAINABLE JOB MATCHING */}
         {activeTab === 'jobs' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          !currentUser ? (
+            <AuthGate
+              featureName="Explainable Job Compatibility Matches"
+              description="Inspect explainable matching algorithms that benchmark your verified competencies directly against live employer vacancies."
+            />
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             <div className="card">
               <h2 className="card-title">Explainable Job Recommendations</h2>
               <p className="card-subtitle">
@@ -1322,11 +1580,18 @@ ${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 
               </div>
             </div>
           </div>
-        )}
+        )
+      )}
 
         {/* TAB 8: ADMIN & RESEARCH CONSOLE */}
         {activeTab === 'admin' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          !currentUser ? (
+            <AuthGate
+              featureName="Admin & Research Console"
+              description="Sign in with administrative privileges to manage canonical skill aliases, tune role weights, and author diagnostic questions."
+            />
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             <div className="card" style={{ background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(245, 158, 11, 0.05))' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
                 <Sliders size={22} color="#fbbf24" />
@@ -1513,7 +1778,8 @@ ${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 
               </div>
             </div>
           </div>
-        )}
+        )
+      )}
       </div>
 
       {/* MODAL 1: SUBMIT PROJECT REPO */}
@@ -1795,6 +2061,21 @@ ${passportData.recommendations.map((r: any) => `- [${r.status === 'COMPLETED' ? 
               >
                 <UserCheck size={15} />
                 {isAuthLoading ? 'Please wait...' : authMode === 'LOGIN' ? 'Sign In' : 'Create Account'}
+              </button>
+
+              <div style={{ position: 'relative', textAlign: 'center', margin: '0.5rem 0' }}>
+                <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: '1px', background: 'var(--border-color)' }} />
+                <span style={{ position: 'relative', background: '#0d1322', padding: '0 0.75rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>OR QUICK DEMO</span>
+              </div>
+
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={handleDemoLogin}
+                disabled={isAuthLoading}
+                style={{ width: '100%', padding: '0.65rem', borderColor: 'rgba(168, 85, 247, 0.4)', color: '#c084fc', background: 'rgba(168, 85, 247, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', fontSize: '0.85rem' }}
+              >
+                <Sparkles size={14} /> Continue as Demo Candidate (1-Click)
               </button>
             </form>
 

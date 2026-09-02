@@ -1,5 +1,17 @@
-import { Controller, Get, Post, Body, Inject, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Inject,
+  HttpCode,
+  HttpStatus,
+  UseGuards
+} from '@nestjs/common';
 import { NestSandboxService } from './sandbox.service';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { AuthPayload } from '../../services/auth.service';
 
 @Controller('sandbox')
 export class SandboxController {
@@ -12,13 +24,23 @@ export class SandboxController {
 
   @Post('run-sql')
   @HttpCode(HttpStatus.OK)
-  async runSQL(@Body() body: { challengeId: string; query: string; userId?: string }) {
-    return this.sandboxService.runSQL(body.challengeId, body.query, body.userId || 'demo_user_01');
+  @UseGuards(JwtAuthGuard)
+  async runSQL(
+    @CurrentUser() user: AuthPayload | undefined,
+    @Body() body: { challengeId: string; query: string; userId?: string }
+  ) {
+    const candidateId = user?.userId || body.userId || 'demo_user_01';
+    return this.sandboxService.runSQL(body.challengeId, body.query, candidateId);
   }
 
   @Post('run-code')
   @HttpCode(HttpStatus.OK)
-  async runCode(@Body() body: { challengeId: string; code: string; userId?: string }) {
-    return this.sandboxService.runCode(body.challengeId, body.code, body.userId || 'demo_user_01');
+  @UseGuards(JwtAuthGuard)
+  async runCode(
+    @CurrentUser() user: AuthPayload | undefined,
+    @Body() body: { challengeId: string; code: string; userId?: string }
+  ) {
+    const candidateId = user?.userId || body.userId || 'demo_user_01';
+    return this.sandboxService.runCode(body.challengeId, body.code, candidateId);
   }
 }
