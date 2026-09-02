@@ -5,13 +5,17 @@ export class MatchService {
   /**
    * Evaluates job compatibility based on demonstrated candidate evidence.
    */
-  public matchJob(userId: string, jobId: string): JobMatchResult {
-    const job = store.jobs.get(jobId);
+  public async matchJob(userId: string, jobId: string): Promise<JobMatchResult> {
+    const jobs = await store.getJobs();
+    const job = jobs.find(j => j.id === jobId);
     if (!job) {
       throw new Error(`Job ${jobId} not found`);
     }
 
-    const userEvidenceList: SkillEvidence[] = store.evidence.get(userId) || [];
+    const allSkills = await store.getSkills();
+    const skillName = (id: string) => allSkills.find(s => s.id === id)?.canonicalName || id;
+
+    const userEvidenceList: SkillEvidence[] = await store.getEvidence(userId);
 
     const matchedSkills: Array<{ skillId: string; canonicalName: string; proficiency: number }> = [];
     const missingSkills: Array<{ skillId: string; canonicalName: string; isRequired: boolean }> = [];
@@ -21,43 +25,34 @@ export class MatchService {
 
     // Evaluate required skills (weight: 1.0)
     for (const skillId of job.requiredSkillIds) {
-      const skill = store.skills.get(skillId);
-      const name = skill ? skill.canonicalName : skillId;
       totalPoints += 100;
-
       const ev = userEvidenceList.find(e => e.skillId === skillId);
       if (ev && ev.proficiencyScore > 0.3) {
-        const proficiency = ev.proficiencyScore;
-        earnedPoints += proficiency * 100;
-        matchedSkills.push({ skillId, canonicalName: name, proficiency });
+        earnedPoints += ev.proficiencyScore * 100;
+        matchedSkills.push({ skillId, canonicalName: skillName(skillId), proficiency: ev.proficiencyScore });
       } else {
-        missingSkills.push({ skillId, canonicalName: name, isRequired: true });
+        missingSkills.push({ skillId, canonicalName: skillName(skillId), isRequired: true });
       }
     }
 
     // Evaluate preferred skills (weight: 0.5)
     for (const skillId of job.preferredSkillIds) {
-      const skill = store.skills.get(skillId);
-      const name = skill ? skill.canonicalName : skillId;
       totalPoints += 50;
-
       const ev = userEvidenceList.find(e => e.skillId === skillId);
       if (ev && ev.proficiencyScore > 0.3) {
-        const proficiency = ev.proficiencyScore;
-        earnedPoints += proficiency * 50;
-        matchedSkills.push({ skillId, canonicalName: name, proficiency });
+        earnedPoints += ev.proficiencyScore * 50;
+        matchedSkills.push({ skillId, canonicalName: skillName(skillId), proficiency: ev.proficiencyScore });
       } else {
-        missingSkills.push({ skillId, canonicalName: name, isRequired: false });
+        missingSkills.push({ skillId, canonicalName: skillName(skillId), isRequired: false });
       }
     }
 
     const matchScore = totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0;
 
-    // Build human-readable explanation
-    let explanation = '';
     const matchedNames = matchedSkills.map(m => m.canonicalName).join(', ');
     const missingReqNames = missingSkills.filter(m => m.isRequired).map(m => m.canonicalName).join(', ');
 
+    let explanation = '';
     if (matchScore >= 75) {
       explanation = `Strong match (${matchScore}%). You have demonstrated evidence in key requirements: ${matchedNames}.`;
     } else if (matchScore >= 45) {
@@ -75,10 +70,11 @@ export class MatchService {
     };
   }
 
-  public matchAllJobs(userId: string): JobMatchResult[] {
+  public async matchAllJobs(userId: string): Promise<JobMatchResult[]> {
+    const jobs = await store.getJobs();
     const results: JobMatchResult[] = [];
-    for (const job of store.jobs.values()) {
-      results.push(this.matchJob(userId, job.id));
+    for (const job of jobs) {
+      results.push(await this.matchJob(userId, job.id));
     }
     return results.sort((a, b) => b.matchScore - a.matchScore);
   }

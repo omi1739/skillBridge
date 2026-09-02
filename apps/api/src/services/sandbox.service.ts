@@ -94,7 +94,7 @@ ORDER BY c.name ASC;`,
   /**
    * Safe in-memory SQL execution against test tables.
    */
-  public executeSQL(challengeId: string, query: string, userId: string = 'demo_user_01'): ExecutionResult {
+  public async executeSQL(challengeId: string, query: string, userId: string = 'demo_user_01'): Promise<ExecutionResult> {
     const startTime = Date.now();
     const cleanQuery = query.trim().toUpperCase();
 
@@ -128,7 +128,7 @@ ORDER BY c.name ASC;`,
         { department_name: 'Marketing', employee_count: 2, avg_salary: 65000.00 }
       ];
 
-      const verifiedEvidence = this.recordVerifiedEvidence(userId, 'skill_sql', 0.95);
+      const verifiedEvidence = await this.recordVerifiedEvidence(userId, 'skill_sql', 0.95);
 
       return {
         passed: true,
@@ -154,7 +154,7 @@ ORDER BY c.name ASC;`,
         { name: 'Tanvir Hossain', email: 'tanvir@example.com' }
       ];
 
-      const verifiedEvidence = this.recordVerifiedEvidence(userId, 'skill_postgresql', 0.90);
+      const verifiedEvidence = await this.recordVerifiedEvidence(userId, 'skill_postgresql', 0.90);
 
       return {
         passed: true,
@@ -218,7 +218,7 @@ ORDER BY c.name ASC;`,
 
         let verifiedEvidence;
         if (allPassed) {
-          verifiedEvidence = this.recordVerifiedEvidence(userId, 'skill_javascript', 0.95);
+          verifiedEvidence = await this.recordVerifiedEvidence(userId, 'skill_javascript', 0.95);
         }
 
         return {
@@ -244,8 +244,8 @@ ORDER BY c.name ASC;`,
     };
   }
 
-  private recordVerifiedEvidence(userId: string, skillId: string, proficiency: number): SkillEvidence {
-    const userEvidence = store.evidence.get(userId) || [];
+  private async recordVerifiedEvidence(userId: string, skillId: string, proficiency: number): Promise<SkillEvidence> {
+    const userEvidence = await store.getEvidence(userId);
     const existingIdx = userEvidence.findIndex(e => e.skillId === skillId && e.sourceType === 'ASSESSMENT');
 
     const newEv: SkillEvidence = {
@@ -266,10 +266,10 @@ ORDER BY c.name ASC;`,
       userEvidence.push(newEv);
     }
 
-    store.evidence.set(userId, userEvidence);
+    await store.saveEvidence(userId, userEvidence);
 
     // Recompute gaps with newly elevated practical score
-    gapService.calculateGaps(userId, 'role_junior_backend');
+    await gapService.calculateGaps(userId, 'role_junior_backend');
 
     return newEv;
   }

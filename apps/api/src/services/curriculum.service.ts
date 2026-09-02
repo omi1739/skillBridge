@@ -135,9 +135,9 @@ export class CurriculumService {
     return this.curricula;
   }
 
-  public analyzeCurriculum(curriculumId: string, roleId: string = 'role_junior_backend'): CurriculumComparisonResult {
+  public async analyzeCurriculum(curriculumId: string, roleId: string = 'role_junior_backend'): Promise<CurriculumComparisonResult> {
     const curriculum = this.curricula.find(c => c.id === curriculumId) || this.curricula[0];
-    const role: Role | undefined = store.roles.get(roleId);
+    const role: Role | undefined = await store.getRole(roleId);
     if (!role) {
       throw new Error(`Role ${roleId} not found`);
     }
