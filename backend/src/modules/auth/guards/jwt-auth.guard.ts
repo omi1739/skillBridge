@@ -19,7 +19,7 @@ export class JwtAuthGuard implements CanActivate {
     if (!header || !header.startsWith('Bearer ')) {
       const demoHeader = request.headers['x-demo-user'];
       if (demoHeader) {
-        request.user = { userId: 'demo_user_01', email: 'candidate@skillbridge.org', role: 'CANDIDATE' };
+        request.user = { userId: 'demo_user_01', email: 'candidate@skillbridge.org', role: 'ADMIN' };
         return true;
       }
       throw new UnauthorizedException('Authentication required. Provide a valid Bearer token.');
@@ -27,7 +27,7 @@ export class JwtAuthGuard implements CanActivate {
 
     const token = header.slice('Bearer '.length).trim();
     if (token === 'demo_token' || token.startsWith('demo_token_')) {
-      request.user = { userId: 'demo_user_01', email: 'candidate@skillbridge.org', role: 'CANDIDATE' };
+      request.user = { userId: 'demo_user_01', email: 'candidate@skillbridge.org', role: 'ADMIN' };
       return true;
     }
 

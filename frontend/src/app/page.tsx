@@ -44,12 +44,10 @@ import {
   Sliders,
   LogIn,
   LogOut,
-  UserPlus,
-  Lock,
   RotateCcw
 } from 'lucide-react';
 
-const API_BASE = 'http://localhost:4000/api';
+const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000/api').replace(/\/$/, '');
 
 export default function SkillBridgeApp() {
   type AppTab = 'market' | 'curriculum' | 'assessment' | 'sandbox' | 'gaps' | 'actions' | 'jobs' | 'admin';
@@ -97,6 +95,7 @@ export default function SkillBridgeApp() {
   const [gaps, setGaps] = useState<SkillGap[]>([]);
   const [recommendations, setRecommendations] = useState<ActionRecommendation[]>([]);
   const [jobMatches, setJobMatches] = useState<JobMatchResult[]>([]);
+  const [expandedMatchId, setExpandedMatchId] = useState<string | null>(null);
   const [userProjects, setUserProjects] = useState<ProjectEvidence[]>([]);
 
   // Project submission modal state
@@ -105,7 +104,7 @@ export default function SkillBridgeApp() {
     title: '',
     repoUrl: '',
     description: '',
-    declaredSkills: [] as string[]
+    primarySkills: [] as string[]
   });
   const [isSubmittingProject, setIsSubmittingProject] = useState(false);
   const [projectSuccessMsg, setProjectSuccessMsg] = useState('');
@@ -134,27 +133,27 @@ export default function SkillBridgeApp() {
     fetch(`${API_BASE}/me/gaps?userId=${userId}&roleId=role_junior_backend`)
       .then(res => res.json())
       .then(data => { if (Array.isArray(data)) setGaps(data); })
-      .catch(() => {});
+      .catch((err) => console.error('[SkillBridge] Data load failed:', err));
 
     fetch(`${API_BASE}/me/recommendations?userId=${userId}&roleId=role_junior_backend`)
       .then(res => res.json())
       .then(data => { if (Array.isArray(data)) setRecommendations(data); })
-      .catch(() => {});
+      .catch((err) => console.error('[SkillBridge] Data load failed:', err));
 
     fetch(`${API_BASE}/jobs/matches?userId=${userId}&roleId=role_junior_backend`)
       .then(res => res.json())
       .then(data => { if (Array.isArray(data)) setJobMatches(data); })
-      .catch(() => {});
+      .catch((err) => console.error('[SkillBridge] Data load failed:', err));
 
     fetch(`${API_BASE}/me/projects?userId=${userId}`)
       .then(res => res.json())
       .then(data => setUserProjects(data))
-      .catch(() => {});
+      .catch((err) => console.error('[SkillBridge] Data load failed:', err));
 
     fetch(`${API_BASE}/admin/overview`)
       .then(res => res.json())
       .then(data => setAdminOverview(data))
-      .catch(() => {});
+      .catch((err) => console.error('[SkillBridge] Data load failed:', err));
   };
 
   const fetchRoleAndSkills = () => {
@@ -170,12 +169,12 @@ export default function SkillBridgeApp() {
           });
         }
       })
-      .catch(() => {});
+      .catch((err) => console.error('[SkillBridge] Data load failed:', err));
 
     fetch(`${API_BASE}/skills`)
       .then(res => res.json())
       .then(data => setSkills(data))
-      .catch(() => {});
+      .catch((err) => console.error('[SkillBridge] Data load failed:', err));
   };
 
   useEffect(() => {
@@ -183,8 +182,13 @@ export default function SkillBridgeApp() {
 
     fetch(`${API_BASE}/assessments/assessment_backend_diagnostic`)
       .then(res => res.json())
-      .then(data => setAssessment(data))
-      .catch(() => {});
+      .then(data => {
+        setAssessment(data);
+        if (data && data.timeLimitMinutes) {
+          setTimeRemaining(data.timeLimitMinutes * 60);
+        }
+      })
+      .catch((err) => console.error('[SkillBridge] Data load failed:', err));
 
     fetch(`${API_BASE}/sandbox/challenges`)
       .then(res => res.json())
@@ -194,17 +198,17 @@ export default function SkillBridgeApp() {
           setSandboxCode(data[0].starterCode);
         }
       })
-      .catch(() => {});
+      .catch((err) => console.error('[SkillBridge] Data load failed:', err));
 
     fetch(`${API_BASE}/curriculum/institutions`)
       .then(res => res.json())
       .then(data => setCurricula(data))
-      .catch(() => {});
+      .catch((err) => console.error('[SkillBridge] Data load failed:', err));
 
     fetch(`${API_BASE}/curriculum/analyze?institutionId=curr_bsc_cse&roleId=role_junior_backend`)
       .then(res => res.json())
       .then(data => setCurriculumAnalysis(data))
-      .catch(() => {});
+      .catch((err) => console.error('[SkillBridge] Data load failed:', err));
 
     // Restore saved session if available
     const savedToken = localStorage.getItem('skillbridge_token');
@@ -224,6 +228,20 @@ export default function SkillBridgeApp() {
 
     refreshUserData();
   }, []);
+
+  useEffect(() => {
+    if (!assessment || timeRemaining <= 0) return;
+    const interval = setInterval(() => {
+      setTimeRemaining(prev => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [assessment, timeRemaining > 0]);
 
   const handleDemoLogin = async () => {
     setIsAuthLoading(true);
@@ -313,7 +331,7 @@ export default function SkillBridgeApp() {
     fetch(`${API_BASE}/curriculum/analyze?institutionId=${currId}&roleId=role_junior_backend`)
       .then(res => res.json())
       .then(data => setCurriculumAnalysis(data))
-      .catch(() => {});
+      .catch((err) => console.error('[SkillBridge] Data load failed:', err));
   };
 
   const handleOpenPassport = async () => {
@@ -334,22 +352,37 @@ export default function SkillBridgeApp() {
 
   const handleCopyPassportMarkdown = () => {
     if (!passportData) return;
-    navigator.clipboard.writeText(passportData.markdown);
+    const candidate = passportData.candidate || {};
+    const alignment = passportData.metrics?.overallAlignment ?? passportData.alignmentScore ?? 0;
+    const lines = [
+      `# SkillBridge Evidence Passport`,
+      ``,
+      `**Candidate:** ${candidate.name || candidate.fullName || 'Candidate'}`,
+      `**Target Role:** ${candidate.targetRole || 'Junior Backend Engineer'}`,
+      `**Passport ID:** ${passportData.passportId || 'SKILLBRIDGE-VERIFIED'}`,
+      `**Target Alignment:** ${alignment}%`,
+      ``,
+      `## Demonstrated Competencies`,
+      ...(passportData.evidence || passportData.competencies || []).map(
+        (comp: any) => `- ${comp.skillName || comp.skill || comp.skillId} — ${Math.round((comp.proficiencyScore ?? comp.proficiency ?? 0) * 100)}% via ${comp.sourceType || comp.provenance || 'PRACTICAL_EVALUATION'}`
+      )
+    ];
+    navigator.clipboard.writeText(lines.join('\n'));
     setCopySuccess(true);
     setTimeout(() => setCopySuccess(false), 2500);
   };
 
-  const handleAnswerSelect = (questionId: string, optionId: string) => {
-    setUserAnswers(prev => ({ ...prev, [questionId]: optionId }));
+  const handleAnswerSelect = (questionId: string, optionText: string) => {
+    setUserAnswers(prev => ({ ...prev, [questionId]: optionText }));
   };
 
   const handleSubmitAssessment = async () => {
     if (!assessment) return;
     setIsSubmittingAssessment(true);
 
-    const answersPayload = Object.entries(userAnswers).map(([questionId, selectedOptionId]) => ({
+    const answersPayload = Object.entries(userAnswers).map(([questionId, selectedAnswer]) => ({
       questionId,
-      selectedOptionId
+      selectedAnswer
     }));
 
     try {
@@ -358,7 +391,7 @@ export default function SkillBridgeApp() {
         headers: authHeaders(),
         body: JSON.stringify({
           userId: activeUserId,
-          timeSpentSeconds: 1800 - timeRemaining,
+          timeSpentSeconds: assessment.timeLimitMinutes * 60 - timeRemaining,
           answers: answersPayload
         })
       });
@@ -372,6 +405,13 @@ export default function SkillBridgeApp() {
       setIsSubmittingAssessment(false);
     }
   };
+
+  useEffect(() => {
+    if (assessment && timeRemaining === 0 && Object.keys(userAnswers).length > 0 && !attemptResult) {
+      handleSubmitAssessment();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeRemaining]);
 
   const handleSelectChallenge = (idx: number) => {
     setSelectedChallengeIdx(idx);
@@ -388,8 +428,8 @@ export default function SkillBridgeApp() {
 
     const endpoint = challenge.type === 'SQL' ? `${API_BASE}/sandbox/run-sql` : `${API_BASE}/sandbox/run-code`;
     const payload = challenge.type === 'SQL'
-      ? { challengeId: challenge.id, sqlQuery: sandboxCode, userId: activeUserId }
-      : { challengeId: challenge.id, userCode: sandboxCode, userId: activeUserId };
+      ? { challengeId: challenge.id, query: sandboxCode, userId: activeUserId }
+      : { challengeId: challenge.id, code: sandboxCode, userId: activeUserId };
 
     try {
       const res = await fetch(endpoint, {
@@ -426,14 +466,14 @@ export default function SkillBridgeApp() {
           title: projectForm.title,
           repoUrl: projectForm.repoUrl,
           description: projectForm.description,
-          declaredSkills: projectForm.declaredSkills
+          primarySkills: projectForm.primarySkills
         })
       });
 
       const data = await res.json();
       if (data.project) {
         setProjectSuccessMsg(`Successfully verified ${data.project.title}! Detected stack: ${data.project.detectedStack.join(', ')}.`);
-        setProjectForm({ title: '', repoUrl: '', description: '', declaredSkills: [] });
+        setProjectForm({ title: '', repoUrl: '', description: '', primarySkills: [] });
         refreshUserData();
         setTimeout(() => {
           setShowProjectModal(false);
@@ -452,12 +492,12 @@ export default function SkillBridgeApp() {
     if (!aliasForm.rawAlias || !aliasForm.canonicalSkillId) return;
 
     try {
-      const res = await fetch(`${API_BASE}/admin/aliases`, {
+      const res = await fetch(`${API_BASE}/admin/skills/alias`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
         body: JSON.stringify({
-          rawAlias: aliasForm.rawAlias,
-          canonicalSkillId: aliasForm.canonicalSkillId
+          alias: aliasForm.rawAlias,
+          skillId: aliasForm.canonicalSkillId
         })
       });
       const data = await res.json();
@@ -479,7 +519,7 @@ export default function SkillBridgeApp() {
     try {
       const res = await fetch(`${API_BASE}/admin/roles/${role.id}/weights`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
         body: JSON.stringify(editingSkillWeight)
       });
       const data = await res.json();
@@ -547,7 +587,7 @@ export default function SkillBridgeApp() {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.15rem' }}>
-            {role.roleSkills.map(rs => {
+            {role?.roleSkills ? role.roleSkills.map(rs => {
               const pct = Math.round(rs.marketDemandFrequency * 100);
               const isRequired = rs.required;
 
@@ -579,7 +619,9 @@ export default function SkillBridgeApp() {
                   </div>
                 </div>
               );
-            })}
+            }) : (
+              <div style={{ color: 'var(--text-muted)', padding: '1rem 0' }}>Loading market demand data...</div>
+            )}
           </div>
         </div>
       </div>
@@ -767,7 +809,7 @@ export default function SkillBridgeApp() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#131722', border: '1px solid var(--border-color)', padding: '0.45rem 0.85rem', borderRadius: '6px', fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}>
             <Clock size={15} color="#93c5fd" />
-            <span>30:00</span>
+            <span>{`${Math.floor(timeRemaining / 60).toString().padStart(2, '0')}:${(timeRemaining % 60).toString().padStart(2, '0')}`}</span>
           </div>
         </div>
 
@@ -800,13 +842,12 @@ export default function SkillBridgeApp() {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
             {currentQuestion.options?.map((opt, idx) => {
-              const optId = `opt_${idx}`;
-              const isSelected = userAnswers[currentQuestion.id] === optId;
+              const isSelected = userAnswers[currentQuestion.id] === opt;
               return (
                 <button
-                  key={optId}
+                  key={idx}
                   className={`option-btn ${isSelected ? 'selected' : ''}`}
-                  onClick={() => handleAnswerSelect(currentQuestion.id, optId)}
+                  onClick={() => handleAnswerSelect(currentQuestion.id, opt)}
                 >
                   <span>{opt}</span>
                   {isSelected && <Check size={16} color="#60a5fa" />}
@@ -890,13 +931,13 @@ export default function SkillBridgeApp() {
                   {activeChallenge.description}
                 </p>
 
-                {activeChallenge.schemaContext && (
+                {activeChallenge.schemaPreview && (
                   <div style={{ marginTop: '1.25rem' }}>
                     <div style={{ fontSize: '0.725rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
                       Schema Tables
                     </div>
                     <pre className="code-block" style={{ fontSize: '0.75rem' }}>
-                      <code>{activeChallenge.schemaContext}</code>
+                      <code>{activeChallenge.schemaPreview}</code>
                     </pre>
                   </div>
                 )}
@@ -950,8 +991,8 @@ export default function SkillBridgeApp() {
                       </span>
                     </div>
 
-                    {sandboxResult.error && (
-                      <p style={{ color: '#fda4af', fontSize: '0.8rem' }}>{sandboxResult.error}</p>
+                    {(sandboxResult.error || sandboxResult.message) && (
+                      <p style={{ color: '#fda4af', fontSize: '0.8rem' }}>{sandboxResult.error || sandboxResult.message}</p>
                     )}
 
                     {sandboxResult.testResults && (
@@ -1142,11 +1183,11 @@ export default function SkillBridgeApp() {
                     fontFamily: 'var(--font-mono)',
                     fontWeight: 700,
                     fontSize: '1.1rem',
-                    background: match.matchScore >= 0.7 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(59, 130, 246, 0.1)',
-                    color: match.matchScore >= 0.7 ? '#6ee7b7' : '#93c5fd',
-                    border: `1px solid ${match.matchScore >= 0.7 ? 'rgba(16, 185, 129, 0.3)' : 'rgba(59, 130, 246, 0.3)'}`
+                    background: match.matchScore >= 70 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+                    color: match.matchScore >= 70 ? '#6ee7b7' : '#93c5fd',
+                    border: `1px solid ${match.matchScore >= 70 ? 'rgba(16, 185, 129, 0.3)' : 'rgba(59, 130, 246, 0.3)'}`
                   }}>
-                    {Math.round(match.matchScore * 100)}% Match
+                    {Math.round(match.matchScore)}% Match
                   </div>
                 </div>
               </div>
@@ -1161,10 +1202,26 @@ export default function SkillBridgeApp() {
                   <strong style={{ color: '#6ee7b7' }}>{match.matchedSkills.map(m => m.canonicalName).join(', ') || 'None yet'}</strong>
                 </div>
 
-                <button className="btn btn-secondary" style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }}>
-                  View Role Details
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => setExpandedMatchId(expandedMatchId === match.job.id ? null : match.job.id)}
+                  style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }}
+                >
+                  {expandedMatchId === match.job.id ? 'Hide Details' : 'View Role Details'}
                 </button>
               </div>
+
+              {expandedMatchId === match.job.id && (
+                <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>{match.explanation}</div>
+                  {match.missingSkills.length > 0 && (
+                    <div style={{ fontSize: '0.775rem', marginTop: '0.5rem' }}>
+                      <span style={{ color: 'var(--text-muted)' }}>Missing Skills: </span>
+                      <span style={{ color: '#fda4af' }}>{match.missingSkills.map(m => m.canonicalName).join(', ')}</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -1188,7 +1245,7 @@ export default function SkillBridgeApp() {
           <div className="stat-grid-3">
             <div className="stat-card">
               <div className="stat-label">Total Jobs Ingested</div>
-              <div className="stat-value">{adminOverview.totalJobsIngested}</div>
+              <div className="stat-value">{adminOverview.totalJobsCount}</div>
             </div>
             <div className="stat-card">
               <div className="stat-label">Canonical Skills</div>
@@ -1196,7 +1253,7 @@ export default function SkillBridgeApp() {
             </div>
             <div className="stat-card">
               <div className="stat-label">Recognized Aliases</div>
-              <div className="stat-value">{adminOverview.aliasMappingsCount}</div>
+              <div className="stat-value">{adminOverview.totalAliasesCount}</div>
             </div>
           </div>
         )}
@@ -1272,7 +1329,7 @@ export default function SkillBridgeApp() {
                     }}
                     style={{ width: '100%', padding: '0.65rem', background: '#0a0c10', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.85rem' }}
                   >
-                    {role.roleSkills.map(rs => (
+                    {(role?.roleSkills || []).map(rs => (
                       <option key={rs.skillId} value={rs.skillId}>
                         {rs.skill?.canonicalName || rs.skillId}
                       </option>
@@ -1392,15 +1449,30 @@ export default function SkillBridgeApp() {
       {currentUser ? (
         <div className="app-shell">
           {/* Vertical Sidebar */}
+          {/* Modern Polished Sidebar */}
           <aside className="app-sidebar">
             <div className="sidebar-header">
-              <div>
-                <div className="brand">
+              <div className="sidebar-brand-row">
+                <div className="sidebar-brand">
+                  <div className="sidebar-brand-icon">
+                    <Terminal size={17} />
+                  </div>
                   <span>SkillBridge</span>
-                  <span className="brand-badge-pill">TRACK</span>
                 </div>
-                <div className="sidebar-track-pill">
+                <div className="sidebar-status-pill">
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+                  <span>v2.0</span>
+                </div>
+              </div>
+
+              <div className="sidebar-track-card">
+                <div className="sidebar-track-label">ACTIVE ROLE TRACK</div>
+                <div className="sidebar-track-title">
                   <span>{role?.title || 'Junior Backend Engineer'}</span>
+                </div>
+                <div className="sidebar-track-meta">
+                  <span className="sidebar-meta-chip">Bangladesh</span>
+                  <span className="sidebar-meta-chip">N = 142 Jobs</span>
                 </div>
               </div>
             </div>
@@ -1412,29 +1484,45 @@ export default function SkillBridgeApp() {
                   className={`sidebar-item ${activeTab === 'market' ? 'active' : ''}`}
                   onClick={() => setActiveTab('market')}
                 >
-                  <TrendingUp size={16} /> Job Market Demand
+                  <span className="sidebar-item-content">
+                    <TrendingUp size={16} />
+                    <span>Job Market Demand</span>
+                  </span>
+                  <span className="sidebar-item-badge">142</span>
                 </button>
                 <button
                   className={`sidebar-item ${activeTab === 'curriculum' ? 'active' : ''}`}
                   onClick={() => setActiveTab('curriculum')}
                 >
-                  <GraduationCap size={16} /> University Syllabi Gap
+                  <span className="sidebar-item-content">
+                    <GraduationCap size={16} />
+                    <span>University Syllabi</span>
+                  </span>
+                  <span className="sidebar-item-badge">Gap</span>
                 </button>
               </div>
 
               <div>
-                <div className="sidebar-section-title">Practical Tests</div>
+                <div className="sidebar-section-title">Practical Benchmarks</div>
                 <button
                   className={`sidebar-item ${activeTab === 'assessment' ? 'active' : ''}`}
                   onClick={() => setActiveTab('assessment')}
                 >
-                  <BrainCircuit size={16} /> Diagnostic Test
+                  <span className="sidebar-item-content">
+                    <BrainCircuit size={16} />
+                    <span>Diagnostic Test</span>
+                  </span>
+                  <span className="sidebar-item-badge">6 Qs</span>
                 </button>
                 <button
                   className={`sidebar-item ${activeTab === 'sandbox' ? 'active' : ''}`}
                   onClick={() => setActiveTab('sandbox')}
                 >
-                  <Terminal size={16} /> SQL & Code Sandbox
+                  <span className="sidebar-item-content">
+                    <Terminal size={16} />
+                    <span>SQL & Code Sandbox</span>
+                  </span>
+                  <span className="sidebar-item-badge">Interactive</span>
                 </button>
               </div>
 
@@ -1444,32 +1532,68 @@ export default function SkillBridgeApp() {
                   className={`sidebar-item ${activeTab === 'gaps' ? 'active' : ''}`}
                   onClick={() => setActiveTab('gaps')}
                 >
-                  <BarChart3 size={16} /> My Skill Gaps
+                  <span className="sidebar-item-content">
+                    <BarChart3 size={16} />
+                    <span>My Skill Gaps</span>
+                  </span>
+                  <span className="sidebar-item-badge" style={{ color: '#fb7185', background: 'rgba(244,63,94,0.12)' }}>
+                    {gaps.length > 0 ? `${gaps.length} Gaps` : 'Priority'}
+                  </span>
                 </button>
                 <button
                   className={`sidebar-item ${activeTab === 'actions' ? 'active' : ''}`}
                   onClick={() => setActiveTab('actions')}
                 >
-                  <Rocket size={16} /> Projects to Build
+                  <span className="sidebar-item-content">
+                    <Rocket size={16} />
+                    <span>Projects to Build</span>
+                  </span>
+                  <span className="sidebar-item-badge">Portfolio</span>
                 </button>
                 <button
                   className={`sidebar-item ${activeTab === 'jobs' ? 'active' : ''}`}
                   onClick={() => setActiveTab('jobs')}
                 >
-                  <Briefcase size={16} /> Matching Jobs
+                  <span className="sidebar-item-content">
+                    <Briefcase size={16} />
+                    <span>Matching Jobs</span>
+                  </span>
+                  <span className="sidebar-item-badge" style={{ color: '#6ee7b7', background: 'rgba(16,185,129,0.12)' }}>
+                    {jobMatches.length > 0 ? `${jobMatches.length} Roles` : 'Live'}
+                  </span>
                 </button>
               </div>
 
               <div>
-                <div className="sidebar-section-title">System</div>
+                <div className="sidebar-section-title">Platform</div>
                 <button
                   className={`sidebar-item ${activeTab === 'admin' ? 'active' : ''}`}
                   onClick={() => setActiveTab('admin')}
                 >
-                  <Sliders size={16} /> Admin & Weights
+                  <span className="sidebar-item-content">
+                    <Sliders size={16} />
+                    <span>Admin & Weights</span>
+                  </span>
+                  <span className="sidebar-item-badge">Tuner</span>
                 </button>
               </div>
             </nav>
+
+            {/* Quick Readiness Widget */}
+            <div className="sidebar-progress-box">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Diagnostic Benchmark</span>
+                <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', fontWeight: 700, color: attemptResult ? (attemptResult.passed ? '#10b981' : '#f59e0b') : '#60a5fa' }}>
+                  {attemptResult ? `${attemptResult.score}%` : 'Not Taken'}
+                </span>
+              </div>
+              <div className="progress-container" style={{ margin: 0, height: '4px', background: '#0a0c12' }}>
+                <div
+                  className="progress-bar progress-indigo"
+                  style={{ width: attemptResult ? `${attemptResult.score}%` : '20%' }}
+                />
+              </div>
+            </div>
 
             <div className="sidebar-footer">
               <div className="sidebar-user-card">
@@ -1481,24 +1605,26 @@ export default function SkillBridgeApp() {
                     {currentProfile?.fullName || currentUser.email.split('@')[0]}
                   </div>
                   <div className="sidebar-user-role">
-                    {currentUser.email === 'candidate@skillbridge.org' ? 'Demo Candidate' : 'Active Candidate'}
+                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+                    <span>{currentUser.email === 'candidate@skillbridge.org' ? 'Demo Candidate' : 'Verified Candidate'}</span>
                   </div>
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <div className="sidebar-actions-row">
                 <button
                   className="btn btn-secondary"
                   onClick={handleOpenPassport}
-                  style={{ flex: 1, padding: '0.45rem 0.5rem', fontSize: '0.75rem' }}
+                  style={{ flex: 1, padding: '0.45rem 0.65rem', fontSize: '0.775rem' }}
                 >
-                  <FileText size={14} /> Skill Passport
+                  <FileText size={14} color="#60a5fa" />
+                  <span>Skill Passport</span>
                 </button>
                 <button
                   className="btn btn-secondary"
                   onClick={handleLogout}
                   title="Sign Out"
-                  style={{ padding: '0.45rem 0.6rem' }}
+                  style={{ padding: '0.45rem 0.65rem' }}
                 >
                   <LogOut size={14} />
                 </button>
@@ -1671,7 +1797,7 @@ export default function SkillBridgeApp() {
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Target Alignment</div>
                   <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#10b981', fontFamily: 'var(--font-mono)' }}>
-                    {passportData.metrics?.targetRoleAlignment ?? passportData.alignmentScore ?? 74}%
+                    {passportData.metrics?.overallAlignment ?? passportData.alignmentScore ?? 74}%
                   </div>
                 </div>
               </div>

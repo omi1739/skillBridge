@@ -2,7 +2,7 @@
   "name": "@skillbridge/api",
   "version": "1.0.0",
   "private": true,
-  "main": "dist/server.js",
+  "main": "dist/main.js",
   "scripts": {
     "dev": "tsx watch src/main.ts",
     "build": "tsc",

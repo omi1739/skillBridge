@@ -20,7 +20,7 @@ import {
 import { query, withTransaction } from './client';
 import { authService } from '../services/auth.service';
 
-const SCHEMA_PATH = path.resolve(__dirname, '../../../../docs/architecture/schema.sql');
+const SCHEMA_PATH = path.resolve(__dirname, '../../../docs/architecture/schema.sql');
 
 export async function applySchema(): Promise<void> {
   const sql = fs.readFileSync(SCHEMA_PATH, 'utf8');

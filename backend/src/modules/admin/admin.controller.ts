@@ -1,5 +1,8 @@
-import { Controller, Get, Post, Patch, Param, Body, Inject } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Body, Inject, UseGuards } from '@nestjs/common';
 import { AdminService } from './admin.service';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 
 @Controller('admin')
 export class AdminController {
@@ -11,11 +14,15 @@ export class AdminController {
   }
 
   @Post('skills/alias')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
   async addSkillAlias(@Body() body: { skillId: string; alias: string }) {
     return this.adminService.addSkillAlias(body.skillId, body.alias);
   }
 
   @Patch('roles/:id/weights')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
   async updateRoleWeights(
     @Param('id') roleId: string,
     @Body() body: { skillId: string; roleWeight?: number; marketDemandFrequency?: number }
@@ -24,6 +31,8 @@ export class AdminController {
   }
 
   @Post('questions')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
   async addQuestion(
     @Body() body: {
       assessmentId?: string;

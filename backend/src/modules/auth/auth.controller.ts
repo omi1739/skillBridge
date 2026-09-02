@@ -51,19 +51,19 @@ export class AuthController {
   }
 
   @Patch('me/profile')
-  async updateProfile(@Body() body: { userId?: string; fullName?: string; targetRoleId?: string; githubUrl?: string; portfolioUrl?: string; bio?: string }) {
-    const userId = body.userId || 'demo_user_01';
-    return this.authService.updateProfile(userId, body);
+  @UseGuards(JwtAuthGuard)
+  async updateProfile(@CurrentUser() user: AuthPayload, @Body() body: { fullName?: string; targetRoleId?: string; githubUrl?: string; portfolioUrl?: string; bio?: string }) {
+    return this.authService.updateProfile(user.userId, body);
   }
 
   @Post('me/skills/declare')
   @HttpCode(HttpStatus.OK)
-  async declareSkill(@Body() body: { userId?: string; skillId?: string; proficiencyScore?: number }) {
-    const userId = body.userId || 'demo_user_01';
+  @UseGuards(JwtAuthGuard)
+  async declareSkill(@CurrentUser() user: AuthPayload, @Body() body: { skillId?: string; proficiencyScore?: number }) {
     if (!body.skillId) {
       throw new BadRequestException('skillId is required');
     }
-    return this.authService.declareSkill(userId, body.skillId, body.proficiencyScore);
+    return this.authService.declareSkill(user.userId, body.skillId, body.proficiencyScore);
   }
 
   @Get('me/gaps')
