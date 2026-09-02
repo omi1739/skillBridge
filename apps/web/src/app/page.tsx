@@ -7,7 +7,8 @@ import {
   AssessmentAttempt,
   SkillGap,
   ActionRecommendation,
-  JobMatchResult
+  JobMatchResult,
+  ProjectEvidence
 } from '@skillbridge/types';
 import {
   TrendingUp,
@@ -27,7 +28,10 @@ import {
   Play,
   Terminal,
   Sparkles,
-  Table
+  Github,
+  FolderGit2,
+  ExternalLink,
+  PlusCircle
 } from 'lucide-react';
 
 const API_BASE = 'http://localhost:4000/api';
@@ -43,6 +47,7 @@ export default function SkillBridgeApp() {
   const [gaps, setGaps] = useState<SkillGap[]>([]);
   const [recommendations, setRecommendations] = useState<ActionRecommendation[]>([]);
   const [jobMatches, setJobMatches] = useState<JobMatchResult[]>([]);
+  const [projects, setProjects] = useState<ProjectEvidence[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Sandbox states
@@ -51,6 +56,16 @@ export default function SkillBridgeApp() {
   const [sandboxCode, setSandboxCode] = useState<string>('');
   const [sandboxResult, setSandboxResult] = useState<any | null>(null);
   const [isExecutingSandbox, setIsExecutingSandbox] = useState(false);
+
+  // Project Submission Form states
+  const [showProjectModal, setShowProjectModal] = useState(false);
+  const [projectForm, setProjectForm] = useState({
+    title: '',
+    repoUrl: '',
+    description: '',
+    primarySkills: ['Node.js', 'PostgreSQL', 'REST APIs', 'Docker']
+  });
+  const [isSubmittingProject, setIsSubmittingProject] = useState(false);
 
   // Fetch initial data from API
   const refreshUserData = () => {
@@ -63,6 +78,16 @@ export default function SkillBridgeApp() {
       .then(res => res.json())
       .then(data => setJobMatches(data))
       .catch(() => {});
+
+    fetch(`${API_BASE}/me/projects?userId=demo_user_01`)
+      .then(res => res.json())
+      .then(data => setProjects(data))
+      .catch(() => {});
+
+    fetch(`${API_BASE}/me/recommendations?userId=demo_user_01`)
+      .then(res => res.json())
+      .then(data => setRecommendations(data))
+      .catch(() => {});
   };
 
   useEffect(() => {
@@ -74,11 +99,6 @@ export default function SkillBridgeApp() {
     fetch(`${API_BASE}/assessments/assessment_backend_diagnostic`)
       .then(res => res.json())
       .then(data => setAssessment(data))
-      .catch(() => {});
-
-    fetch(`${API_BASE}/me/recommendations?userId=demo_user_01`)
-      .then(res => res.json())
-      .then(data => setRecommendations(data))
       .catch(() => {});
 
     fetch(`${API_BASE}/sandbox/challenges`)
@@ -164,6 +184,36 @@ export default function SkillBridgeApp() {
     }
   };
 
+  const handleSubmitProject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!projectForm.title || !projectForm.repoUrl) return;
+
+    setIsSubmittingProject(true);
+    try {
+      const res = await fetch(`${API_BASE}/me/projects`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: 'demo_user_01',
+          ...projectForm
+        })
+      });
+      const data = await res.json();
+      setShowProjectModal(false);
+      setProjectForm({
+        title: '',
+        repoUrl: '',
+        description: '',
+        primarySkills: ['Node.js', 'PostgreSQL', 'REST APIs', 'Docker']
+      });
+      refreshUserData();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSubmittingProject(false);
+    }
+  };
+
   const activeChallenge = challenges[selectedChallengeIdx];
 
   return (
@@ -205,7 +255,7 @@ export default function SkillBridgeApp() {
               className={`nav-tab-btn ${activeTab === 'actions' ? 'active' : ''}`}
               onClick={() => setActiveTab('actions')}
             >
-              <Rocket size={16} /> Action Plan
+              <Rocket size={16} /> Action Plan & Portfolio
             </button>
             <button
               className={`nav-tab-btn ${activeTab === 'jobs' ? 'active' : ''}`}
@@ -475,7 +525,6 @@ export default function SkillBridgeApp() {
               </p>
             </div>
 
-            {/* Challenge Picker Tabs */}
             <div style={{ display: 'flex', gap: '0.75rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
               {challenges.map((ch, idx) => (
                 <button
@@ -492,7 +541,6 @@ export default function SkillBridgeApp() {
 
             {activeChallenge && (
               <div className="grid-2">
-                {/* Left: Problem & Schema */}
                 <div className="card">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                     <span className="badge badge-preferred">{activeChallenge.type} Challenge</span>
@@ -526,7 +574,6 @@ export default function SkillBridgeApp() {
                   )}
                 </div>
 
-                {/* Right: Code Editor & Execution Console */}
                 <div className="card" style={{ display: 'flex', flexDirection: 'column' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                     <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
@@ -561,7 +608,6 @@ export default function SkillBridgeApp() {
                     }}
                   />
 
-                  {/* Execution Results Console */}
                   {sandboxResult && (
                     <div style={{ marginTop: '1rem', padding: '1rem', borderRadius: '8px', background: sandboxResult.passed ? 'rgba(16, 185, 129, 0.1)' : 'rgba(244, 63, 94, 0.1)', border: `1px solid ${sandboxResult.passed ? 'var(--accent-emerald)' : 'var(--accent-rose)'}` }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
@@ -577,7 +623,6 @@ export default function SkillBridgeApp() {
                         {sandboxResult.message}
                       </p>
 
-                      {/* SQL Output Rows Table Preview */}
                       {sandboxResult.outputRows && (
                         <div style={{ overflowX: 'auto', marginTop: '0.5rem' }}>
                           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', fontFamily: 'var(--font-mono)' }}>
@@ -601,7 +646,6 @@ export default function SkillBridgeApp() {
                         </div>
                       )}
 
-                      {/* JS Assertion Results */}
                       {sandboxResult.testResults && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '0.5rem' }}>
                           {sandboxResult.testResults.map((t: any, idx: number) => (
@@ -673,23 +717,38 @@ export default function SkillBridgeApp() {
           </div>
         )}
 
-        {/* TAB 5: ACTION PLAN & CAPSTONE PROJECTS */}
+        {/* TAB 5: ACTION PLAN & CAPSTONE PROJECTS WITH GITHUB PORTFOLIO */}
         {activeTab === 'actions' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+            {/* Action Recommendations */}
             <div className="card">
-              <h2 className="card-title">Multi-Skill Capstone Action Roadmap</h2>
-              <p className="card-subtitle">
-                Targeted projects designed to bridge multiple high-priority gaps simultaneously.
-              </p>
+              <div className="card-header">
+                <div>
+                  <h2 className="card-title">Multi-Skill Capstone Action Roadmap</h2>
+                  <p className="card-subtitle">
+                    Targeted projects designed to bridge multiple high-priority gaps simultaneously.
+                  </p>
+                </div>
+                <button className="btn btn-primary" onClick={() => setShowProjectModal(true)}>
+                  <PlusCircle size={16} /> Submit Project Repository
+                </button>
+              </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1.5rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1rem' }}>
                 {recommendations.map(rec => (
                   <div key={rec.id} style={{ background: 'rgba(255,255,255,0.02)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
                       <div>
-                        <span className="badge badge-critical" style={{ marginBottom: '0.35rem' }}>
-                          {rec.type.replace('_', ' ')}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
+                          <span className="badge badge-critical">
+                            {rec.type.replace('_', ' ')}
+                          </span>
+                          {rec.status === 'COMPLETED' && (
+                            <span className="badge badge-strength">
+                              ✓ Completed & Verified
+                            </span>
+                          )}
+                        </div>
                         <h3 style={{ fontSize: '1.15rem', fontWeight: 700 }}>{rec.title}</h3>
                       </div>
                       <span style={{ fontSize: '0.85rem', color: '#a5b4fc', fontFamily: 'var(--font-mono)' }}>
@@ -710,14 +769,136 @@ export default function SkillBridgeApp() {
                         ))}
                       </div>
 
-                      <button className="btn btn-primary" style={{ padding: '0.45rem 0.9rem', fontSize: '0.85rem' }}>
-                        Start Project Guided Lab <ChevronRight size={14} />
-                      </button>
+                      {rec.status !== 'COMPLETED' ? (
+                        <button className="btn btn-primary" onClick={() => setShowProjectModal(true)} style={{ padding: '0.45rem 0.9rem', fontSize: '0.85rem' }}>
+                          Submit Solution <FolderGit2 size={14} />
+                        </button>
+                      ) : (
+                        <span style={{ fontSize: '0.85rem', color: '#6ee7b7', fontWeight: 600 }}>
+                          ✓ Evidence linked to candidate profile
+                        </span>
+                      )}
                     </div>
                   </div>
                 ))}
               </div>
             </div>
+
+            {/* Submitted Portfolio & GitHub Evidence */}
+            <div className="card">
+              <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <FolderGit2 size={20} color="#a5b4fc" /> Verified Portfolio & Project Evidence
+              </h2>
+              <p className="card-subtitle" style={{ marginBottom: '1.25rem' }}>
+                Demonstrated real-world repository evidence linked to your SkillBridge profile.
+              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {projects.map(proj => (
+                  <div key={proj.id} style={{ background: 'rgba(255,255,255,0.02)', padding: '1.25rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem' }}>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>{proj.title}</h3>
+                          <span className="badge badge-strength">
+                            {proj.verificationStatus}
+                          </span>
+                        </div>
+                        <a href={proj.repoUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-cyan)', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.25rem', textDecoration: 'none' }}>
+                          <Github size={14} /> {proj.repoUrl} <ExternalLink size={12} />
+                        </a>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                        {proj.hasDocker && <span className="badge badge-preferred">Dockerfile</span>}
+                        {proj.hasTests && <span className="badge badge-strength">Automated Tests</span>}
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.05)', padding: '0.2rem 0.5rem', borderRadius: '4px' }}>
+                          ~{proj.commitCountEstimate} commits
+                        </span>
+                      </div>
+                    </div>
+
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', margin: '0.75rem 0' }}>
+                      {proj.description}
+                    </p>
+
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      {proj.detectedStack.map((tech, idx) => (
+                        <span key={idx} style={{ background: 'rgba(255,255,255,0.04)', color: '#e2e8f0', fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
+                          {tech}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Modal for Project Submission */}
+            {showProjectModal && (
+              <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '1rem' }}>
+                <div className="card" style={{ maxWidth: '560px', width: '100%', background: '#0d1322', border: '1px solid var(--border-active)' }}>
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>
+                    Submit Capstone Project Repository
+                  </h3>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
+                    Provide your GitHub repository URL. The system will parse project signals and attach verified project evidence to your skill profile.
+                  </p>
+
+                  <form onSubmit={handleSubmitProject} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <div>
+                      <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.35rem' }}>
+                        Project Title
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Production Task Management REST API"
+                        value={projectForm.title}
+                        onChange={e => setProjectForm({ ...projectForm, title: e.target.value })}
+                        style={{ width: '100%', padding: '0.65rem', background: '#070b14', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.9rem', outline: 'none' }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.35rem' }}>
+                        GitHub Repository URL
+                      </label>
+                      <input
+                        type="url"
+                        required
+                        placeholder="https://github.com/username/project-repo"
+                        value={projectForm.repoUrl}
+                        onChange={e => setProjectForm({ ...projectForm, repoUrl: e.target.value })}
+                        style={{ width: '100%', padding: '0.65rem', background: '#070b14', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.9rem', outline: 'none' }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.35rem' }}>
+                        Description & Implementation Highlights
+                      </label>
+                      <textarea
+                        rows={3}
+                        placeholder="Mention used technologies (e.g. Node.js, PostgreSQL, Docker, Jest tests, JWT auth)..."
+                        value={projectForm.description}
+                        onChange={e => setProjectForm({ ...projectForm, description: e.target.value })}
+                        style={{ width: '100%', padding: '0.65rem', background: '#070b14', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.9rem', outline: 'none', resize: 'vertical' }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+                      <button type="button" className="btn btn-secondary" onClick={() => setShowProjectModal(false)}>
+                        Cancel
+                      </button>
+                      <button type="submit" className="btn btn-primary" disabled={isSubmittingProject}>
+                        {isSubmittingProject ? 'Verifying...' : 'Verify & Submit'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

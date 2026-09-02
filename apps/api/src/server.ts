@@ -317,6 +317,30 @@ app.post('/api/sandbox/run-code', async (req: Request, res: Response) => {
   res.json(result);
 });
 
+import { projectService } from './services/project.service';
+
+// 9. Candidate Project & Portfolio Evidence
+app.get('/api/me/projects', (req: Request, res: Response) => {
+  const userId = (req.query.userId as string) || 'demo_user_01';
+  res.json(projectService.getProjects(userId));
+});
+
+app.post('/api/me/projects', (req: Request, res: Response) => {
+  const { userId = 'demo_user_01', title, repoUrl, description, primarySkills } = req.body;
+  if (!title || !repoUrl) {
+    return res.status(400).json({ error: 'Title and repoUrl are required' });
+  }
+
+  const result = projectService.submitProject(userId, {
+    title,
+    repoUrl,
+    description: description || '',
+    primarySkills: primarySkills || ['Node.js', 'PostgreSQL', 'REST APIs', 'Docker']
+  });
+
+  res.json(result);
+});
+
 // 7. Jobs & Explainable Matching
 app.get('/api/jobs', (req: Request, res: Response) => {
   res.json(Array.from(store.jobs.values()));

@@ -149,6 +149,22 @@ export interface ActionRecommendation {
   status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
 }
 
+export interface ProjectEvidence {
+  id: string;
+  userId: string;
+  title: string;
+  repoUrl: string;
+  description: string;
+  primarySkills: string[];
+  detectedStack: string[];
+  hasTests: boolean;
+  hasDocker: boolean;
+  hasReadme: boolean;
+  commitCountEstimate: number;
+  verificationStatus: 'PENDING' | 'VERIFIED' | 'NEEDS_REVIEW';
+  submittedAt: string;
+}
+
 export interface JobListing {
   id: string;
   title: string;
