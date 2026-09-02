@@ -1,139 +1,101 @@
-# SkillBridge 🌉
+# SkillBridge
 
-> **Evidence-Based Labor Market Intelligence, Practical Skill Assessment & Explainable Career Pathways**
+SkillBridge is an open-source labor market intelligence and skill assessment platform. It helps early-career developers identify real industry skill demands, test their capabilities through practical evaluations, identify concrete skill gaps, and follow structured project-based roadmaps.
 
-SkillBridge bridges the disconnect between local labor market demand and early-career job seekers. Rather than acting as a generic job board, course marketplace, or black-box AI chatbot, SkillBridge provides a structured, evidence-backed feedback loop for tech talent.
+## Overview
+
+Unlike conventional job boards or generic course aggregators, SkillBridge focuses on an evidence-based pipeline:
+
+- **Market Demand Ingestion**: Ingests and normalizes local job postings to extract current technology requirements.
+- **Competency Verification**: Tests candidate skills through objective assessments (MCQs, code debugging, and SQL/logic queries) rather than self-reported checkboxes.
+- **Deterministic Gap Analysis**: Calculates missing competencies against target roles using transparent mathematical weights.
+- **Actionable Project Roadmaps**: Recommends multi-skill portfolio projects tailored to bridge identified gaps.
+- **Explainable Matching**: Evaluates candidate fit for open roles with clear explanations of strengths and missing prerequisites.
 
 ---
 
-## 🔄 The Core Feedback Loop
+## Architecture & Tech Stack
 
-```text
-  ┌───────────────────────┐
-  │   Labor Market Data   │ (Curated / Validated Job Postings)
-  └───────────┬───────────┘
-              ▼
-  ┌───────────────────────┐
-  │   Skill Demand Model  │ (Role Profiles & Required Competencies)
-  └─────┬───────────┬─────┘
-        │           │
-        ▼           ▼
-┌──────────────┐ ┌────────────────────┐
-│ User Profile │ │  Skill Assessment  │ (MCQs, Output Prediction, Query/Code Tasks)
-└───────┬──────┘ └─────────┬──────────┘
-        │                  │
-        └────────┬─────────┘
-                 ▼
-      ┌──────────────────────┐
-      │    Skill Evidence    │ (Self-Reported vs. Practical Demonstrated)
-      └──────────┬───────────┘
-                 ▼
-      ┌──────────────────────┐
-      │   Skill Gap Engine   │ (Transparent, Mathematical Priority Ranking)
-      └──────────┬───────────┘
-                 ▼
-      ┌──────────────────────┐
-      │     Action Plan      │ (Targeted Learning & Multi-Skill Capstone Projects)
-      └──────────┬───────────┘
-                 ▼
-      ┌──────────────────────┐
-      │     Reassessment     │ (Quantifiable Skill Progression)
-      └──────────┬───────────┘
-                 ▼
-      ┌──────────────────────┐
-      │ Explainable Job Match│ (Direct Evidence Breakdown, No Black Boxes)
-      └──────────────────────┘
+SkillBridge is structured as a modular TypeScript monorepo to ensure clean separation of concerns without premature microservice overhead:
+
+- **Frontend (`apps/web`)**: Next.js, TypeScript, custom responsive CSS design system.
+- **Backend (`apps/api`)**: NestJS (Node.js runtime), modular architecture (Auth, Roles, Skills, Assessments, Gaps, Matches).
+- **Database**: PostgreSQL with normalized schema (roles, canonical skills, attempts, evidence records).
+- **Background Workers (`workers/`)**: Ingestion worker for market data cleaning and isolated worker for sandboxed evaluation.
+- **Cache & Message Broker**: Redis for job queues and rate limiting.
+
+### Repository Layout
+
 ```
-
----
-
-## 🌟 Core Principles
-
-1. **Evidence Beats Self-Declaration**: Practical problem solving and verified execution carry higher confidence than self-checked skill boxes.
-2. **Transparent & Explainable Scoring**: Every gap and recommendation is backed by auditable formulas:
-   $$\text{Priority} = \text{Role Weight} \times \text{Market Demand} \times (1 - \text{Demonstrated Proficiency})$$
-3. **Narrow & Deep First**: Starting with a single target archetype (**Junior Backend Engineer in Bangladesh**) and core skills (`JavaScript`, `Node.js`, `SQL`, `PostgreSQL`, `Git`, `REST APIs`, `Docker`).
-4. **Safety by Design**: Sandboxed, ephemeral, network-disabled execution for candidate code and SQL evaluation.
-5. **Privacy & Ethical Fairness**: Scoring strictly measures demonstrated competency, eliminating demographic bias.
-
----
-
-## 🏛️ System Architecture
-
-A **Modular Monolith** architecture designed for velocity, clean bounded contexts, and simple local execution.
-
-```text
 skillbridge/
 ├── apps/
-│   ├── web/                  # Next.js (TypeScript, Modern Responsive UI)
-│   └── api/                  # NestJS / Node.js Backend API
+│   ├── web/               # Next.js web application
+│   └── api/               # NestJS core API
 ├── packages/
-│   ├── types/                # Shared TypeScript models and DTOs
-│   ├── validation/           # Zod validation schemas
-│   └── config/               # Shared configs
+│   ├── types/             # Shared TypeScript interfaces & DTOs
+│   ├── validation/        # Shared validation schemas
+│   └── config/            # Shared ESLint/TS configs
 ├── workers/
-│   ├── market-ingestion/     # Job data pipeline & normalization
-│   └── assessment-runner/    # Ephemeral isolated sandbox runner
+│   ├── market-ingestion/  # Job data extraction & normalization
+│   └── assessment-runner/ # Ephemeral code/SQL execution sandbox
 ├── docs/
-│   ├── research/             # Market studies, surveys, and legal matrix
-│   ├── ontology/             # Canonical skill definitions and synonyms
-│   └── decisions/            # Architectural Decision Records (ADRs)
-├── infra/
-│   └── docker/               # PostgreSQL, Redis, and service containers
-└── README.md
-```
-
-### Technology Stack
-- **Frontend**: Next.js (React, TypeScript), Vanilla CSS / Custom Design System.
-- **Backend**: NestJS / Node.js (TypeScript, Clean Architecture).
-- **Database**: PostgreSQL (Normalized relational model for users, roles, skills, attempts, gaps).
-- **Caching & Queues**: Redis (Rate limiting, background jobs).
-- **Testing & Sandbox**: Ephemeral Docker sandbox for isolated code/SQL evaluation.
-
----
-
-## 🗺️ Step-by-Step Implementation Roadmap
-
-We are executing this project **step by step** through incremental, independently verifiable milestones:
-
-```
-[Phase 0] Setup & Research Documentation
-    ├── Step 1: Project Blueprint & Repository Workspace (Current)
-    ├── Step 2: Canonical Skill Ontology & Synonym Mapping
-    └── Step 3: Relational Database Schema Design (PostgreSQL)
-
-[Phase 1] Core Foundation & Target Role Profile
-    ├── Step 4: Backend API & Shared Monorepo Config
-    ├── Step 5: Auth & User Onboarding Flow
-    └── Step 6: Role Profile & Market Demand Display (Junior Backend Engineer)
-
-[Phase 2] Labor Market Intelligence Pipeline
-    ├── Step 7: Curated Job Ingestion & Normalization Worker
-    └── Step 8: Interactive Market Analytics & Demand Metrics
-
-[Phase 3] Assessment Engine & Evidence Modeling
-    ├── Step 9: MCQ & Scenario-Based Assessment Engine
-    ├── Step 10: Ephemeral Sandbox Evaluation (SQL & Practical Code Tasks)
-    └── Step 11: Multi-Tiered Skill Evidence Store
-
-[Phase 4] Skill Gap Engine & Action Planning
-    ├── Step 12: Transparent Skill Gap Computation & Priority Engine
-    └── Step 13: Concrete Action Plan & Project Recommendations
-
-[Phase 5] Explainable Job Matching & Extension
-    ├── Step 14: Explainable Match Scoring & Verification
-    └── Step 15: Recruiter & Analytics Console
+│   ├── research/          # Market research, data legal matrix, user studies
+│   ├── ontology/          # Canonical skills and synonym definitions
+│   └── decisions/         # Architecture Decision Records (ADRs)
+└── infra/
+    └── docker/            # Docker Compose setup for local PostgreSQL, Redis & API
 ```
 
 ---
 
-## 🚀 Current Milestone: Phase 0 — Setup & Initial Data Foundation
+## Implementation Roadmap
 
-- [x] **Step 1**: Initialize `README.md` and repository roadmap.
-- [ ] **Step 2**: Create initial docs directory and canonical skill ontology (`/docs/ontology/skills_v1.json`).
-- [ ] **Step 3**: Design PostgreSQL database schema migrations for roles, skills, and user profiles.
+The project is built incrementally across focused phases. Each phase is verified through automated tests and working prototypes before progressing.
+
+### Initial Target Scope
+To maintain focus, the initial implementation targets one specific role archetype: **Junior Backend Engineer** (focusing on Node.js, SQL, PostgreSQL, REST APIs, Git, and Docker).
+
+### Phase Breakdown
+
+- **Phase 0: Research, Ontology & Database Design** *(Current)*
+  - Define research methodology and legal data ingestion policy.
+  - Establish canonical skill ontology and synonym mapping dictionary.
+  - Design normalized relational schema in PostgreSQL.
+
+- **Phase 1: Core Backend & Role Profiles**
+  - Initialize monorepo workspace and environment configuration.
+  - Implement authentication, user profiles, and role browsing.
+  - Build UI for viewing role skill profiles and demand metrics.
+
+- **Phase 2: Market Intelligence Engine**
+  - Implement job posting ingestion and normalization pipeline.
+  - Calculate transparent demand frequency metrics.
+
+- **Phase 3: Assessment & Evidence Collection**
+  - Build MCQ and scenario-based diagnostic engine.
+  - Add isolated, sandboxed SQL query evaluation.
+  - Store multi-tiered skill evidence (Self-reported vs. Verified).
+
+- **Phase 4: Skill Gap & Action Planning Engine**
+  - Implement deterministic gap calculation algorithm.
+  - Generate curated learning and multi-skill capstone project recommendations.
+
+- **Phase 5: Explainable Job Matching & Analytics**
+  - Implement match ranking with clear textual explanations.
+  - Add admin/research console for ontology management.
 
 ---
 
-## 📄 License & Attribution
-Developed as an open, evidence-driven project for technical skill alignment and labor market intelligence.
+## Development Setup
+
+### Prerequisites
+- Node.js (>= 20.x)
+- Docker & Docker Compose
+- PostgreSQL (>= 15)
+
+*(Detailed setup instructions will be updated as packages are initialized in Phase 1).*
+
+---
+
+## License
+MIT
