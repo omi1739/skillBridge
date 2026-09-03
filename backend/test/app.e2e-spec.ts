@@ -86,4 +86,17 @@ describe('SkillBridge API (e2e)', () => {
       .send({ skillId: 'skill_nodejs' })
       .expect(401);
   });
+
+  it('GET /api/admin/overview returns 401 without a token', () => {
+    return request(app.getHttpServer())
+      .get('/api/admin/overview')
+      .expect(401);
+  });
+
+  it('admin routes reject the demo token because the demo user is a USER, not ADMIN', () => {
+    return request(app.getHttpServer())
+      .get('/api/admin/overview')
+      .set('Authorization', 'Bearer demo_token_demo_user_01')
+      .expect(403);
+  });
 });

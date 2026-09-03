@@ -148,6 +148,54 @@ export async function seedAll(): Promise<void> {
        demoProfile.createdAt, demoProfile.updatedAt]
     );
 
+    // --- Admin + Recruiter users (real role separation, login-testable) ---
+    //   Admin:    admin@skillbridge.org    / AdminBridge@123    (role ADMIN)
+    //   Recruiter: recruiter@skillbridge.org / RecruitBridge@123 (role RECRUITER)
+    const adminPasswordHash = await authService.hashPassword('AdminBridge@123');
+    const recruiterPasswordHash = await authService.hashPassword('RecruitBridge@123');
+    const staffUsers = [
+      {
+        user: { id: 'admin_user_01', email: 'admin@skillbridge.org', role: 'ADMIN', createdAt: new Date().toISOString() } as User,
+        profile: {
+          id: 'profile_admin_01', userId: 'admin_user_01', fullName: 'SkillBridge Admin',
+          targetRoleId: 'role_junior_backend', githubUrl: '', portfolioUrl: '',
+          bio: 'Platform administrator responsible for the skill ontology and role weight tuning.',
+          createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+        } as Profile,
+        hash: adminPasswordHash
+      },
+      {
+        user: { id: 'recruiter_user_01', email: 'recruiter@skillbridge.org', role: 'RECRUITER', createdAt: new Date().toISOString() } as User,
+        profile: {
+          id: 'profile_recruiter_01', userId: 'recruiter_user_01', fullName: 'Talent Acquisition Partner',
+          targetRoleId: 'role_junior_backend', githubUrl: '', portfolioUrl: '',
+          bio: 'Recruiter reviewing candidate skill passports and job matches.',
+          createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+        } as Profile,
+        hash: recruiterPasswordHash
+      }
+    ];
+    for (const staff of staffUsers) {
+      const u = staff.user;
+      await client.query(
+        `INSERT INTO users (id, email, password_hash, role, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5::timestamptz,$5::timestamptz)
+         ON CONFLICT (id) DO UPDATE SET
+           email = EXCLUDED.email,
+           password_hash = EXCLUDED.password_hash,
+           role = EXCLUDED.role`,
+        [u.id, u.email, staff.hash, u.role, u.createdAt]
+      );
+      const p = staff.profile;
+      await client.query(
+        `INSERT INTO profiles (id, user_id, full_name, target_role_id, github_url, portfolio_url, bio, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8::timestamptz,$9::timestamptz)
+         ON CONFLICT (id) DO NOTHING`,
+        [p.id, p.userId, p.fullName, p.targetRoleId || null, p.githubUrl || null,
+         p.portfolioUrl || null, p.bio || null, p.createdAt, p.updatedAt]
+      );
+    }
+
     // --- Demo self-reported evidence ---
     const nowIso = new Date().toISOString();
     const initialEvidence: SkillEvidence[] = [

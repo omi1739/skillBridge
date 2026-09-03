@@ -9,6 +9,8 @@ export class AdminController {
   constructor(@Inject(AdminService) private readonly adminService: AdminService) {}
 
   @Get('overview')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
   async getOverview() {
     return this.adminService.getOverview();
   }

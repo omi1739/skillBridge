@@ -102,7 +102,7 @@ SkillBridge/
 | GET | `/api/curriculum/analyze` | Compare curriculum to role | – |
 | GET | `/api/jobs` | Job listings | – |
 | GET | `/api/jobs/matches` | Matched jobs for user | – |
-| GET | `/api/admin/overview` | Ontology stats | – |
+| GET | `/api/admin/overview` | Ontology stats | Admin |
 | POST | `/api/admin/skills/alias` | Add skill alias | Admin |
 | PATCH | `/api/admin/roles/:id/weights` | Tune role skill weights | Admin |
 | POST | `/api/admin/questions` | Add assessment question | Admin |
@@ -206,8 +206,11 @@ Backend unit and e2e tests isolate the real Postgres connection by mocking the `
 
 
 ### Demo Access
-- Demo user: `candidate@skillbridge.org` / `SkillBridge@123`
-- The demo login grants access to all tabs, including the Admin & Ontology Console.
+- Demo candidate: `candidate@skillbridge.org` / `SkillBridge@123`
+- Platform admin: `admin@skillbridge.org` / `AdminBridge@123`
+- Recruiter: `recruiter@skillbridge.org` / `RecruitBridge@123`
+
+Roles are resolved from the database and enforced end-to-end. The demo login is a regular `USER` (candidate); the **Admin & Ontology Console** tab only appears for `ADMIN` users, and the protected admin endpoints (`/api/admin/*`) return `403` for non-admin roles instead of being bypassed by the demo token.
 
 ---
 

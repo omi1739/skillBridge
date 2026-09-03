@@ -1,6 +1,7 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { Request } from 'express';
 import { authService, AuthPayload } from '../../../services/auth.service';
+import { store } from '../../../store';
 
 declare global {
   namespace Express {
@@ -10,16 +11,27 @@ declare global {
   }
 }
 
+/**
+ * Resolves the real role for the shared demo identity from the database,
+ * instead of hardcoding ADMIN. The demo user is a regular USER, so the demo
+ * token can never reach ADMIN-only routes — real role separation is enforced.
+ */
+async function resolveDemoRole(): Promise<string> {
+  const demoUser = await store.getUser('demo_user_01');
+  return demoUser?.role || 'USER';
+}
+
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
     const header = request.headers.authorization;
 
     if (!header || !header.startsWith('Bearer ')) {
       const demoHeader = request.headers['x-demo-user'];
       if (demoHeader) {
-        request.user = { userId: 'demo_user_01', email: 'candidate@skillbridge.org', role: 'ADMIN' };
+        const role = await resolveDemoRole();
+        request.user = { userId: 'demo_user_01', email: 'candidate@skillbridge.org', role };
         return true;
       }
       throw new UnauthorizedException('Authentication required. Provide a valid Bearer token.');
@@ -27,7 +39,8 @@ export class JwtAuthGuard implements CanActivate {
 
     const token = header.slice('Bearer '.length).trim();
     if (token === 'demo_token' || token.startsWith('demo_token_')) {
-      request.user = { userId: 'demo_user_01', email: 'candidate@skillbridge.org', role: 'ADMIN' };
+      const role = await resolveDemoRole();
+      request.user = { userId: 'demo_user_01', email: 'candidate@skillbridge.org', role };
       return true;
     }
 
@@ -43,14 +56,15 @@ export class JwtAuthGuard implements CanActivate {
 
 @Injectable()
 export class OptionalJwtAuthGuard implements CanActivate {
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
     const header = request.headers.authorization;
 
     if (header && header.startsWith('Bearer ')) {
       const token = header.slice('Bearer '.length).trim();
       if (token === 'demo_token' || token.startsWith('demo_token_')) {
-        request.user = { userId: 'demo_user_01', email: 'candidate@skillbridge.org', role: 'CANDIDATE' };
+        const role = await resolveDemoRole();
+        request.user = { userId: 'demo_user_01', email: 'candidate@skillbridge.org', role };
         return true;
       }
       const payload = authService.verifyToken(token);
@@ -58,7 +72,8 @@ export class OptionalJwtAuthGuard implements CanActivate {
         request.user = payload;
       }
     } else if (request.headers['x-demo-user']) {
-      request.user = { userId: 'demo_user_01', email: 'candidate@skillbridge.org', role: 'CANDIDATE' };
+      const role = await resolveDemoRole();
+      request.user = { userId: 'demo_user_01', email: 'candidate@skillbridge.org', role };
     }
     return true;
   }

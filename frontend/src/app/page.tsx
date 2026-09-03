@@ -129,7 +129,7 @@ export default function SkillBridgeApp() {
     return headers;
   };
 
-  const refreshUserData = (userId = activeUserId) => {
+  const refreshUserData = (userId = activeUserId, role?: string) => {
     fetch(`${API_BASE}/me/gaps?userId=${userId}&roleId=role_junior_backend`)
       .then(res => res.json())
       .then(data => { if (Array.isArray(data)) setGaps(data); })
@@ -150,10 +150,17 @@ export default function SkillBridgeApp() {
       .then(data => setUserProjects(data))
       .catch((err) => console.error('[SkillBridge] Data load failed:', err));
 
-    fetch(`${API_BASE}/admin/overview`)
-      .then(res => res.json())
-      .then(data => setAdminOverview(data))
-      .catch((err) => console.error('[SkillBridge] Data load failed:', err));
+    if (role === 'ADMIN') {
+      fetch(`${API_BASE}/admin/overview`, { headers: authHeaders() })
+        .then(res => (res.ok ? res.json() : Promise.reject(res)))
+        .then(data => setAdminOverview(data))
+        .catch((err) => {
+          console.error('[SkillBridge] Admin overview load failed:', err);
+          setAdminOverview(null);
+        });
+    } else {
+      setAdminOverview(null);
+    }
   };
 
   const fetchRoleAndSkills = () => {
@@ -258,7 +265,7 @@ export default function SkillBridgeApp() {
         localStorage.setItem('skillbridge_profile', JSON.stringify(data.profile));
         setShowAuthModal(false);
         setActiveTab('market');
-        refreshUserData('demo_user_01');
+        refreshUserData('demo_user_01', data.user.role);
       }
     } catch (err) {
       console.error(err);
@@ -307,7 +314,7 @@ export default function SkillBridgeApp() {
       setShowAuthModal(false);
       setAuthForm({ email: '', password: '', fullName: '', targetRoleId: 'role_junior_backend' });
       setActiveTab('market');
-      refreshUserData(data.user.id);
+      refreshUserData(data.user.id, data.user.role);
     } catch (err: any) {
       setAuthError(err.message || 'An error occurred.');
     } finally {
@@ -1573,16 +1580,18 @@ export default function SkillBridgeApp() {
 
               <div>
                 <div className="sidebar-section-title">Platform</div>
-                <button
-                  className={`sidebar-item ${activeTab === 'admin' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('admin')}
-                >
-                  <span className="sidebar-item-content">
-                    <Sliders size={16} />
-                    <span>Admin & Weights</span>
-                  </span>
-                  <span className="sidebar-item-badge">Tuner</span>
-                </button>
+                {currentUser?.role === 'ADMIN' && (
+                  <button
+                    className={`sidebar-item ${activeTab === 'admin' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('admin')}
+                  >
+                    <span className="sidebar-item-content">
+                      <Sliders size={16} />
+                      <span>Admin & Weights</span>
+                    </span>
+                    <span className="sidebar-item-badge">Tuner</span>
+                  </button>
+                )}
               </div>
             </nav>
 
@@ -1613,7 +1622,7 @@ export default function SkillBridgeApp() {
                   </div>
                   <div className="sidebar-user-role">
                     <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
-                    <span>{currentUser.email === 'candidate@skillbridge.org' ? 'Demo Candidate' : 'Verified Candidate'}</span>
+                    <span>{currentUser.role === 'ADMIN' ? 'Administrator' : currentUser.role === 'RECRUITER' ? 'Recruiter' : 'Verified Candidate'}</span>
                   </div>
                 </div>
               </div>
@@ -1648,7 +1657,7 @@ export default function SkillBridgeApp() {
             {activeTab === 'gaps' && renderGapsView()}
             {activeTab === 'actions' && renderActionsView()}
             {activeTab === 'jobs' && renderJobsView()}
-            {activeTab === 'admin' && renderAdminView()}
+            {activeTab === 'admin' && currentUser?.role === 'ADMIN' && renderAdminView()}
           </main>
         </div>
       ) : (

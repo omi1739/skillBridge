@@ -158,4 +158,13 @@ describe('SkillBridge page API contract', () => {
       expect(body).not.toHaveProperty('code');
     });
   }, 30000);
+
+  it('hides the Admin console tab for a non-admin (USER) user', async () => {
+    const user = userEvent.setup();
+    render(<Page />);
+    await loginAsDemo(user);
+
+    await screen.findByText(/matching jobs/i);
+    expect(screen.queryByRole('button', { name: /Admin & Weights/i })).toBeNull();
+  }, 20000);
 });
