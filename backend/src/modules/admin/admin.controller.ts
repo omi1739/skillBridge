@@ -3,6 +3,7 @@ import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { AddAliasDto, UpdateRoleWeightsDto, AddQuestionDto } from '../../dto/admin.dto';
 
 @Controller('admin')
 export class AdminController {
@@ -18,7 +19,7 @@ export class AdminController {
   @Post('skills/alias')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
-  async addSkillAlias(@Body() body: { skillId: string; alias: string }) {
+  async addSkillAlias(@Body() body: AddAliasDto) {
     return this.adminService.addSkillAlias(body.skillId, body.alias);
   }
 
@@ -27,7 +28,7 @@ export class AdminController {
   @Roles('ADMIN')
   async updateRoleWeights(
     @Param('id') roleId: string,
-    @Body() body: { skillId: string; roleWeight?: number; marketDemandFrequency?: number }
+    @Body() body: UpdateRoleWeightsDto
   ) {
     return this.adminService.updateRoleWeights(roleId, body.skillId, body.roleWeight, body.marketDemandFrequency);
   }
@@ -35,19 +36,7 @@ export class AdminController {
   @Post('questions')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
-  async addQuestion(
-    @Body() body: {
-      assessmentId?: string;
-      prompt: string;
-      correctAnswer: string;
-      subSkill: string;
-      codeSnippet?: string;
-      questionType?: string;
-      options?: string[];
-      explanation?: string;
-      points?: number;
-    }
-  ) {
+  async addQuestion(@Body() body: AddQuestionDto) {
     return this.adminService.addQuestion(
       body.assessmentId,
       body.prompt,

@@ -12,6 +12,7 @@ import { NestSandboxService } from './sandbox.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthPayload } from '../../services/auth.service';
+import { RunSqlDto, RunCodeDto } from '../../dto/sandbox.dto';
 
 @Controller('sandbox')
 export class SandboxController {
@@ -27,7 +28,7 @@ export class SandboxController {
   @UseGuards(JwtAuthGuard)
   async runSQL(
     @CurrentUser() user: AuthPayload | undefined,
-    @Body() body: { challengeId: string; query: string; userId?: string }
+    @Body() body: RunSqlDto
   ) {
     const candidateId = user?.userId || body.userId || 'demo_user_01';
     return this.sandboxService.runSQL(body.challengeId, body.query, candidateId);
@@ -38,7 +39,7 @@ export class SandboxController {
   @UseGuards(JwtAuthGuard)
   async runCode(
     @CurrentUser() user: AuthPayload | undefined,
-    @Body() body: { challengeId: string; code: string; userId?: string }
+    @Body() body: RunCodeDto
   ) {
     const candidateId = user?.userId || body.userId || 'demo_user_01';
     return this.sandboxService.runCode(body.challengeId, body.code, candidateId);

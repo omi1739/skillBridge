@@ -6,7 +6,6 @@ import {
   Body,
   Query,
   UseGuards,
-  BadRequestException,
   Inject,
   HttpCode,
   HttpStatus
@@ -15,25 +14,20 @@ import { NestAuthService } from './auth.service';
 import { JwtAuthGuard, OptionalJwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { AuthPayload } from '../../services/auth.service';
+import { RegisterDto, LoginDto, DeclareSkillDto, UpdateProfileDto } from '../../dto/auth.dto';
 
 @Controller()
 export class AuthController {
   constructor(@Inject(NestAuthService) private readonly authService: NestAuthService) {}
 
   @Post('auth/register')
-  async register(@Body() body: { email?: string; password?: string; fullName?: string; targetRoleId?: string }) {
-    if (!body.email || !body.password || !body.fullName) {
-      throw new BadRequestException('Email, password, and fullName are required.');
-    }
+  async register(@Body() body: RegisterDto) {
     return this.authService.register(body.email, body.password, body.fullName, body.targetRoleId);
   }
 
   @Post('auth/login')
   @HttpCode(HttpStatus.OK)
-  async login(@Body() body: { email?: string; password?: string }) {
-    if (!body.email || !body.password) {
-      throw new BadRequestException('Email and password are required.');
-    }
+  async login(@Body() body: LoginDto) {
     return this.authService.login(body.email, body.password);
   }
 
@@ -52,17 +46,14 @@ export class AuthController {
 
   @Patch('me/profile')
   @UseGuards(JwtAuthGuard)
-  async updateProfile(@CurrentUser() user: AuthPayload, @Body() body: { fullName?: string; targetRoleId?: string; githubUrl?: string; portfolioUrl?: string; bio?: string }) {
+  async updateProfile(@CurrentUser() user: AuthPayload, @Body() body: UpdateProfileDto) {
     return this.authService.updateProfile(user.userId, body);
   }
 
   @Post('me/skills/declare')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
-  async declareSkill(@CurrentUser() user: AuthPayload, @Body() body: { skillId?: string; proficiencyScore?: number }) {
-    if (!body.skillId) {
-      throw new BadRequestException('skillId is required');
-    }
+  async declareSkill(@CurrentUser() user: AuthPayload, @Body() body: DeclareSkillDto) {
     return this.authService.declareSkill(user.userId, body.skillId, body.proficiencyScore);
   }
 

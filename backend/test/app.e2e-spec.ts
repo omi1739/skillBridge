@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 
@@ -42,6 +42,10 @@ describe('SkillBridge API (e2e)', () => {
     // Override database.service so onModuleInit does not matter
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api');
+    // Mirror production validation so DTO-based 400s are exercised.
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: false, transform: true })
+    );
     await app.init();
   });
 
@@ -70,6 +74,13 @@ describe('SkillBridge API (e2e)', () => {
     return request(app.getHttpServer())
       .post('/api/auth/login')
       .send({ password: 'only-password' })
+      .expect(400);
+  });
+
+  it('rejects an invalid email via DTO validation', () => {
+    return request(app.getHttpServer())
+      .post('/api/auth/register')
+      .send({ email: 'not-an-email', password: 'longenoughpass', fullName: 'Test User' })
       .expect(400);
   });
 

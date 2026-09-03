@@ -11,6 +11,7 @@ import { ProjectsService } from './projects.service';
 import { JwtAuthGuard, OptionalJwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthPayload } from '../../services/auth.service';
+import { ProjectSubmissionDto } from '../../dto/project.dto';
 
 @Controller()
 export class ProjectsController {
@@ -27,7 +28,7 @@ export class ProjectsController {
   @UseGuards(JwtAuthGuard)
   async submitProject(
     @CurrentUser() user: AuthPayload | undefined,
-    @Body() body: { userId?: string; title: string; repoUrl: string; description: string; primarySkills?: string[] }
+    @Body() body: ProjectSubmissionDto
   ) {
     const userId = user?.userId || body.userId || 'demo_user_01';
     return this.projectsService.submitProject(userId, body.title, body.repoUrl, body.description, body.primarySkills);

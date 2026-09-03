@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import * as path from 'path';
 import { NestFactory } from '@nestjs/core';
-import { Logger } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 
 // Load .env file from the api workspace root (Node 22+ or fallback)
@@ -25,6 +25,16 @@ async function bootstrap() {
 
   // Global prefix ensuring backward compatibility with /api routes
   app.setGlobalPrefix('api');
+
+  // Declarative request validation via DTOs. Whitelist strips unknown body
+  // properties; production additionally rejects unknown properties outright.
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: process.env.NODE_ENV === 'production',
+      transform: true
+    })
+  );
 
   const port = process.env.PORT || 4000;
   await app.listen(port);
