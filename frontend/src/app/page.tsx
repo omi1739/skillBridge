@@ -811,7 +811,7 @@ export default function SkillBridgeApp() {
                 </h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   {curriculumAnalysis.strongAcademicAreas.map((item, idx) => (
-                    <div key={idx} style={{ background: '#0e141a', border: '1px solid #1c2b24', padding: '0.85rem', borderRadius: '6px' }}>
+                    <div key={idx} style={{ background: 'var(--bg-row)', border: '1px solid var(--border-faint)', padding: '0.85rem', borderRadius: '6px' }}>
                       <strong style={{ color: '#a7f3d0', fontSize: '0.9rem' }}>{item.skill}</strong>
                       <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
                         {item.reason}
@@ -827,7 +827,7 @@ export default function SkillBridgeApp() {
                 </h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   {curriculumAnalysis.criticalMarketOmissions.map((item, idx) => (
-                    <div key={idx} style={{ background: '#160e12', border: '1px solid #331d25', padding: '0.85rem', borderRadius: '6px' }}>
+                    <div key={idx} style={{ background: 'rgba(251, 113, 133, 0.05)', border: '1px solid rgba(251, 113, 133, 0.16)', padding: '0.85rem', borderRadius: '6px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <strong style={{ color: '#fecdd3', fontSize: '0.9rem' }}>{item.skill}</strong>
                         <span className="badge badge-critical" style={{ fontSize: '0.675rem' }}>
@@ -902,7 +902,7 @@ export default function SkillBridgeApp() {
             <h3 className="card-title" style={{ marginBottom: '1rem' }}>Sub-Skill Breakdown</h3>
             <div className="grid-2">
               {attemptResult.subSkillScores?.map((sub, i) => (
-                <div key={i} style={{ background: '#0e1118', padding: '1rem', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                <div key={i} style={{ background: 'var(--bg-inset-panel)', padding: '1rem', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>{sub.subSkill}</span>
                     <span className={`badge ${sub.status === 'STRENGTH' ? 'badge-strength' : sub.status === 'MODERATE' ? 'badge-gap' : 'badge-critical'}`}>
@@ -940,7 +940,7 @@ export default function SkillBridgeApp() {
             <h1 className="page-title">{assessment.title}</h1>
             <p className="page-subtitle">{questions.length} multi-part questions testing practical Node.js, SQL, and HTTP engineering skills.</p>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#131722', border: '1px solid var(--border-color)', padding: '0.45rem 0.85rem', borderRadius: '6px', fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--bg-chip)', border: '1px solid var(--border-color)', padding: '0.45rem 0.85rem', borderRadius: '6px', fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}>
             <Clock size={15} color="#93c5fd" />
             <span>{`${Math.floor(timeRemaining / 60).toString().padStart(2, '0')}:${(timeRemaining % 60).toString().padStart(2, '0')}`}</span>
           </div>
@@ -1099,8 +1099,8 @@ export default function SkillBridgeApp() {
                   style={{
                     width: '100%',
                     height: '240px',
-                    background: '#080a0e',
-                    color: '#93c5fa',
+                    background: 'var(--bg-inset)',
+                    color: '#5eead4',
                     border: '1px solid var(--border-color)',
                     borderRadius: '6px',
                     padding: '0.85rem',
@@ -1259,7 +1259,7 @@ export default function SkillBridgeApp() {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             {userProjects.map(proj => (
-              <div key={proj.id} style={{ background: '#0e1118', padding: '1rem', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+              <div key={proj.id} style={{ background: 'var(--bg-inset-panel)', padding: '1rem', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <a href={proj.repoUrl} target="_blank" rel="noreferrer" style={{ color: '#60a5fa', fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.4rem', textDecoration: 'none' }}>
                     <Github size={14} /> {proj.title} <ExternalLink size={12} />
@@ -1273,7 +1273,7 @@ export default function SkillBridgeApp() {
                 </p>
                 <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                   {proj.detectedStack.map((tech, idx) => (
-                    <span key={idx} style={{ background: '#1c2336', color: '#93c5fd', fontSize: '0.7rem', padding: '0.15rem 0.45rem', borderRadius: '4px' }}>
+                    <span key={idx} style={{ background: 'var(--bg-chip)', color: '#93c5fd', fontSize: '0.7rem', padding: '0.15rem 0.45rem', borderRadius: '4px' }}>
                       {tech}
                     </span>
                   ))}
@@ -1407,7 +1407,7 @@ export default function SkillBridgeApp() {
                   placeholder="e.g. Postgres, PSQL, Node"
                   value={aliasForm.rawAlias}
                   onChange={e => setAliasForm({ ...aliasForm, rawAlias: e.target.value })}
-                  style={{ width: '100%', padding: '0.65rem', background: '#0a0c10', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.85rem' }}
+                  style={{ width: '100%', padding: '0.65rem', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '0.85rem' }}
                 />
               </div>
 
@@ -1418,7 +1418,7 @@ export default function SkillBridgeApp() {
                 <select
                   value={aliasForm.canonicalSkillId}
                   onChange={e => setAliasForm({ ...aliasForm, canonicalSkillId: e.target.value })}
-                  style={{ width: '100%', padding: '0.65rem', background: '#0a0c10', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.85rem' }}
+                  style={{ width: '100%', padding: '0.65rem', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '0.85rem' }}
                 >
                   <option value="">Select canonical skill...</option>
                   {skills.map(s => (
@@ -1460,7 +1460,7 @@ export default function SkillBridgeApp() {
                         });
                       }
                     }}
-                    style={{ width: '100%', padding: '0.65rem', background: '#0a0c10', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.85rem' }}
+                    style={{ width: '100%', padding: '0.65rem', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '0.85rem' }}
                   >
                     {(role?.roleSkills || []).map(rs => (
                       <option key={rs.skillId} value={rs.skillId}>
@@ -1607,8 +1607,8 @@ export default function SkillBridgeApp() {
                   <span>SkillBridge</span>
                 </div>
                 <div className="sidebar-status-pill">
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
-                  <span>v2.0</span>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#5eead4', display: 'inline-block' }} />
+                  <span>LIVE</span>
                 </div>
               </div>
 
@@ -1863,7 +1863,7 @@ export default function SkillBridgeApp() {
                   value={projectForm.title}
                   onChange={e => setProjectForm({ ...projectForm, title: e.target.value })}
                   required
-                  style={{ width: '100%', padding: '0.65rem', background: '#0a0c10', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.85rem' }}
+                  style={{ width: '100%', padding: '0.65rem', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '0.85rem' }}
                 />
               </div>
 
@@ -1877,7 +1877,7 @@ export default function SkillBridgeApp() {
                   value={projectForm.repoUrl}
                   onChange={e => setProjectForm({ ...projectForm, repoUrl: e.target.value })}
                   required
-                  style={{ width: '100%', padding: '0.65rem', background: '#0a0c10', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.85rem' }}
+                  style={{ width: '100%', padding: '0.65rem', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '0.85rem' }}
                 />
               </div>
 
@@ -1890,7 +1890,7 @@ export default function SkillBridgeApp() {
                   value={projectForm.description}
                   onChange={e => setProjectForm({ ...projectForm, description: e.target.value })}
                   rows={3}
-                  style={{ width: '100%', padding: '0.65rem', background: '#0a0c10', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.85rem', resize: 'vertical' }}
+                  style={{ width: '100%', padding: '0.65rem', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '0.85rem', resize: 'vertical' }}
                 />
               </div>
 
@@ -1937,7 +1937,7 @@ export default function SkillBridgeApp() {
               </div>
             </div>
 
-            <div style={{ background: '#090b10', padding: '1.25rem', borderRadius: '8px', border: '1px solid var(--border-color)', marginBottom: '1.25rem' }}>
+            <div style={{ background: 'var(--bg-inset-panel)', padding: '1.25rem', borderRadius: '8px', border: '1px solid var(--border-color)', marginBottom: '1.25rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>{passportData.candidate?.name || passportData.candidate?.fullName || 'Candidate'}</h3>
@@ -1960,7 +1960,7 @@ export default function SkillBridgeApp() {
                 {(passportData.evidence || passportData.competencies || []).map((comp: any, idx: number) => {
                   const score = comp.proficiencyScore ?? comp.proficiency ?? 0;
                   return (
-                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#0e1118', padding: '0.75rem', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-inset-panel)', padding: '0.75rem', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
                       <div>
                         <strong style={{ fontSize: '0.875rem' }}>{comp.skillName || comp.skill || comp.skillId}</strong>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>via {comp.sourceType || comp.provenance || 'PRACTICAL_EVALUATION'}</div>
