@@ -23,13 +23,14 @@ export class IngestionController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
   async runIngestion(
-    @Body() body: { sourceUrl?: string; minMatches?: number; replace?: boolean } = {}
+    @Body() body: { sourceUrl?: string; minMatches?: number; replace?: boolean; source?: string } = {}
   ) {
     try {
       return await this.ingestionService.ingest({
         sourceUrl: body.sourceUrl,
         minMatches: body.minMatches,
-        replace: body.replace
+        replace: body.replace,
+        source: body.source
       });
     } catch (err: any) {
       // Surface the underlying reason for diagnosis during rollout. The

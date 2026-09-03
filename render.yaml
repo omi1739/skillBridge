@@ -36,3 +36,31 @@ services:
         sync: false
       - key: JOB_SOURCE_NAME
         sync: false
+      - key: JOB_BD_PAGES
+        sync: false
+
+  # Scheduled job-board ingestion, separate from the always-on web service so
+  # it runs a fixed number of times per day instead of in the background.
+  # Runs the BdJobs (Bangladesh) scraper three times a day (00/08/16 UTC).
+  - type: cron
+    name: skillbridge-api-bdjobs-ingest
+    runtime: node
+    plan: free
+    schedule: "0 */8 * * *"
+    buildCommand: npm install && npm run build --workspace=@skillbridge/types && npm run build --workspace=@skillbridge/api
+    startCommand: npm run db:ingest --workspace=@skillbridge/api bdjobs
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: JOB_INGEST_SOURCE
+        value: bdjobs
+      - key: JOB_BD_PAGES
+        sync: false
+      - key: JOB_MIN_MATCHES
+        sync: false

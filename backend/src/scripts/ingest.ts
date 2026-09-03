@@ -6,7 +6,8 @@ import { pool } from '../db/client';
 async function main() {
   const service = new IngestionService(new CacheService());
   const report = await service.ingest({
-    minMatches: process.env.JOB_MIN_MATCHES ? Number(process.env.JOB_MIN_MATCHES) : 1
+    minMatches: process.env.JOB_MIN_MATCHES ? Number(process.env.JOB_MIN_MATCHES) : 1,
+    source: process.env.JOB_INGEST_SOURCE || process.argv[2] || 'arbeitnow'
   });
   // eslint-disable-next-line no-console
   console.log(JSON.stringify(report, null, 2));

@@ -3,6 +3,7 @@ import { store } from '../../store';
 import { query } from '../../db/client';
 import { Skill, JobListing, MarketDemandResponse, MarketDemandStat } from '@skillbridge/types';
 import { CacheService } from '../../common/cache.service';
+import { bdJobsScraper, BdJobItem } from '../../services/bdjobs-scraper.service';
 
 const TARGET_ROLE = 'role_junior_backend';
 
@@ -60,11 +61,19 @@ export class IngestionService {
   }
 
   /**
-   * Pull live backend job postings from a compliant public job API and write
+   * Pull live backend job postings from a compliant public job board and write
    * them (with full provenance: source, external id, posting url) into the
    * store, then recompute market demand from the resulting dataset.
+   *
+   * `source` selects the board: 'arbeitnow' (default, international) or
+   * 'bdjobs' (Bangladesh). Both feed through the same validation classifier.
    */
-  async ingest(params?: { sourceUrl?: string; minMatches?: number; replace?: boolean }): Promise<{
+  async ingest(params?: {
+    sourceUrl?: string;
+    minMatches?: number;
+    replace?: boolean;
+    source?: string;
+  }): Promise<{
     fetched: number;
     classified: number;
     inserted: number;
@@ -78,15 +87,35 @@ export class IngestionService {
     const sourceUrl = params?.sourceUrl || process.env.JOB_API_URL || 'https://www.arbeitnow.com/api/job-board-api';
     const minMatches = params?.minMatches ?? 1;
     const replace = params?.replace ?? false;
-    const sourceName = (process.env.JOB_SOURCE_NAME || 'Arbeitnow').trim();
-    const sourceId = await store.ensureJobSource(sourceName, 'API',
-      'Free public job-board API. Link back and do not abuse. See Arbeitnow terms of service.',
-      {
+    const requestedSource = (params?.source || process.env.JOB_INGEST_SOURCE || 'arbeitnow').trim().toLowerCase();
+    const source = requestedSource === 'bdjobs' ? 'bdjobs' : 'arbeitnow';
+
+    const sourceConfig = source === 'bdjobs' ? {
+      name: 'BdJobs',
+      accessMethod: 'API',
+      description: 'Bangladesh job board. Scraped via its public JSON list API with a polite rate limit. Link back and respect BdJobs terms of service.',
+      meta: {
+        sourceType: 'API',
+        website: 'https://www.bdjobs.com',
+        apiUrl: 'https://gateway.bdjobs.com/recruitment-account-test/api/JobSearch/GetJobSearch',
+        permissionStatus: 'NOT_REQUIRED'
+      }
+    } : {
+      name: (process.env.JOB_SOURCE_NAME || 'Arbeitnow').trim(),
+      accessMethod: 'API',
+      description: 'Free public job-board API. Link back and do not abuse. See Arbeitnow terms of service.',
+      meta: {
         sourceType: 'API',
         website: 'https://www.arbeitnow.com',
         apiUrl: sourceUrl,
-        permissionStatus: 'NOT_REQUIRED',
-      });
+        permissionStatus: 'NOT_REQUIRED'
+      }
+    };
+
+    const sourceName = sourceConfig.name;
+    const sourceId = await store.ensureJobSource(sourceName, 'API',
+      sourceConfig.description,
+      sourceConfig.meta);
 
     // Replacing clears this source's previously-ingested jobs first so a
     // re-sync with a stricter classifier (or expired listings) stays accurate.
@@ -97,7 +126,9 @@ export class IngestionService {
     }
 
     const skills = await store.getSkills();
-    const raw = await this.fetchRaw(sourceUrl);
+    const raw: RawJob[] = source === 'bdjobs'
+      ? (await bdJobsScraper.scrape()).map(toRawJob)
+      : await this.fetchRaw(sourceUrl);
 
     const built: Array<Parameters<typeof store.upsertJobs>[0][number]> = [];
     for (const item of raw) {
@@ -391,4 +422,17 @@ function isWholeWordOrSubmatch(haystack: string, token: string): boolean {
   const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const wordBoundary = new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, 'i');
   return wordBoundary.test(haystack);
+}
+
+function toRawJob(item: BdJobItem): RawJob {
+  return {
+    externalId: item.externalId,
+    title: item.title,
+    company: item.company,
+    location: item.location,
+    description: item.description,
+    postingUrl: item.postingUrl,
+    postedAt: item.postedAt,
+    isRemote: item.isRemote
+  };
 }
