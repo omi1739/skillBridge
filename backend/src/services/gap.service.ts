@@ -73,6 +73,8 @@ export class GapService {
 
     gaps.sort((a, b) => b.priorityScore - a.priorityScore);
 
+    await store.saveGaps(userId, gaps);
+
     return gaps;
   }
 }

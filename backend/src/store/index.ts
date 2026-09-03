@@ -10,7 +10,9 @@ import {
   SkillEvidence,
   ActionRecommendation,
   ProjectEvidence,
-  JobListing
+  JobListing,
+  SkillGap,
+  JobMatchResult
 } from '@skillbridge/types';
 import { query, withTransaction } from '../db/client';
 
@@ -293,6 +295,33 @@ export class AppDataStore {
     });
   }
 
+  // ---- Skill gaps (persisted analysis) ----
+  async saveGaps(userId: string, gaps: SkillGap[]): Promise<void> {
+    if (gaps.length === 0) return;
+    await withTransaction(async client => {
+      for (const g of gaps) {
+        await client.query(
+          `INSERT INTO skill_gaps
+             (id, user_id, role_id, skill_id, skill_name, priority_score, role_weight,
+              market_demand, demonstrated_proficiency, explanation, status, calculated_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::timestamptz)
+           ON CONFLICT (user_id, role_id, skill_id) DO UPDATE SET
+             skill_name=EXCLUDED.skill_name,
+             priority_score=EXCLUDED.priority_score,
+             role_weight=EXCLUDED.role_weight,
+             market_demand=EXCLUDED.market_demand,
+             demonstrated_proficiency=EXCLUDED.demonstrated_proficiency,
+             explanation=EXCLUDED.explanation,
+             status=EXCLUDED.status,
+             calculated_at=EXCLUDED.calculated_at`,
+          [g.id, userId, g.roleId, g.skillId, g.skillName, g.priorityScore, g.roleWeight,
+           g.marketDemand, g.demonstratedProficiency, g.explanation, g.status,
+           new Date().toISOString()]
+        );
+      }
+    });
+  }
+
   // ---- Recommendations ----
   async getRecommendations(userId: string): Promise<ActionRecommendation[]> {
     const rows = await query<RecRow>(
@@ -414,6 +443,23 @@ export class AppDataStore {
       preferredSkillIds: prefMap.get(j.id) || [],
       postedAt: j.posted_at
     }));
+  }
+
+  // ---- Job matches (persisted analysis) ----
+  async saveJobMatches(userId: string, results: JobMatchResult[]): Promise<void> {
+    if (results.length === 0) return;
+    await withTransaction(async client => {
+      for (const r of results) {
+        await client.query(
+          `INSERT INTO job_matches
+             (user_id, job_id, match_score, matched_skills, missing_skills, explanation, calculated_at)
+           VALUES ($1,$2,$3,$4::jsonb,$5::jsonb,$6,$7::timestamptz)`,
+          [userId, r.job.id, r.matchScore,
+           JSON.stringify(r.matchedSkills), JSON.stringify(r.missingSkills),
+           r.explanation, new Date().toISOString()]
+        );
+      }
+    });
   }
 
   // ---- Admin ops ----

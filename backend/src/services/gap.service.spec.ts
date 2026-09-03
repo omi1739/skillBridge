@@ -5,7 +5,8 @@ import { Role, SkillEvidence } from '@skillbridge/types';
 jest.mock('../store', () => ({
   store: {
     getRole: jest.fn(),
-    getEvidence: jest.fn()
+    getEvidence: jest.fn(),
+    saveGaps: jest.fn().mockResolvedValue(undefined)
   }
 }));
 
@@ -92,6 +93,16 @@ describe('GapService', () => {
     expect(nodejs.demonstratedProficiency).toBe(0.25);
     expect(nodejs.status).toBe('MAJOR_GAP');
     expect(docker.status).toBe('MAINTAIN');
+  });
+
+  it('persists the calculated gaps to the store', async () => {
+    mockedStore.getEvidence.mockResolvedValue([]);
+    await service.calculateGaps('user_1', 'role_junior_backend');
+    expect(mockedStore.saveGaps).toHaveBeenCalledTimes(1);
+    const saved = mockedStore.saveGaps.mock.calls[0][1] as any[];
+    expect(saved).toHaveLength(2);
+    expect(saved[0].userId).toBe('user_1');
+    expect(saved.map((g: any) => g.skillId).sort()).toEqual(['skill_docker', 'skill_nodejs']);
   });
 
   it('prefers ASSESSMENT evidence over SELF_REPORTED for the same skill', async () => {

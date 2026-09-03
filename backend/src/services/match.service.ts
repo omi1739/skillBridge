@@ -61,13 +61,16 @@ export class MatchService {
       explanation = `Early match (${matchScore}%). Key requirements (${missingReqNames}) lack practical evidence. Recommended capstone projects will elevate this match.`;
     }
 
-    return {
+    const result: JobMatchResult = {
       job,
       matchScore,
       matchedSkills,
       missingSkills,
       explanation
     };
+
+    await store.saveJobMatches(userId, [result]);
+    return result;
   }
 
   public async matchAllJobs(userId: string): Promise<JobMatchResult[]> {

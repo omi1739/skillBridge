@@ -6,7 +6,8 @@ jest.mock('../store', () => ({
   store: {
     getJobs: jest.fn(),
     getSkills: jest.fn(),
-    getEvidence: jest.fn()
+    getEvidence: jest.fn(),
+    saveJobMatches: jest.fn().mockResolvedValue(undefined)
   }
 }));
 
@@ -65,6 +66,12 @@ describe('MatchService', () => {
     expect(result.matchScore).toBe(100);
     expect(result.matchedSkills).toHaveLength(3);
     expect(result.missingSkills).toHaveLength(0);
+
+    expect(mockedStore.saveJobMatches).toHaveBeenCalledTimes(1);
+    const saved = mockedStore.saveJobMatches.mock.calls[0][1] as any[];
+    expect(saved).toHaveLength(1);
+    expect(saved[0].job.id).toBe('job_1');
+    expect(saved[0].matchScore).toBe(100);
   });
 
   it('ignores low-proficiency evidence (<= 0.3) and treats the skill as missing', async () => {
