@@ -181,6 +181,8 @@ export default function SkillBridgeApp() {
   const [jobMatches, setJobMatches] = useState<JobMatchResult[]>([]);
   const [expandedMatchId, setExpandedMatchId] = useState<string | null>(null);
   const [jobRemoteFilter, setJobRemoteFilter] = useState<'ALL' | 'REMOTE' | 'ONSITE'>('ALL');
+  const [jobRegionFilter, setJobRegionFilter] = useState<'ALL' | 'BANGLADESH' | 'INTERNATIONAL'>('ALL');
+  const [jobSort, setJobSort] = useState<'priority' | 'recent'>('priority');
   const [userProjects, setUserProjects] = useState<ProjectEvidence[]>([]);
 
   // Project submission modal state
@@ -1581,12 +1583,33 @@ export default function SkillBridgeApp() {
   };
 
   const renderJobsView = () => {
-    const filteredMatches = jobMatches.filter(match => {
+    const bdCount = jobMatches.filter(m => m.job.isBangladesh).length;
+    const internationalCount = jobMatches.length - bdCount;
+    const bdOnsite = jobMatches.filter(m => m.job.isBangladesh && !m.job.isRemote).length;
+    const bdRemote = jobMatches.filter(m => m.job.isBangladesh && m.job.isRemote).length;
+    const remoteCount = jobMatches.filter(m => m.job.isRemote).length;
+
+    const regionMatches = jobMatches.filter(match => {
+      if (jobRegionFilter === 'BANGLADESH') return !!match.job.isBangladesh;
+      if (jobRegionFilter === 'INTERNATIONAL') return !match.job.isBangladesh;
+      return true;
+    });
+
+    const remoteFiltered = regionMatches.filter(match => {
       if (jobRemoteFilter === 'REMOTE') return !!match.job.isRemote;
       if (jobRemoteFilter === 'ONSITE') return !match.job.isRemote;
       return true;
     });
-    const remoteCount = jobMatches.filter(m => m.job.isRemote).length;
+
+    const filteredMatches = [...remoteFiltered].sort((a, b) => {
+      if (jobSort === 'recent') {
+        return new Date(b.job.postedAt).getTime() - new Date(a.job.postedAt).getTime();
+      }
+      const pa = (a.job.isBangladesh && !a.job.isRemote) ? 0 : a.job.isRemote ? 1 : 2;
+      const pb = (b.job.isBangladesh && !b.job.isRemote) ? 0 : b.job.isRemote ? 1 : 2;
+      if (pa !== pb) return pa - pb;
+      return (b.matchScore ?? 0) - (a.matchScore ?? 0);
+    });
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -1594,27 +1617,68 @@ export default function SkillBridgeApp() {
           <div>
             <h1 className="page-title">Matching Backend Jobs</h1>
             <p className="page-subtitle">
-              Compatibility scores computed directly against your demonstrated skill evidence, with full requirement traceability and verified remote / work-from-home availability.
+              Bangladesh-first: on-site roles in Bangladesh are shown first, then remote / work-from-home, then other on-site postings. Compatibility scores are computed directly against your demonstrated skill evidence with full requirement traceability.
             </p>
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              {([
+                { key: 'ALL', label: `All (${jobMatches.length})` },
+                { key: 'BANGLADESH', label: `🇧🇩 Bangladesh (${bdCount})` },
+                { key: 'INTERNATIONAL', label: `International (${internationalCount})` }
+              ] as const).map(o => (
+                <button
+                  key={o.key}
+                  className={`btn ${jobRegionFilter === o.key ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => setJobRegionFilter(o.key)}
+                  style={{ fontSize: '0.8rem', padding: '0.4rem 0.85rem' }}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              {([
+                { key: 'ALL', label: 'Onsite / Remote' },
+                { key: 'REMOTE', label: `Remote / WFH (${remoteCount})` },
+                { key: 'ONSITE', label: `Onsite (${jobMatches.length - remoteCount})` }
+              ] as const).map(o => (
+                <button
+                  key={o.key}
+                  className={`btn ${jobRemoteFilter === o.key ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => setJobRemoteFilter(o.key)}
+                  style={{ fontSize: '0.8rem', padding: '0.4rem 0.85rem' }}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+            <span>Sort:</span>
             {([
-              { key: 'ALL', label: `All (${jobMatches.length})` },
-              { key: 'REMOTE', label: `Remote / WFH (${remoteCount})` },
-              { key: 'ONSITE', label: `Onsite (${jobMatches.length - remoteCount})` }
+              { key: 'priority', label: '🇧🇩 Bangladesh onsite → Remote' },
+              { key: 'recent', label: 'Most recent' }
             ] as const).map(o => (
               <button
                 key={o.key}
-                className={`btn ${jobRemoteFilter === o.key ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => setJobRemoteFilter(o.key)}
-                style={{ fontSize: '0.8rem', padding: '0.4rem 0.85rem' }}
+                className={`btn ${jobSort === o.key ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setJobSort(o.key)}
+                style={{ fontSize: '0.78rem', padding: '0.35rem 0.75rem' }}
               >
                 {o.label}
               </button>
             ))}
+            {jobSort === 'priority' && bdCount > 0 && (
+              <span style={{ color: 'var(--text-muted)', fontSize: '0.74rem' }}>
+                • {bdOnsite} on-site in BD, {bdRemote} remote in BD
+              </span>
+            )}
           </div>
         </div>
 
@@ -1634,6 +1698,11 @@ export default function SkillBridgeApp() {
                   <div style={{ color: '#60a5fa', fontSize: '0.85rem', fontWeight: 500, marginTop: '0.15rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                     {match.job.company}
                     {match.job.location ? <span style={{ color: 'var(--text-muted)' }}>• {match.job.location}</span> : null}
+                    {match.job.isBangladesh && (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.6rem', fontWeight: 700, padding: '0.1rem 0.45rem', borderRadius: '9999px', whiteSpace: 'nowrap', background: 'rgba(251,146,60,0.12)', color: '#fb923c', border: '1px solid rgba(251,146,60,0.4)' }}>
+                        🇧🇩 Bangladesh
+                      </span>
+                    )}
                     <RemoteBadge isRemote={match.job.isRemote} location={match.job.location} />
                   </div>
                 </div>

@@ -425,7 +425,7 @@ export class AppDataStore {
   }
 
   // ---- Jobs ----
-  async getJobs(): Promise<JobListing[]> {
+  async getJobs(sort: 'priority' | 'recent' = 'priority'): Promise<JobListing[]> {
     const skillRows = await query<any>(
       `SELECT js.job_id, js.skill_id, js.is_required FROM job_skills js ORDER BY js.job_id`
     );
@@ -438,11 +438,22 @@ export class AppDataStore {
       arr.push(sk.skill_id);
     }
 
+    // Bangladesh keyword set (cities/areas + country). Drives the "Bangladesh first" default sort.
+    const orderClause = sort === 'recent'
+      ? `j.posted_at DESC NULLS LAST, j.id`
+      : `CASE
+           WHEN is_bd AND NOT COALESCE(j.is_remote, false) THEN 1
+           WHEN COALESCE(j.is_remote, false) THEN 2
+           ELSE 3
+         END,
+         j.posted_at DESC NULLS LAST, j.id`;
+
     const rows = await query<any>(
-      `SELECT j.*, s.name AS source_name, s.access_method AS source_access_method
+      `SELECT j.*, s.name AS source_name, s.access_method AS source_access_method,
+              (LOWER(COALESCE(j.location,'')) ~ 'dhaka|bangladesh|gulshan|dhanmondi|tejgaon|baridhara|banani|bashundhara|uttara|mirpur|motijheel|mogbazar|badda|agargaon|farmgate|chittagong|sylhet|khulna|rajshahi|rangpur|mymensingh|comilla|cumilla|barisal|bogra|jashore|gazipur|narayanganj|cox''?s bazar') AS is_bd
        FROM jobs j
        LEFT JOIN job_sources s ON s.id = j.source_id
-       ORDER BY j.posted_at DESC NULLS LAST, j.id`
+       ORDER BY ${orderClause}`
     );
     return rows.map(j => ({
       id: j.id,
@@ -461,7 +472,8 @@ export class AppDataStore {
       externalId: j.external_id || undefined,
       verificationStatus: j.verification_status || 'UNVERIFIED',
       lastVerifiedAt: j.last_verified_at || null,
-      isRemote: j.is_remote ? true : false
+      isRemote: j.is_remote ? true : false,
+      isBangladesh: j.is_bd ? true : false
     }));
   }
 

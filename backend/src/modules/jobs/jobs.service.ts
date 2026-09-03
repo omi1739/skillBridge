@@ -4,8 +4,8 @@ import { matchService } from '../../services/match.service';
 
 @Injectable()
 export class JobsService {
-  async getJobs() {
-    return store.getJobs();
+  async getJobs(sort: 'priority' | 'recent' = 'priority') {
+    return store.getJobs(sort);
   }
 
   async getMatches(userId: string = 'demo_user_01') {

@@ -225,6 +225,7 @@ export interface JobListing {
   verificationStatus?: VerificationStatus;
   lastVerifiedAt?: string | null;
   isRemote?: boolean;
+  isBangladesh?: boolean;
 }
 
 export type JobSourceType =

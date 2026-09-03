@@ -8,8 +8,8 @@ export class JobsController {
   constructor(@Inject(JobsService) private readonly jobsService: JobsService) {}
 
   @Get()
-  async getJobs() {
-    return this.jobsService.getJobs();
+  async getJobs(@Query('sort') sort?: string) {
+    return this.jobsService.getJobs(sort === 'recent' ? 'recent' : 'priority');
   }
 
   @Get('matches')
