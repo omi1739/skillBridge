@@ -8,7 +8,6 @@ services:
     name: skillbridge-api
     runtime: node
     plan: free
-    rootDir: backend
     buildCommand: npm install && npm run build --workspace=@skillbridge/types && npm run build --workspace=@skillbridge/api
     startCommand: npm run start --workspace=@skillbridge/api
     healthCheckPath: /api/health
