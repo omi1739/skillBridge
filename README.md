@@ -219,7 +219,6 @@ Backend unit and e2e tests isolate the real Postgres connection by mocking the `
 
 ### Demo Access
 - Demo candidate: `candidate@skillbridge.org` / `SkillBridge@123`
-- Platform admin: `admin@skillbridge.org` / `AdminBridge@123`
 - Recruiter: `recruiter@skillbridge.org` / `RecruitBridge@123`
 
 Roles are resolved from the database and enforced end-to-end. The demo login is a regular `USER` (candidate); the **Admin & Ontology Console** tab only appears for `ADMIN` users, and the protected admin endpoints (`/api/admin/*`) return `403` for non-admin roles instead of being bypassed by the demo token.
