@@ -206,7 +206,7 @@ export class IngestionService {
             location: it.location || '',
             description,
             postingUrl: it.url || '',
-            postedAt: it.created_at || undefined
+            postedAt: this.toIsoDate(it.created_at)
           });
         }
         // Polite throttle between pages.
@@ -284,6 +284,20 @@ export class IngestionService {
       .replace(/&#39;/g, "'")
       .replace(/\s+/g, ' ')
       .trim();
+  }
+
+  private toIsoDate(value: string | number | undefined): string | undefined {
+    if (value === undefined || value === null || value === '') return undefined;
+    // Arbeitnow returns Unix epoch seconds; a bare number is rejected by
+    // Postgres when cast to timestamptz, so normalize to an ISO string.
+    if (typeof value === 'number' || /^\d+$/.test(String(value).trim())) {
+      const epoch = Number(value);
+      // If it looks like milliseconds (13 digits) use as-is, else seconds.
+      const ms = Math.abs(epoch) > 1e12 ? epoch : epoch * 1000;
+      const d = new Date(ms);
+      return isNaN(d.getTime()) ? undefined : d.toISOString();
+    }
+    return String(value).trim();
   }
 
   private async sleep(ms: number): Promise<void> {
