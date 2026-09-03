@@ -228,12 +228,16 @@ CREATE INDEX IF NOT EXISTS idx_gaps_user_role ON skill_gaps(user_id, role_id);
 CREATE INDEX IF NOT EXISTS idx_job_skills_job ON job_skills(job_id);
 CREATE INDEX IF NOT EXISTS idx_projects_user ON projects(user_id);
 
+-- Indexes to keep ingestion dedupe + demand recompute fast. The (source_id,
+-- external_id) pair must be UNIQUE so idempotent ingestion upserts work.
+-- Drop any prior partial variant then create a plain unique index, because a
+-- BARE "ON CONFLICT (source_id, external_id)" cannot match a partial index.
+
 -- Idempotent upgrade for databases created before these columns existed.
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS posting_url VARCHAR(500);
 
--- Indexes to keep ingestion dedupe + demand recompute fast. The (source_id,
--- external_id) pair must be UNIQUE so idempotent ingestion upserts work.
+DROP INDEX IF EXISTS uq_jobs_source_external;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_jobs_source_external ON jobs(source_id, external_id);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_job_sources_name ON job_sources(name);
-CREATE UNIQUE INDEX IF NOT EXISTS uq_jobs_source_external ON jobs(source_id, external_id) WHERE source_id IS NOT NULL AND external_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_jobs_role ON jobs(role_id);
 CREATE INDEX IF NOT EXISTS idx_job_skills_skill ON job_skills(skill_id);
