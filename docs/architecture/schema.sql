@@ -231,8 +231,9 @@ CREATE INDEX IF NOT EXISTS idx_projects_user ON projects(user_id);
 -- Idempotent upgrade for databases created before these columns existed.
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS posting_url VARCHAR(500);
 
--- Indexes to keep ingestion dedupe + demand recompute fast.
+-- Indexes to keep ingestion dedupe + demand recompute fast. The (source_id,
+-- external_id) pair must be UNIQUE so idempotent ingestion upserts work.
 CREATE UNIQUE INDEX IF NOT EXISTS uq_job_sources_name ON job_sources(name);
-CREATE INDEX IF NOT EXISTS idx_jobs_source_external ON jobs(source_id, external_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_jobs_source_external ON jobs(source_id, external_id) WHERE source_id IS NOT NULL AND external_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_jobs_role ON jobs(role_id);
 CREATE INDEX IF NOT EXISTS idx_job_skills_skill ON job_skills(skill_id);
