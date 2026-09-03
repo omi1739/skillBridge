@@ -201,6 +201,7 @@ export default function SkillBridgeApp() {
 
   // Admin state
   const [adminOverview, setAdminOverview] = useState<any | null>(null);
+  const [adminDashboard, setAdminDashboard] = useState<any | null>(null);
   const [adminUsers, setAdminUsers] = useState<any[]>([]);
   const [adminUserMsg, setAdminUserMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [editingSkillWeight, setEditingSkillWeight] = useState<{ skillId: string; roleWeight: number; marketDemandFrequency: number } | null>(null);
@@ -289,9 +290,17 @@ export default function SkillBridgeApp() {
           console.error('[SkillBridge] Admin overview load failed:', err);
           setAdminOverview(null);
         });
+      fetch(`${API_BASE}/admin/dashboard`, { headers: headersFor(token) })
+        .then(res => (res.ok ? res.json() : Promise.reject(res)))
+        .then(data => setAdminDashboard(data))
+        .catch((err) => {
+          console.error('[SkillBridge] Admin dashboard load failed:', err);
+          setAdminDashboard(null);
+        });
       fetchAdminUsers(token);
     } else {
       setAdminOverview(null);
+      setAdminDashboard(null);
       setAdminUsers([]);
     }
 
@@ -1662,6 +1671,34 @@ export default function SkillBridgeApp() {
   };
 
   const renderAdminView = () => {
+    const dash = adminDashboard || null;
+    const roleColor: Record<string, string> = { ADMIN: '#f59e0b', RECRUITER: '#22d3ee', USER: '#14b8a6' };
+
+    const roleCount = (r: string) =>
+      dash && Array.isArray(dash.byRole)
+        ? dash.byRole.find((x: any) => x.role === r)?.count ?? 0
+        : 0;
+
+    const donutTotal = dash?.totalUsers ?? 0;
+    let cursor = 0;
+    const gradients: string[] = (dash?.byRole || []).map((x: any) => {
+      const frac = donutTotal ? x.count / donutTotal : 0;
+      const start = cursor;
+      const end = cursor + frac * 360;
+      cursor = end;
+      return `${roleColor[x.role] || '#64748b'} ${start}deg ${end}deg`;
+    });
+    const donutBg = gradients.length
+      ? `conic-gradient(${gradients.join(', ')})`
+      : `conic-gradient(#14b8a6 0deg 360deg)`;
+
+    const signupData = dash?.recentSignups || [];
+    const maxSignups = Math.max(1, ...signupData.map((s: any) => s.count));
+    const dayLabel = (iso: string) => {
+      const d = new Date(iso + 'T00:00:00');
+      return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    };
+
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         <div className="page-header">
@@ -1686,6 +1723,123 @@ export default function SkillBridgeApp() {
             <div className="stat-card">
               <div className="stat-label">Recognized Aliases</div>
               <div className="stat-value">{adminOverview.totalAliasesCount}</div>
+            </div>
+          </div>
+        )}
+
+        {/* ---- User Dashboard ---- */}
+        {(dash || !adminUsers.length) && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Users size={18} color="#a78bfa" />
+              <h2 className="card-title" style={{ marginBottom: 0 }}>User Dashboard</h2>
+            </div>
+
+            <div className="stat-grid-4">
+              <div className="stat-card">
+                <div className="stat-label">Total Users</div>
+                <div className="stat-value">{dash?.totalUsers ?? '—'}</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-label">Admins</div>
+                <div className="stat-value" style={{ color: '#f59e0b' }}>{dash ? roleCount('ADMIN') : '—'}</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-label">Recruiters</div>
+                <div className="stat-value" style={{ color: '#22d3ee' }}>{dash ? roleCount('RECRUITER') : '—'}</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-label">Regular Users</div>
+                <div className="stat-value" style={{ color: '#14b8a6' }}>{dash ? roleCount('USER') : '—'}</div>
+              </div>
+            </div>
+
+            <div className="grid-2">
+              <div className="card">
+                <h3 className="card-title" style={{ marginBottom: '1rem' }}>Users by role</h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
+                  <div
+                    className="admin-donut"
+                    style={{ background: donutBg }}
+                  >
+                    <div className="admin-donut-hole">
+                      <div className="admin-donut-value">{dash?.totalUsers ?? 0}</div>
+                      <div className="admin-donut-label">users</div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: 140 }}>
+                    {(dash?.byRole || []).map((x: any) => (
+                      <div key={x.role} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem' }}>
+                        <span style={{ width: 10, height: 10, borderRadius: 3, background: roleColor[x.role] || '#64748b' }} />
+                        <span style={{ color: 'var(--text-secondary)' }}>{x.role}</span>
+                        <strong style={{ color: 'var(--text-primary)', marginLeft: 'auto' }}>{x.count}</strong>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="card">
+                <h3 className="card-title" style={{ marginBottom: '1rem' }}>New users · last 14 days</h3>
+                {signupData.length === 0 ? (
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>No signups recorded in this window.</div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: '3px', height: 130 }}>
+                    {signupData.map((s: any) => (
+                      <div key={s.day} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem', flex: 1 }}>
+                        <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{s.count}</span>
+                        <div
+                          className="admin-bar"
+                          style={{ height: `${Math.max(4, (s.count / maxSignups) * 86)}px` }}
+                        />
+                        <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>{dayLabel(s.day)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="grid-2">
+              <div className="card">
+                <h3 className="card-title" style={{ marginBottom: '1rem' }}>By provider</h3>
+                {(dash?.byProvider || []).map((x: any) => {
+                  const pct = donutTotal ? Math.round((x.count / donutTotal) * 100) : 0;
+                  return (
+                    <div key={x.provider} style={{ marginBottom: '0.85rem' }}>
+                      <div className="demand-row-label">
+                        <span className="demand-skill">
+                          <span style={{ textTransform: 'capitalize' }}>{x.provider}</span>
+                        </span>
+                        <span className="demand-pct">{x.count} · {pct}%</span>
+                      </div>
+                      <div className="progress-container" style={{ margin: 0 }}>
+                        <div className="progress-bar progress-indigo" style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="card">
+                <h3 className="card-title" style={{ marginBottom: '1rem' }}>By status</h3>
+                {(dash?.byStatus || []).map((x: any) => {
+                  const pct = donutTotal ? Math.round((x.count / donutTotal) * 100) : 0;
+                  return (
+                    <div key={x.status} style={{ marginBottom: '0.85rem' }}>
+                      <div className="demand-row-label">
+                        <span className="demand-skill">
+                          <span style={{ textTransform: 'capitalize' }}>{x.status.toLowerCase()}</span>
+                        </span>
+                        <span className="demand-pct">{x.count} · {pct}%</span>
+                      </div>
+                      <div className="progress-container" style={{ margin: 0 }}>
+                        <div className="progress-bar progress-amber" style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}

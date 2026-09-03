@@ -119,6 +119,13 @@ export class AdminController {
     return this.adminService.getUsers();
   }
 
+  @Get('dashboard')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async getDashboard() {
+    return this.adminService.getDashboard();
+  }
+
   @Patch('users/:id/role')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')

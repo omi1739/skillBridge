@@ -222,6 +222,40 @@ export class AdminService {
     return store.getAllUsers();
   }
 
+  async getDashboard() {
+    const totalRows = await query<{ c: string }>(`SELECT COUNT(*)::text AS c FROM users`);
+    const totalUsers = Number(totalRows[0]?.c || 0);
+
+    const roleRows = await query<any>(
+      `SELECT role, COUNT(*)::int AS count FROM users GROUP BY role ORDER BY count DESC`
+    );
+
+    const statusRows = await query<any>(
+      `SELECT COALESCE(current_status, 'OTHER') AS status, COUNT(*)::int AS count
+       FROM users GROUP BY current_status ORDER BY count DESC`
+    );
+
+    const providerRows = await query<any>(
+      `SELECT COALESCE(provider, 'EMAIL') AS provider, COUNT(*)::int AS count
+       FROM users GROUP BY provider ORDER BY count DESC`
+    );
+
+    const recentRows = await query<any>(
+      `SELECT to_char(created_at, 'YYYY-MM-DD') AS day, COUNT(*)::int AS count
+       FROM users
+       WHERE created_at >= CURRENT_DATE - INTERVAL '13 days'
+       GROUP BY day ORDER BY day ASC`
+    );
+
+    return {
+      totalUsers,
+      byRole: roleRows.map(r => ({ role: r.role || 'USER', count: r.count })),
+      byStatus: statusRows.map(r => ({ status: r.status, count: r.count })),
+      byProvider: providerRows.map(r => ({ provider: r.provider, count: r.count })),
+      recentSignups: recentRows.map(r => ({ day: r.day, count: r.count }))
+    };
+  }
+
   async updateUserRole(userId: string, role: string, currentUser: AuthPayload) {
     if (!userId) throw new BadRequestException('userId is required');
 
