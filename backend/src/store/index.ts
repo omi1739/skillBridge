@@ -458,19 +458,115 @@ export class AppDataStore {
       sourceName: j.source_name || undefined,
       sourceUrl: j.posting_url || undefined,
       sourceAccessMethod: j.source_access_method || undefined,
-      externalId: j.external_id || undefined
+      externalId: j.external_id || undefined,
+      verificationStatus: j.verification_status || 'UNVERIFIED',
+      lastVerifiedAt: j.last_verified_at || null
     }));
   }
 
   async getJobSources(): Promise<any[]> {
-    const rows = await query<any>(`SELECT * FROM job_sources ORDER BY name`);
+    const rows = await query<any>(
+      `SELECT s.*, COUNT(j.id)::int AS job_count
+       FROM job_sources s
+       LEFT JOIN jobs j ON j.source_id = s.id
+       GROUP BY s.id
+       ORDER BY s.name`
+    );
     return rows.map(r => ({
       id: r.id,
       name: r.name,
+      sourceType: r.source_type || r.access_method || 'API',
+      website: r.website || undefined,
+      apiUrl: r.api_url || undefined,
+      feedUrl: r.feed_url || undefined,
+      careerUrl: r.career_url || undefined,
       accessMethod: r.access_method,
+      crawlAllowed: r.crawl_allowed ?? false,
+      redistributionAllowed: r.redistribution_allowed ?? false,
+      permissionStatus: r.permission_status || 'PENDING',
+      permissionReference: r.permission_reference || undefined,
       licenseNotes: r.license_notes || undefined,
-      isActive: r.is_active
+      isActive: r.is_active,
+      lastSyncedAt: r.last_synced_at || null,
+      jobCount: r.job_count
     }));
+  }
+
+  async addJobSource(data: {
+    name: string;
+    sourceType?: string;
+    accessMethod: string;
+    website?: string;
+    apiUrl?: string;
+    feedUrl?: string;
+    careerUrl?: string;
+    crawlAllowed?: boolean;
+    redistributionAllowed?: boolean;
+    permissionStatus?: string;
+    permissionReference?: string;
+    licenseNotes?: string;
+  }): Promise<any> {
+    const rows = await query<any>(
+      `INSERT INTO job_sources
+         (name, source_type, access_method, website, api_url, feed_url, career_url,
+          crawl_allowed, redistribution_allowed, permission_status, permission_reference, license_notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+       ON CONFLICT (name) DO UPDATE SET
+         source_type=EXCLUDED.source_type, access_method=EXCLUDED.access_method,
+         website=EXCLUDED.website, api_url=EXCLUDED.api_url, feed_url=EXCLUDED.feed_url,
+         career_url=EXCLUDED.career_url, crawl_allowed=EXCLUDED.crawl_allowed,
+         redistribution_allowed=EXCLUDED.redistribution_allowed,
+         permission_status=EXCLUDED.permission_status,
+         permission_reference=EXCLUDED.permission_reference,
+         license_notes=EXCLUDED.license_notes,
+         updated_at=CURRENT_TIMESTAMP
+       RETURNING id`,
+      [data.name, data.sourceType || 'API', data.accessMethod,
+       data.website || null, data.apiUrl || null, data.feedUrl || null,
+       data.careerUrl || null, data.crawlAllowed ?? false,
+       data.redistributionAllowed ?? false, data.permissionStatus || 'PENDING',
+       data.permissionReference || null, data.licenseNotes || null]
+    );
+    return { id: rows[0].id };
+  }
+
+  async updateJobSource(sourceId: string, patch: Partial<{
+    isActive: boolean;
+    permissionStatus: string;
+    crawlAllowed: boolean;
+    redistributionAllowed: boolean;
+    website: string;
+    apiUrl: string;
+    feedUrl: string;
+    careerUrl: string;
+    permissionReference: string;
+    licenseNotes: string;
+  }>): Promise<void> {
+    const sets: string[] = [];
+    const vals: any[] = [];
+    let idx = 1;
+    const push = (col: string, val: any) => {
+      sets.push(`${col} = $${idx++}`);
+      vals.push(val);
+    };
+    if (typeof patch.isActive === 'boolean') push('is_active', patch.isActive);
+    if (patch.permissionStatus) push('permission_status', patch.permissionStatus);
+    if (typeof patch.crawlAllowed === 'boolean') push('crawl_allowed', patch.crawlAllowed);
+    if (typeof patch.redistributionAllowed === 'boolean') push('redistribution_allowed', patch.redistributionAllowed);
+    if (patch.website !== undefined) push('website', patch.website);
+    if (patch.apiUrl !== undefined) push('api_url', patch.apiUrl);
+    if (patch.feedUrl !== undefined) push('feed_url', patch.feedUrl);
+    if (patch.careerUrl !== undefined) push('career_url', patch.careerUrl);
+    if (patch.permissionReference !== undefined) push('permission_reference', patch.permissionReference);
+    if (patch.licenseNotes !== undefined) push('license_notes', patch.licenseNotes);
+    sets.push('updated_at = CURRENT_TIMESTAMP');
+    vals.push(sourceId);
+    if (sets.length === 1) return;
+    await query(`UPDATE job_sources SET ${sets.join(', ')} WHERE id = $${idx}`, vals);
+  }
+
+  async deleteJobSource(sourceId: string): Promise<void> {
+    await query(`DELETE FROM job_sources WHERE id = $1`, [sourceId]);
   }
 
   async deleteJobsBySource(sourceId: string): Promise<number> {
@@ -482,13 +578,115 @@ export class AppDataStore {
     return Number(rows[0]?.c || 0);
   }
 
-  async ensureJobSource(name: string, accessMethod: string, licenseNotes?: string): Promise<string> {
-    const rows = await query<any>(
-      `INSERT INTO job_sources (name, access_method, license_notes, is_active)
-       VALUES ($1,$2,$3,true)
-       ON CONFLICT (name) DO UPDATE SET access_method=EXCLUDED.access_method
+  async deleteJobById(jobId: string): Promise<boolean> {
+    const rows = await query<{ c: string }>(
+      `WITH removed AS (DELETE FROM jobs WHERE id = $1 RETURNING id)
+       SELECT COUNT(*)::text AS c FROM removed`,
+      [jobId]
+    );
+    return Number(rows[0]?.c || 0) > 0;
+  }
+
+  async markJobsAsVerified(sourceId: string): Promise<number> {
+    const rows = await query<{ c: string }>(
+      `UPDATE jobs
+       SET verification_status = 'SOURCE_VERIFIED', last_verified_at = CURRENT_TIMESTAMP
+       WHERE source_id = $1 AND verification_status != 'EMPLOYER_VERIFIED'
        RETURNING id`,
-      [name, accessMethod, licenseNotes || null]
+      [sourceId]
+    );
+    return rows.length;
+  }
+
+  async markSourceSynced(sourceId: string): Promise<void> {
+    await query(
+      `UPDATE job_sources SET last_synced_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1`,
+      [sourceId]
+    );
+  }
+
+  async runVerificationSweep(): Promise<{ expired: number; recentlyChecked: number; verified: number }> {
+    const EXPIRY_INTERVAL = "7 days";
+    const RECENT_INTERVAL = "48 hours";
+
+    // Expire jobs: source inactive OR last_verified_at older than 7 days
+    const expired = await query<{ c: string }>(
+      `WITH expired AS (
+         UPDATE jobs SET verification_status = 'EXPIRED'
+         WHERE (
+           source_id IS NOT NULL AND NOT EXISTS (
+             SELECT 1 FROM job_sources s WHERE s.id = jobs.source_id AND s.is_active
+           )
+           OR
+           (last_verified_at IS NOT NULL AND last_verified_at < CURRENT_TIMESTAMP - INTERVAL '${EXPIRY_INTERVAL}')
+         )
+         AND verification_status NOT IN ('EMPLOYER_VERIFIED', 'EXPIRED')
+         RETURNING id
+       )
+       SELECT COUNT(*)::text AS c FROM expired`
+    );
+
+    // RECENTLY_CHECKED: source is active AND last_verified_at within 48h
+    const recent = await query<{ c: string }>(
+      `WITH updated AS (
+         UPDATE jobs SET verification_status = 'RECENTLY_CHECKED'
+         WHERE source_id IN (SELECT id FROM job_sources WHERE is_active)
+           AND last_verified_at >= CURRENT_TIMESTAMP - INTERVAL '${RECENT_INTERVAL}'
+           AND verification_status = 'SOURCE_VERIFIED'
+         RETURNING id
+       )
+       SELECT COUNT(*)::text AS c FROM updated`
+    );
+
+    // SOURCE_VERIFIED: source is active AND last_verified_at > 48h ago
+    const verified = await query<{ c: string }>(
+      `WITH updated AS (
+         UPDATE jobs SET verification_status = 'SOURCE_VERIFIED'
+         WHERE source_id IN (SELECT id FROM job_sources WHERE is_active)
+           AND (last_verified_at IS NULL OR last_verified_at < CURRENT_TIMESTAMP - INTERVAL '${RECENT_INTERVAL}')
+           AND verification_status = 'RECENTLY_CHECKED'
+         RETURNING id
+       )
+       SELECT COUNT(*)::text AS c FROM updated`
+    );
+
+    return {
+      expired: Number(expired[0]?.c || 0),
+      recentlyChecked: Number(recent[0]?.c || 0),
+      verified: Number(verified[0]?.c || 0)
+    };
+  }
+
+  async ensureJobSource(name: string, accessMethod: string, licenseNotes?: string, extra?: Partial<{
+    sourceType: string;
+    website: string;
+    apiUrl: string;
+    feedUrl: string;
+    careerUrl: string;
+    crawlAllowed: boolean;
+    redistributionAllowed: boolean;
+    permissionStatus: string;
+  }>): Promise<string> {
+    const rows = await query<any>(
+      `INSERT INTO job_sources
+         (name, access_method, license_notes, is_active, source_type, website, api_url, feed_url, career_url, crawl_allowed, redistribution_allowed, permission_status)
+       VALUES ($1,$2,$3,true,$4,$5,$6,$7,$8,$9,$10,$11)
+       ON CONFLICT (name) DO UPDATE SET
+         access_method=EXCLUDED.access_method,
+         license_notes=EXCLUDED.license_notes,
+         source_type=COALESCE(EXCLUDED.source_type, job_sources.source_type),
+         website=COALESCE(EXCLUDED.website, job_sources.website),
+         api_url=COALESCE(EXCLUDED.api_url, job_sources.api_url),
+         feed_url=COALESCE(EXCLUDED.feed_url, job_sources.feed_url),
+         career_url=COALESCE(EXCLUDED.career_url, job_sources.career_url),
+         updated_at=CURRENT_TIMESTAMP
+       RETURNING id`,
+      [name, accessMethod, licenseNotes || null,
+       extra?.sourceType || 'API', extra?.website || null, extra?.apiUrl || null,
+       extra?.feedUrl || null, extra?.careerUrl || null,
+       extra?.crawlAllowed ?? false, extra?.redistributionAllowed ?? false,
+       extra?.permissionStatus || 'PENDING']
     );
     return rows[0].id;
   }
@@ -514,13 +712,14 @@ export class AppDataStore {
         const id = `job_src_${this.effectiveCompanyKey(j)}_${this.hashExternal(j.externalId)}`;
         const upsert = await client.query(
           `INSERT INTO jobs
-             (id, source_id, external_id, title, company, location, experience_level, role_id, description, posting_url, posted_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::timestamptz)
+             (id, source_id, external_id, title, company, location, experience_level, role_id, description, posting_url, posted_at, verification_status, last_verified_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::timestamptz,'SOURCE_VERIFIED',CURRENT_TIMESTAMP)
            ON CONFLICT (source_id, external_id)
            DO UPDATE SET title=EXCLUDED.title, company=EXCLUDED.company,
              location=EXCLUDED.location, experience_level=EXCLUDED.experience_level,
              role_id=EXCLUDED.role_id, description=EXCLUDED.description,
-             posting_url=EXCLUDED.posting_url, posted_at=EXCLUDED.posted_at
+             posting_url=EXCLUDED.posting_url, posted_at=EXCLUDED.posted_at,
+             verification_status='SOURCE_VERIFIED', last_verified_at=CURRENT_TIMESTAMP
            RETURNING (xmax = 0) AS freshly_inserted`,
           [id, j.sourceId, j.externalId, j.title, j.company, j.location,
            j.experienceLevel, j.roleId, j.description, j.postingUrl,

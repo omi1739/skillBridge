@@ -77,10 +77,21 @@ CREATE TABLE IF NOT EXISTS role_skills (
 CREATE TABLE IF NOT EXISTS job_sources (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL,
+    source_type VARCHAR(50) DEFAULT 'API',      -- API, RSS, XML_FEED, PARTNER_FEED, EMPLOYER, PERMITTED_CRAWLER
+    website VARCHAR(255),
+    api_url VARCHAR(500),
+    feed_url VARCHAR(500),
+    career_url VARCHAR(500),
     access_method VARCHAR(50) NOT NULL,         -- API, PARTNER_FEED, MANUAL_CURATED
+    crawl_allowed BOOLEAN DEFAULT FALSE,
+    redistribution_allowed BOOLEAN DEFAULT FALSE,
+    permission_status VARCHAR(50) DEFAULT 'PENDING',  -- GRANTED, PENDING, DENIED, NOT_REQUIRED
+    permission_reference TEXT,
     license_notes TEXT,
     is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    last_synced_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS jobs (
@@ -94,6 +105,8 @@ CREATE TABLE IF NOT EXISTS jobs (
     role_id VARCHAR(100) REFERENCES roles(id) ON DELETE SET NULL,
     description TEXT NOT NULL,
     posting_url VARCHAR(500),
+    verification_status VARCHAR(50) DEFAULT 'UNVERIFIED',  -- EMPLOYER_VERIFIED, SOURCE_VERIFIED, RECENTLY_CHECKED, EXTERNAL_SOURCE, EXPIRED, UNVERIFIED
+    last_verified_at TIMESTAMP WITH TIME ZONE,
     posted_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -235,9 +248,24 @@ CREATE INDEX IF NOT EXISTS idx_projects_user ON projects(user_id);
 
 -- Idempotent upgrade for databases created before these columns existed.
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS posting_url VARCHAR(500);
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS verification_status VARCHAR(50) DEFAULT 'UNVERIFIED';
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS last_verified_at TIMESTAMP WITH TIME ZONE;
+
+ALTER TABLE job_sources ADD COLUMN IF NOT EXISTS source_type VARCHAR(50) DEFAULT 'API';
+ALTER TABLE job_sources ADD COLUMN IF NOT EXISTS website VARCHAR(255);
+ALTER TABLE job_sources ADD COLUMN IF NOT EXISTS api_url VARCHAR(500);
+ALTER TABLE job_sources ADD COLUMN IF NOT EXISTS feed_url VARCHAR(500);
+ALTER TABLE job_sources ADD COLUMN IF NOT EXISTS career_url VARCHAR(500);
+ALTER TABLE job_sources ADD COLUMN IF NOT EXISTS crawl_allowed BOOLEAN DEFAULT FALSE;
+ALTER TABLE job_sources ADD COLUMN IF NOT EXISTS redistribution_allowed BOOLEAN DEFAULT FALSE;
+ALTER TABLE job_sources ADD COLUMN IF NOT EXISTS permission_status VARCHAR(50) DEFAULT 'PENDING';
+ALTER TABLE job_sources ADD COLUMN IF NOT EXISTS permission_reference TEXT;
+ALTER TABLE job_sources ADD COLUMN IF NOT EXISTS last_synced_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE job_sources ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
 
 DROP INDEX IF EXISTS uq_jobs_source_external;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_jobs_source_external ON jobs(source_id, external_id);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_job_sources_name ON job_sources(name);
 CREATE INDEX IF NOT EXISTS idx_jobs_role ON jobs(role_id);
 CREATE INDEX IF NOT EXISTS idx_job_skills_skill ON job_skills(skill_id);
+CREATE INDEX IF NOT EXISTS idx_jobs_verification ON jobs(verification_status);

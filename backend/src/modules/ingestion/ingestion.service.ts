@@ -69,6 +69,7 @@ export class IngestionService {
     inserted: number;
     updated: number;
     removed: number;
+    expired: number;
     recomputedRoles: number;
     totalJobs: number;
     source: string;
@@ -77,7 +78,14 @@ export class IngestionService {
     const minMatches = params?.minMatches ?? 1;
     const replace = params?.replace ?? false;
     const sourceName = (process.env.JOB_SOURCE_NAME || 'Arbeitnow').trim();
-    const sourceId = await store.ensureJobSource(sourceName, 'API', 'Free public job-board API. Link back and do not abuse. See Arbeitnow terms of service.');
+    const sourceId = await store.ensureJobSource(sourceName, 'API',
+      'Free public job-board API. Link back and do not abuse. See Arbeitnow terms of service.',
+      {
+        sourceType: 'API',
+        website: 'https://www.arbeitnow.com',
+        apiUrl: sourceUrl,
+        permissionStatus: 'NOT_REQUIRED',
+      });
 
     // Replacing clears this source's previously-ingested jobs first so a
     // re-sync with a stricter classifier (or expired listings) stays accurate.
@@ -118,11 +126,16 @@ export class IngestionService {
       updated = res.updated;
     }
 
+    // Mark this source as synced and run verification sweep to expire old
+    // jobs from sources that haven't been re-checked recently.
+    await store.markSourceSynced(sourceId);
+    const sweep = await store.runVerificationSweep();
+
     const recomputed = await store.recomputeMarketDemand();
     await this.bustCaches();
 
     this.logger.log(
-      `Ingestion complete: fetched=${raw.length} classified=${built.length} inserted=${inserted} updated=${updated} removed=${removed} totalJobs=${recomputed.totalJobs}`
+      `Ingestion complete: fetched=${raw.length} classified=${built.length} inserted=${inserted} updated=${updated} removed=${removed} expired=${sweep.expired} totalJobs=${recomputed.totalJobs}`
     );
     return {
       fetched: raw.length,
@@ -130,6 +143,7 @@ export class IngestionService {
       inserted,
       updated,
       removed,
+      expired: sweep.expired,
       recomputedRoles: recomputed.updatedRoles,
       totalJobs: recomputed.totalJobs,
       source: sourceName

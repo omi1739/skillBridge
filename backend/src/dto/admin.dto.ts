@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsNumber, Min, Max, IsArray } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsNumber, Min, Max, IsArray, IsBoolean, IsIn } from 'class-validator';
 
 export class AddAliasDto {
   @IsString()
@@ -65,4 +65,100 @@ export class AddQuestionDto {
   @IsOptional()
   @IsNumber()
   points?: number;
+}
+
+export class AddJobSourceDto {
+  @IsString()
+  @IsNotEmpty()
+  name!: string;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['API', 'RSS', 'XML_FEED', 'PARTNER_FEED', 'EMPLOYER', 'PERMITTED_CRAWLER'])
+  sourceType?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @IsIn(['API', 'PARTNER_FEED', 'MANUAL_CURATED'])
+  accessMethod!: string;
+
+  @IsOptional()
+  @IsString()
+  website?: string;
+
+  @IsOptional()
+  @IsString()
+  apiUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  feedUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  careerUrl?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  crawlAllowed?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  redistributionAllowed?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['GRANTED', 'PENDING', 'DENIED', 'NOT_REQUIRED'])
+  permissionStatus?: string;
+
+  @IsOptional()
+  @IsString()
+  permissionReference?: string;
+
+  @IsOptional()
+  @IsString()
+  licenseNotes?: string;
+}
+
+export class UpdateJobSourceDto {
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['GRANTED', 'PENDING', 'DENIED', 'NOT_REQUIRED'])
+  permissionStatus?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  crawlAllowed?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  redistributionAllowed?: boolean;
+
+  @IsOptional()
+  @IsString()
+  website?: string;
+
+  @IsOptional()
+  @IsString()
+  apiUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  feedUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  careerUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  permissionReference?: string;
+
+  @IsOptional()
+  @IsString()
+  licenseNotes?: string;
 }

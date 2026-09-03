@@ -199,6 +199,14 @@ export interface CurriculumComparisonResult {
   summaryAnalysis: string;
 }
 
+export type VerificationStatus =
+  | 'EMPLOYER_VERIFIED'
+  | 'SOURCE_VERIFIED'
+  | 'RECENTLY_CHECKED'
+  | 'EXTERNAL_SOURCE'
+  | 'EXPIRED'
+  | 'UNVERIFIED';
+
 export interface JobListing {
   id: string;
   title: string;
@@ -214,14 +222,41 @@ export interface JobListing {
   sourceUrl?: string;
   sourceAccessMethod?: string;
   externalId?: string;
+  verificationStatus?: VerificationStatus;
+  lastVerifiedAt?: string | null;
 }
+
+export type JobSourceType =
+  | 'API'
+  | 'RSS'
+  | 'XML_FEED'
+  | 'PARTNER_FEED'
+  | 'EMPLOYER'
+  | 'PERMITTED_CRAWLER';
+
+export type PermissionStatus = 'GRANTED' | 'PENDING' | 'DENIED' | 'NOT_REQUIRED';
 
 export interface JobSource {
   id: string;
   name: string;
+  sourceType?: JobSourceType;
+  website?: string;
+  apiUrl?: string;
+  feedUrl?: string;
+  careerUrl?: string;
   accessMethod: 'API' | 'PARTNER_FEED' | 'MANUAL_CURATED';
+  crawlAllowed: boolean;
+  redistributionAllowed: boolean;
+  permissionStatus: PermissionStatus;
+  permissionReference?: string;
   licenseNotes?: string;
   isActive: boolean;
+  lastSyncedAt?: string | null;
+  jobCount?: number;
+}
+
+export interface JobSourceAdminRow extends JobSource {
+  sourceUrl?: string;
 }
 
 export interface MarketDemandStat {

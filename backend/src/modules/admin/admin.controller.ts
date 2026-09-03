@@ -1,9 +1,9 @@
-import { Controller, Get, Post, Patch, Param, Body, Inject, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, Inject, UseGuards } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { AddAliasDto, UpdateRoleWeightsDto, AddQuestionDto } from '../../dto/admin.dto';
+import { AddAliasDto, UpdateRoleWeightsDto, AddQuestionDto, AddJobSourceDto, UpdateJobSourceDto } from '../../dto/admin.dto';
 
 @Controller('admin')
 export class AdminController {
@@ -48,5 +48,63 @@ export class AdminController {
       body.explanation,
       body.points
     );
+  }
+
+  // --- Source Management ---
+
+  @Get('sources')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async getSources() {
+    return this.adminService.getSources();
+  }
+
+  @Post('sources')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async addSource(@Body() body: AddJobSourceDto) {
+    return this.adminService.addSource(body);
+  }
+
+  @Patch('sources/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async updateSource(
+    @Param('id') sourceId: string,
+    @Body() body: UpdateJobSourceDto
+  ) {
+    return this.adminService.updateSource(sourceId, body);
+  }
+
+  @Delete('sources/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async deleteSource(@Param('id') sourceId: string) {
+    return this.adminService.deleteSource(sourceId);
+  }
+
+  // --- Job Removal ---
+
+  @Delete('jobs/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async deleteJob(@Param('id') jobId: string) {
+    return this.adminService.deleteJob(jobId);
+  }
+
+  // --- Verification ---
+
+  @Post('verification/sweep')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async runVerificationSweep() {
+    return this.adminService.runVerificationSweep();
+  }
+
+  @Get('verification/status')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async getVerificationStatus() {
+    return this.adminService.getVerificationStatus();
   }
 }

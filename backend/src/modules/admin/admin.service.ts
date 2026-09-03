@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { store } from '../../store';
 import { query } from '../../db/client';
+import { AddJobSourceDto, UpdateJobSourceDto } from '../../dto/admin.dto';
 
 @Injectable()
 export class AdminService {
@@ -127,5 +128,90 @@ export class AdminService {
 
     await store.addQuestion(newQuestion);
     return { success: true, question: newQuestion };
+  }
+
+  // --- Source Management ---
+
+  async getSources() {
+    const sources = await store.getJobSources();
+    const jobs = await store.getJobs();
+    const jobCountBySource = new Map<string, number>();
+    for (const j of jobs) {
+      const src = j.sourceName;
+      if (src) jobCountBySource.set(src, (jobCountBySource.get(src) || 0) + 1);
+    }
+    return sources.map(s => ({
+      ...s,
+      jobCount: jobCountBySource.get(s.name) || s.jobCount || 0
+    }));
+  }
+
+  async addSource(body: AddJobSourceDto) {
+    if (!body.name || !body.accessMethod) {
+      throw new BadRequestException('name and accessMethod are required');
+    }
+    const result = await store.addJobSource({
+      name: body.name,
+      sourceType: body.sourceType || 'API',
+      accessMethod: body.accessMethod,
+      website: body.website,
+      apiUrl: body.apiUrl,
+      feedUrl: body.feedUrl,
+      careerUrl: body.careerUrl,
+      crawlAllowed: body.crawlAllowed ?? false,
+      redistributionAllowed: body.redistributionAllowed ?? false,
+      permissionStatus: body.permissionStatus || 'PENDING',
+      permissionReference: body.permissionReference,
+      licenseNotes: body.licenseNotes
+    });
+    return { success: true, source: result };
+  }
+
+  async updateSource(sourceId: string, body: UpdateJobSourceDto) {
+    if (!sourceId) throw new BadRequestException('sourceId is required');
+    await store.updateJobSource(sourceId, body);
+    return { success: true };
+  }
+
+  async deleteSource(sourceId: string) {
+    if (!sourceId) throw new BadRequestException('sourceId is required');
+    const removed = await store.deleteJobsBySource(sourceId);
+    await store.deleteJobSource(sourceId);
+    return { success: true, jobsRemoved: removed };
+  }
+
+  // --- Job Removal ---
+
+  async deleteJob(jobId: string) {
+    if (!jobId) throw new BadRequestException('jobId is required');
+    const deleted = await store.deleteJobById(jobId);
+    if (!deleted) throw new NotFoundException('Job not found');
+    return { success: true };
+  }
+
+  // --- Verification ---
+
+  async runVerificationSweep() {
+    const result = await store.runVerificationSweep();
+    return { success: true, ...result };
+  }
+
+  async getVerificationStatus() {
+    const rows = await query<any>(
+      `SELECT verification_status AS status, COUNT(*)::int AS count
+       FROM jobs
+       GROUP BY verification_status
+       ORDER BY count DESC`
+    );
+    const totalRows = await query<{ c: string }>(
+      `SELECT COUNT(*)::text AS c FROM jobs`
+    );
+    return {
+      totalJobs: Number(totalRows[0]?.c || 0),
+      byStatus: rows.map(r => ({
+        status: r.status || 'UNVERIFIED',
+        count: r.count
+      }))
+    };
   }
 }
