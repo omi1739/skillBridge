@@ -192,6 +192,19 @@ npm run build     # compiles shared, backend, and frontend
 npm start         # runs the compiled NestJS API
 ```
 
+### 6. Testing
+The monorepo ships with automated unit, e2e, and UI contract tests:
+
+```bash
+npm test --workspace=@skillbridge/api     # backend unit tests (services, jest)
+npm run test:e2e --workspace=@skillbridge/api   # backend HTTP e2e (supertest, mocked DB)
+npm test --workspace=@skillbridge/web     # frontend UI API-contract tests (vitest + Testing Library)
+npm run typecheck                         # typecheck all workspaces
+```
+
+Backend unit and e2e tests isolate the real Postgres connection by mocking the `db/client` layer, so they run without a database. Frontend tests render the dashboard, mock `fetch`, and assert the exact request payload field names (`query`, `code`, `selectedAnswer`) sent to the API. A GitHub Actions workflow (`.github/workflows/ci.yml`) runs typecheck, unit tests, e2e tests, and builds on every push/PR to `main`.
+
+
 ### Demo Access
 - Demo user: `candidate@skillbridge.org` / `SkillBridge@123`
 - The demo login grants access to all tabs, including the Admin & Ontology Console.

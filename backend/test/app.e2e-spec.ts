@@ -1,0 +1,89 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { INestApplication } from '@nestjs/common';
+import request from 'supertest';
+import { AppModule } from '../src/app.module';
+
+// Mock the database layer so the whole app runs against in-memory data.
+jest.mock('../src/db/client', () => {
+  const fakeQuery = jest.fn(async (text: string) => {
+    const key = String(text).toLowerCase();
+    if (key.includes('select 1')) {
+      return [{ '?column?': 1 }];
+    }
+    return [];
+  });
+  const fakePool = {
+    query: fakeQuery,
+    connect: jest.fn(async () => ({
+      query: fakeQuery,
+      release: jest.fn()
+    })),
+    end: jest.fn()
+  };
+  return {
+    pool: fakePool,
+    query: fakeQuery,
+    withTransaction: jest.fn(async <T>(fn: (client: any) => Promise<T>): Promise<T> => {
+      await fakePool.connect();
+      return fn({ query: fakeQuery });
+    }),
+    testConnection: jest.fn(async () => true)
+  };
+});
+
+describe('SkillBridge API (e2e)', () => {
+  let app: INestApplication;
+
+  beforeAll(async () => {
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule]
+    }).compile();
+
+    // Override database.service so onModuleInit does not matter
+    app = moduleFixture.createNestApplication();
+    app.setGlobalPrefix('api');
+    await app.init();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('GET /api/health returns ok', () => {
+    return request(app.getHttpServer())
+      .get('/api/health')
+      .expect(200)
+      .expect(res => {
+        expect(res.body.status).toBe('ok');
+        expect(res.body.service).toBe('skillbridge-api');
+      });
+  });
+
+  it('POST /api/auth/register rejects missing fields', () => {
+    return request(app.getHttpServer())
+      .post('/api/auth/register')
+      .send({ email: 'test@example.com' })
+      .expect(400);
+  });
+
+  it('POST /api/auth/login rejects missing credentials', () => {
+    return request(app.getHttpServer())
+      .post('/api/auth/login')
+      .send({ password: 'only-password' })
+      .expect(400);
+  });
+
+  it('POST /api/admin/skills/alias returns 401 without a token', () => {
+    return request(app.getHttpServer())
+      .post('/api/admin/skills/alias')
+      .send({ skillId: 'skill_nodejs', alias: 'Node' })
+      .expect(401);
+  });
+
+  it('PATCH /api/admin/roles/:id/weights returns 401 without a token', () => {
+    return request(app.getHttpServer())
+      .patch('/api/admin/roles/role_junior_backend/weights')
+      .send({ skillId: 'skill_nodejs' })
+      .expect(401);
+  });
+});
