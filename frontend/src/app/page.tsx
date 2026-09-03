@@ -13,7 +13,8 @@ import {
   CurriculumComparisonResult,
   Skill,
   User,
-  Profile
+  Profile,
+  VerificationStatus
 } from '@skillbridge/types';
 import {
   TrendingUp,
@@ -56,6 +57,30 @@ const CURRENT_STATUS_OPTIONS = [
   { value: 'JOB_SEEKER', label: 'Job Seeker' },
   { value: 'OTHER', label: 'Other' }
 ] as const;
+
+const VERIFICATION_BADGES: Record<VerificationStatus, { label: string; color: string; bg: string }> = {
+  EMPLOYER_VERIFIED: { label: 'Employer Verified', color: '#16a34a', bg: '#dcfce7' },
+  SOURCE_VERIFIED:   { label: 'Source Verified',   color: '#0d9488', bg: '#ccfbf1' },
+  RECENTLY_CHECKED:  { label: 'Recently Checked',  color: '#2563eb', bg: '#dbeafe' },
+  EXTERNAL_SOURCE:   { label: 'External Source',    color: '#9333ea', bg: '#f3e8ff' },
+  EXPIRED:           { label: 'Expired',            color: '#dc2626', bg: '#fee2e2' },
+  UNVERIFIED:        { label: 'Unverified',         color: '#6b7280', bg: '#f3f4f6' },
+};
+
+function VerificationBadge({ status }: { status?: VerificationStatus }) {
+  const s = status || 'UNVERIFIED';
+  const badge = VERIFICATION_BADGES[s];
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
+      fontSize: '0.6rem', fontWeight: 600, padding: '0.1rem 0.4rem',
+      borderRadius: '9999px', background: badge.bg, color: badge.color,
+      lineHeight: 1.4, whiteSpace: 'nowrap' as const
+    }}>
+      {s === 'EXPIRED' ? '✕' : s === 'EMPLOYER_VERIFIED' ? '★' : '✓'} {badge.label}
+    </span>
+  );
+}
 
 const AUTH_INPUT_STYLE: React.CSSProperties = {
   width: '100%',
@@ -814,6 +839,7 @@ export default function SkillBridgeApp() {
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
                             <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>{j.sourceName || 'Manual'}</span>
+                            <VerificationBadge status={j.verificationStatus} />
                             {j.sourceUrl ? (
                               <a href={j.sourceUrl} target="_blank" rel="noopener noreferrer" className="btn btn-secondary" style={{ fontSize: '0.7rem', padding: '0.2rem 0.6rem' }}>
                                 Open ↗
@@ -831,10 +857,11 @@ export default function SkillBridgeApp() {
             )}
           </div>
 
-          <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-faint)', fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', flexWrap: 'wrap', gap: '0.5rem 1.25rem' }}>
+          <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-faint)', fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', flexWrap: 'wrap', gap: '0.5rem 1.25rem', alignItems: 'center' }}>
             <span><strong style={{ color: 'var(--text-secondary)' }}>Computed from</strong> {totalJobsCount} live postings</span>
             <span><strong style={{ color: 'var(--text-secondary)' }}>Source</strong> {sourceList}</span>
             <span><strong style={{ color: 'var(--text-secondary)' }}>Last synced</strong> {lastSync}</span>
+            <span><VerificationBadge status="SOURCE_VERIFIED" /></span>
             <span>Percentages are occurrence counts across real, verifiable postings — click a value to open them.</span>
           </div>
         </div>
@@ -1644,6 +1671,7 @@ export default function SkillBridgeApp() {
                   Source: <strong style={{ color: 'var(--text-secondary)' }}>{marketProvenance.sources.join(' + ')}</strong>
                   {' · '}{marketProvenance.totalJobs} postings
                   {marketProvenance.lastIngestedAt ? ` · synced ${new Date(marketProvenance.lastIngestedAt).toLocaleDateString()}` : ''}
+                  <span style={{ marginLeft: '0.5rem' }}><VerificationBadge status="SOURCE_VERIFIED" /></span>
                 </div>
               )}
               <div className="demand-list">
