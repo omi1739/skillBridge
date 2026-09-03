@@ -3,7 +3,9 @@ import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { AddAliasDto, UpdateRoleWeightsDto, AddQuestionDto, AddJobSourceDto, UpdateJobSourceDto } from '../../dto/admin.dto';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { AuthPayload } from '../../services/auth.service';
+import { AddAliasDto, UpdateRoleWeightsDto, AddQuestionDto, AddJobSourceDto, UpdateJobSourceDto, UpdateUserRoleDto } from '../../dto/admin.dto';
 
 @Controller('admin')
 export class AdminController {
@@ -106,5 +108,35 @@ export class AdminController {
   @Roles('ADMIN')
   async getVerificationStatus() {
     return this.adminService.getVerificationStatus();
+  }
+
+  // --- User Management ---
+
+  @Get('users')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async getUsers() {
+    return this.adminService.getUsers();
+  }
+
+  @Patch('users/:id/role')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async updateUserRole(
+    @CurrentUser() currentUser: AuthPayload,
+    @Param('id') userId: string,
+    @Body() body: UpdateUserRoleDto
+  ) {
+    return this.adminService.updateUserRole(userId, body.role, currentUser);
+  }
+
+  @Delete('users/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async deleteUser(
+    @CurrentUser() currentUser: AuthPayload,
+    @Param('id') userId: string
+  ) {
+    return this.adminService.deleteUser(userId, currentUser);
   }
 }

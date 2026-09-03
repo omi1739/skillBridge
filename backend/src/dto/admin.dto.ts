@@ -120,6 +120,13 @@ export class AddJobSourceDto {
   licenseNotes?: string;
 }
 
+export class UpdateUserRoleDto {
+  @IsString()
+  @IsNotEmpty()
+  @IsIn(['USER', 'ADMIN', 'RECRUITER'])
+  role!: string;
+}
+
 export class UpdateJobSourceDto {
   @IsOptional()
   @IsBoolean()

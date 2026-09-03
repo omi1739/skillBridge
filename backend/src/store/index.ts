@@ -659,6 +659,88 @@ export class AppDataStore {
     };
   }
 
+  // --- User Management ---
+
+  async getAllUsers(): Promise<Array<{
+    id: string;
+    email: string;
+    role: string;
+    currentStatus: string | null;
+    provider: string;
+    googleId: string | null;
+    createdAt: string;
+    updatedAt: string | null;
+    fullName: string | null;
+    hasPassword: boolean;
+  }>> {
+    const rows = await query<any>(
+      `SELECT u.id, u.email, u.role, u.current_status, u.provider, u.google_id,
+              u.created_at, u.updated_at,
+              p.full_name,
+              (u.password_hash IS NOT NULL AND u.password_hash != '') AS has_password
+       FROM users u
+       LEFT JOIN profiles p ON p.user_id = u.id
+       ORDER BY u.created_at DESC`
+    );
+    return rows.map(r => ({
+      id: r.id,
+      email: r.email,
+      role: r.role || 'USER',
+      currentStatus: r.current_status || null,
+      provider: r.provider || 'EMAIL',
+      googleId: r.google_id || null,
+      createdAt: r.created_at ? new Date(r.created_at).toISOString() : new Date(0).toISOString(),
+      updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : null,
+      fullName: r.full_name || null,
+      hasPassword: Boolean(r.has_password)
+    }));
+  }
+
+  async countAdmins(): Promise<number> {
+    const rows = await query<{ c: string }>(
+      `SELECT COUNT(*)::text AS c FROM users WHERE role = 'ADMIN'`
+    );
+    return Number(rows[0]?.c || 0);
+  }
+
+  async getUserById(id: string): Promise<{
+    id: string;
+    email: string;
+    role: string;
+    provider: string;
+  } | null> {
+    const rows = await query<any>(
+      `SELECT id, email, role, provider FROM users WHERE id = $1`,
+      [id]
+    );
+    if (!rows[0]) return null;
+    return {
+      id: rows[0].id,
+      email: rows[0].email,
+      role: rows[0].role || 'USER',
+      provider: rows[0].provider || 'EMAIL'
+    };
+  }
+
+  async updateUserRole(userId: string, role: string): Promise<boolean> {
+    const rows = await query<any>(
+      `UPDATE users SET role = $2, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1
+       RETURNING id`,
+      [userId, role]
+    );
+    return rows.length > 0;
+  }
+
+  async deleteUserById(userId: string): Promise<boolean> {
+    const rows = await query<any>(
+      `WITH deleted AS (DELETE FROM users WHERE id = $1 RETURNING id)
+       SELECT COUNT(*)::text AS c FROM deleted`,
+      [userId]
+    );
+    return Number(rows[0]?.c || 0) > 0;
+  }
+
   async ensureJobSource(name: string, accessMethod: string, licenseNotes?: string, extra?: Partial<{
     sourceType: string;
     website: string;

@@ -48,7 +48,8 @@ import {
   RotateCcw,
   ShieldCheck,
   Lock,
-  MapPin
+  MapPin,
+  Users
 } from 'lucide-react';
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000/api').replace(/\/$/, '');
@@ -200,6 +201,8 @@ export default function SkillBridgeApp() {
 
   // Admin state
   const [adminOverview, setAdminOverview] = useState<any | null>(null);
+  const [adminUsers, setAdminUsers] = useState<any[]>([]);
+  const [adminUserMsg, setAdminUserMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [editingSkillWeight, setEditingSkillWeight] = useState<{ skillId: string; roleWeight: number; marketDemandFrequency: number } | null>(null);
   const [aliasForm, setAliasForm] = useState({ rawAlias: '', canonicalSkillId: '' });
   const [weightSaveSuccess, setWeightSaveSuccess] = useState(false);
@@ -286,11 +289,68 @@ export default function SkillBridgeApp() {
           console.error('[SkillBridge] Admin overview load failed:', err);
           setAdminOverview(null);
         });
+      fetchAdminUsers(token);
     } else {
       setAdminOverview(null);
+      setAdminUsers([]);
     }
 
     fetchJobs(token);
+  };
+
+  const fetchAdminUsers = (t?: string | null) => {
+    const token = t || authToken;
+    if (!token) {
+      setAdminUsers([]);
+      return;
+    }
+    fetch(`${API_BASE}/admin/users`, { headers: headersFor(token) })
+      .then(res => (res.ok ? res.json() : Promise.reject(res)))
+      .then(data => {
+        if (Array.isArray(data)) setAdminUsers(data);
+      })
+      .catch((err) => {
+        console.error('[SkillBridge] Admin users load failed:', err);
+        setAdminUsers([]);
+      });
+  };
+
+  const handleChangeUserRole = (userId: string, role: string) => {
+    setAdminUserMsg(null);
+    fetch(`${API_BASE}/admin/users/${userId}/role`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify({ role })
+    })
+      .then(res => res.json().then((data: any) => ({ ok: res.ok, data })))
+      .then(({ ok, data }) => {
+        if (ok && data?.success) {
+          setAdminUserMsg({ ok: true, text: 'Role updated.' });
+          fetchAdminUsers();
+        } else {
+          setAdminUserMsg({ ok: false, text: (data?.message) || 'Could not update role.' });
+        }
+      })
+      .catch(() => setAdminUserMsg({ ok: false, text: 'Update failed.' }));
+  };
+
+  const handleDeleteUser = (userId: string, email: string) => {
+    if (!window.confirm(`Delete user ${email}? This is permanent.`)) return;
+    setAdminUserMsg(null);
+    fetch(`${API_BASE}/admin/users/${userId}`, {
+      method: 'DELETE',
+      headers: authHeaders()
+    })
+      .then(res => res.json().then((data: any) => ({ ok: res.ok, data })))
+      .then(({ ok, data }) => {
+        if (ok && data?.success) {
+          setAdminUserMsg({ ok: true, text: 'User deleted.' });
+          fetchAdminUsers();
+        } else {
+          setAdminUserMsg({ ok: false, text: (data?.message) || 'Could not delete user.' });
+        }
+      })
+      .catch(() => setAdminUserMsg({ ok: false, text: 'Delete failed.' }));
   };
 
   const fetchRoleAndSkills = () => {
@@ -1735,6 +1795,83 @@ export default function SkillBridgeApp() {
               </form>
             )}
           </div>
+        </div>
+
+        <div className="card" style={{ padding: '1.25rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+            <Users size={18} color="#a78bfa" />
+            <h2 className="card-title" style={{ marginBottom: 0 }}>User Management</h2>
+          </div>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginBottom: '1rem' }}>
+            List, change roles, and remove registered accounts. You cannot change your own role or delete your own account.
+          </p>
+
+          {adminUserMsg && (
+            <div style={{ marginBottom: '0.9rem', padding: '0.6rem 0.8rem', borderRadius: '6px', fontSize: '0.82rem', background: adminUserMsg.ok ? 'rgba(16,185,129,0.12)' : 'rgba(248,113,113,0.14)', color: adminUserMsg.ok ? '#6ee7b7' : '#fca5a5' }}>
+              {adminUserMsg.text}
+            </div>
+          )}
+
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+            <thead>
+              <tr style={{ textAlign: 'left', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-color)' }}>
+                <th style={{ padding: '0.5rem 0.5rem 0.5rem 0' }}>Name / Email</th>
+                <th style={{ padding: '0.5rem' }}>Provider</th>
+                <th style={{ padding: '0.5rem' }}>Status</th>
+                <th style={{ padding: '0.5rem' }}>Role</th>
+                <th style={{ padding: '0.5rem' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {adminUsers.map(u => {
+                const isSelf = currentUser?.id === u.id;
+                return (
+                  <tr key={u.id} style={{ borderBottom: '1px solid var(--border-faint)' }}>
+                    <td style={{ padding: '0.6rem 0.5rem 0.6rem 0' }}>
+                      <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                        {u.fullName || '—'} {isSelf && <span style={{ color: '#5eead4', fontSize: '0.72rem' }}>(you)</span>}
+                      </div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{u.email}</div>
+                    </td>
+                    <td style={{ padding: '0.6rem 0.5rem' }}>
+                      <span style={{ textTransform: 'capitalize', color: 'var(--text-secondary)' }}>{u.provider || 'EMAIL'}</span>
+                    </td>
+                    <td style={{ padding: '0.6rem 0.5rem' }}>
+                      <span style={{ textTransform: 'capitalize', color: 'var(--text-secondary)' }}>{u.currentStatus ? u.currentStatus.toLowerCase() : '—'}</span>
+                    </td>
+                    <td style={{ padding: '0.6rem 0.5rem' }}>
+                      {isSelf ? (
+                        <span style={{ color: 'var(--text-secondary)' }}>{u.role}</span>
+                      ) : (
+                        <select
+                          value={u.role}
+                          onChange={e => handleChangeUserRole(u.id, e.target.value)}
+                          style={{ padding: '0.35rem 0.5rem', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '0.78rem' }}
+                        >
+                          <option value="USER">USER</option>
+                          <option value="RECRUITER">RECRUITER</option>
+                          <option value="ADMIN">ADMIN</option>
+                        </select>
+                      )}
+                    </td>
+                    <td style={{ padding: '0.6rem 0.5rem' }}>
+                      <button
+                        disabled={isSelf}
+                        onClick={() => handleDeleteUser(u.id, u.email)}
+                        className="btn"
+                        style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', background: 'rgba(248,113,113,0.12)', color: '#fca5a5', border: '1px solid rgba(248,113,113,0.35)' }}
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+              {adminUsers.length === 0 && (
+                <tr><td colSpan={5} style={{ padding: '1rem', color: 'var(--text-muted)' }}>No users loaded.</td></tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     );

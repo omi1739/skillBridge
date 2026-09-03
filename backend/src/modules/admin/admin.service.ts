@@ -1,7 +1,8 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { store } from '../../store';
 import { query } from '../../db/client';
 import { AddJobSourceDto, UpdateJobSourceDto } from '../../dto/admin.dto';
+import { AuthPayload } from '../../services/auth.service';
 
 @Injectable()
 export class AdminService {
@@ -213,5 +214,50 @@ export class AdminService {
         count: r.count
       }))
     };
+  }
+
+  // --- User Management ---
+
+  async getUsers() {
+    return store.getAllUsers();
+  }
+
+  async updateUserRole(userId: string, role: string, currentUser: AuthPayload) {
+    if (!userId) throw new BadRequestException('userId is required');
+
+    const target = await store.getUserById(userId);
+    if (!target) throw new NotFoundException('User not found');
+
+    if (currentUser.userId === userId) {
+      throw new ForbiddenException('You cannot change your own role. Ask another admin.');
+    }
+
+    const isLastAdminDowngrade =
+      target.role === 'ADMIN' && role !== 'ADMIN' &&
+      (await store.countAdmins()) <= 1;
+    if (isLastAdminDowngrade) {
+      throw new ForbiddenException('Cannot demote the last remaining admin.');
+    }
+
+    const updated = await store.updateUserRole(userId, role);
+    return { success: updated, userId, role };
+  }
+
+  async deleteUser(userId: string, currentUser: AuthPayload) {
+    if (!userId) throw new BadRequestException('userId is required');
+
+    const target = await store.getUserById(userId);
+    if (!target) throw new NotFoundException('User not found');
+
+    if (currentUser.userId === userId) {
+      throw new ForbiddenException('You cannot delete your own account.');
+    }
+
+    if (target.role === 'ADMIN' && (await store.countAdmins()) <= 1) {
+      throw new ForbiddenException('Cannot delete the last remaining admin.');
+    }
+
+    const deleted = await store.deleteUserById(userId);
+    return { success: deleted, userId };
   }
 }
