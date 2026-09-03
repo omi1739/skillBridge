@@ -439,10 +439,11 @@ export class AppDataStore {
     }
 
     // Bangladesh keyword set (cities/areas + country). Drives the "Bangladesh first" default sort.
+    const bdExpr = `(LOWER(COALESCE(j.location,'')) ~ 'dhaka|bangladesh|gulshan|dhanmondi|tejgaon|baridhara|banani|bashundhara|uttara|mirpur|motijheel|mogbazar|badda|agargaon|farmgate|chittagong|sylhet|khulna|rajshahi|rangpur|mymensingh|comilla|cumilla|barisal|bogra|jashore|gazipur|narayanganj|cox''?s bazar')`;
     const orderClause = sort === 'recent'
       ? `j.posted_at DESC NULLS LAST, j.id`
       : `CASE
-           WHEN is_bd AND NOT COALESCE(j.is_remote, false) THEN 1
+           WHEN ${bdExpr} AND NOT COALESCE(j.is_remote, false) THEN 1
            WHEN COALESCE(j.is_remote, false) THEN 2
            ELSE 3
          END,
@@ -450,7 +451,7 @@ export class AppDataStore {
 
     const rows = await query<any>(
       `SELECT j.*, s.name AS source_name, s.access_method AS source_access_method,
-              (LOWER(COALESCE(j.location,'')) ~ 'dhaka|bangladesh|gulshan|dhanmondi|tejgaon|baridhara|banani|bashundhara|uttara|mirpur|motijheel|mogbazar|badda|agargaon|farmgate|chittagong|sylhet|khulna|rajshahi|rangpur|mymensingh|comilla|cumilla|barisal|bogra|jashore|gazipur|narayanganj|cox''?s bazar') AS is_bd
+              ${bdExpr} AS is_bd
        FROM jobs j
        LEFT JOIN job_sources s ON s.id = j.source_id
        ORDER BY ${orderClause}`
