@@ -1834,6 +1834,65 @@ export default function SkillBridgeApp() {
             </div>
           )}
         </div>
+
+        <div style={{ marginTop: '3rem', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+          <div className="about-section">
+            <div className="about-heading">
+              <span className="about-kicker">About SkillBridge</span>
+              <h2 className="about-title">Built for Bangladeshi developers ready for real backend work.</h2>
+            </div>
+            <div className="about-grid">
+              <div className="about-card">
+                <Briefcase size={22} color="#5eead4" />
+                <div>
+                  <h3>Real, verified job intelligence</h3>
+                  <p>
+                    We continuously digest live junior backend postings — remote / work-from-home and onsite — from trusted sources, so the skills we tell you to learn are exactly what employers actually ask for.
+                  </p>
+                </div>
+              </div>
+              <div className="about-card">
+                <Rocket size={22} color="#5eead4" />
+                <div>
+                  <h3>Skills measured, not guessed</h3>
+                  <p>
+                    Instead of generic advice, SkillBridge benchmarks your SQL and Node.js skills against the real market, then shows precisely which gaps stand between you and the roles you want.
+                  </p>
+                </div>
+              </div>
+              <div className="about-card">
+                <ShieldCheck size={22} color="#5eead4" />
+                <div>
+                  <h3>Safe, honest &amp; verified</h3>
+                  <p>
+                    Every job posting is source-verified and clearly badged. No fake listings, no bait — only registered members see the raw postings, and everything is 100% real.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="about-section">
+            <div className="about-heading">
+              <span className="about-kicker">How it works</span>
+              <h2 className="about-title">Four steps from “what should I learn?” to “I got the job”.</h2>
+            </div>
+            <div className="steps-grid">
+              {[
+                { icon: <BarChart3 size={20} />, title: '1. See the live market', desc: 'Explore what junior backend employers really ask for — the exact skill percentages computed from live, verified postings.' },
+                { icon: <BrainCircuit size={20} />, title: '2. Test your skills', desc: 'Take a short diagnostic and run SQL & Node.js challenges in a live sandbox to get an honest baseline of where you stand.' },
+                { icon: <TrendingUp size={20} />, title: '3. Close your gaps', desc: 'SkillBridge pinpoints the missing skills and ranks the roles that match your evidence, so you always know the next best move.' },
+                { icon: <Briefcase size={20} />, title: '4. Apply with confidence', desc: 'See matching jobs (remote / WFH and onsite) with source links, match scores, and full requirement traceability.' }
+              ].map(step => (
+                <div key={step.title} className="step-card">
+                  <div className="step-icon">{step.icon}</div>
+                  <h3>{step.title}</h3>
+                  <p>{step.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     );
   };
