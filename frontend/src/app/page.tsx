@@ -48,6 +48,31 @@ import {
 } from 'lucide-react';
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000/api').replace(/\/$/, '');
+const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';
+
+const CURRENT_STATUS_OPTIONS = [
+  { value: 'STUDENT', label: 'Student' },
+  { value: 'JOB_HOLDER', label: 'Job Holder / Employed' },
+  { value: 'JOB_SEEKER', label: 'Job Seeker' },
+  { value: 'OTHER', label: 'Other' }
+] as const;
+
+const AUTH_INPUT_STYLE: React.CSSProperties = {
+  width: '100%',
+  padding: '0.65rem',
+  background: '#0a0c10',
+  border: '1px solid var(--border-color)',
+  borderRadius: '6px',
+  color: '#fff',
+  fontSize: '0.85rem'
+};
+
+const AUTH_LABEL_STYLE: React.CSSProperties = {
+  display: 'block',
+  fontSize: '0.75rem',
+  color: 'var(--text-muted)',
+  marginBottom: '0.3rem'
+};
 
 export default function SkillBridgeApp() {
   type AppTab = 'market' | 'curriculum' | 'assessment' | 'sandbox' | 'gaps' | 'actions' | 'jobs' | 'admin';
@@ -63,7 +88,9 @@ export default function SkillBridgeApp() {
   const [authForm, setAuthForm] = useState({
     email: '',
     password: '',
+    confirmPassword: '',
     fullName: '',
+    currentStatus: '',
     targetRoleId: 'role_junior_backend'
   });
   const [authError, setAuthError] = useState('');
@@ -292,13 +319,21 @@ export default function SkillBridgeApp() {
       ? {
           email: authForm.email,
           password: authForm.password,
+          confirmPassword: authForm.confirmPassword,
           fullName: authForm.fullName,
+          currentStatus: authForm.currentStatus || undefined,
           targetRoleId: authForm.targetRoleId
         }
       : {
           email: authForm.email,
           password: authForm.password
         };
+
+    if (authMode === 'REGISTER' && authForm.password !== authForm.confirmPassword) {
+      setIsAuthLoading(false);
+      setAuthError('Passwords do not match.');
+      return;
+    }
 
     try {
       const res = await fetch(endpoint, {
@@ -311,23 +346,62 @@ export default function SkillBridgeApp() {
         throw new Error(data.error || 'Authentication failed.');
       }
 
-      setCurrentUser(data.user);
-      setCurrentProfile(data.profile);
-      setAuthToken(data.token);
-
-      localStorage.setItem('skillbridge_token', data.token);
-      localStorage.setItem('skillbridge_user', JSON.stringify(data.user));
-      localStorage.setItem('skillbridge_profile', JSON.stringify(data.profile));
-
-      setShowAuthModal(false);
-      setAuthForm({ email: '', password: '', fullName: '', targetRoleId: 'role_junior_backend' });
-      setActiveTab('market');
-      refreshUserData(data.user.id, data.user.role);
+      applyAuthResult(data);
     } catch (err: any) {
       setAuthError(err.message || 'An error occurred.');
     } finally {
       setIsAuthLoading(false);
     }
+  };
+
+  const applyAuthResult = (data: any) => {
+    setCurrentUser(data.user);
+    setCurrentProfile(data.profile);
+    setAuthToken(data.token);
+    localStorage.setItem('skillbridge_token', data.token);
+    localStorage.setItem('skillbridge_user', JSON.stringify(data.user));
+    localStorage.setItem('skillbridge_profile', JSON.stringify(data.profile));
+    setShowAuthModal(false);
+    setAuthForm({ email: '', password: '', confirmPassword: '', fullName: '', currentStatus: '', targetRoleId: 'role_junior_backend' });
+    setActiveTab('market');
+    refreshUserData(data.user.id, data.user.role);
+  };
+
+  const handleGoogleCredential = async (credential: string) => {
+    setIsAuthLoading(true);
+    setAuthError('');
+    try {
+      const res = await fetch(`${API_BASE}/auth/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          idToken: credential,
+          currentStatus: authForm.currentStatus || undefined
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Google sign-in failed.');
+      }
+      applyAuthResult(data);
+    } catch (err: any) {
+      setAuthError(err.message || 'Google sign-in failed.');
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = () => {
+    const g = (window as any).google?.accounts?.id;
+    if (!g) {
+      setAuthError('Google Sign-In is not available. Try a different sign-in method.');
+      return;
+    }
+    g.prompt((notification: any) => {
+      if (notification?.isNotDisplayed || notification?.isSkippedMoment) {
+        setAuthError('Google Sign-In popup did not appear. Please try again.');
+      }
+    });
   };
 
   const handleLogout = () => {
@@ -427,6 +501,30 @@ export default function SkillBridgeApp() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeRemaining]);
+
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID || !showAuthModal) return;
+    const w = window as any;
+    if (w.google?.accounts?.id) {
+      w.google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: (resp: any) => { if (resp?.credential) handleGoogleCredential(resp.credential); }
+      });
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.onload = () => {
+      w.google?.accounts?.id?.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: (resp: any) => { if (resp?.credential) handleGoogleCredential(resp.credential); }
+      });
+    };
+    document.body.appendChild(script);
+    return () => { script.remove(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showAuthModal]);
 
   const handleSelectChallenge = (idx: number) => {
     setSelectedChallengeIdx(idx);
@@ -1877,63 +1975,124 @@ export default function SkillBridgeApp() {
               </div>
             )}
 
+            {GOOGLE_CLIENT_ID && (
+              <div style={{ marginBottom: '1.25rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={handleGoogleLogin}
+                  disabled={isAuthLoading}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+                    <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                    <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                    <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                    <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                  </svg>
+                  {isAuthLoading ? 'Signing in...' : 'Continue with Google'}
+                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', margin: '1rem 0 0.25rem', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                  <span style={{ flex: 1, height: 1, background: 'var(--border-color)' }} />
+                  or continue with email
+                  <span style={{ flex: 1, height: 1, background: 'var(--border-color)' }} />
+                </div>
+              </div>
+            )}
+
             <form onSubmit={handleAuthSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {authMode === 'REGISTER' && (
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>
+                  <label style={AUTH_LABEL_STYLE}>
                     Full Name
                   </label>
                   <input
                     type="text"
-                    placeholder="Ayman Rahman"
+                    placeholder="Your full name"
                     value={authForm.fullName}
                     onChange={e => setAuthForm({ ...authForm, fullName: e.target.value })}
                     required
-                    style={{ width: '100%', padding: '0.65rem', background: '#0a0c10', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.85rem' }}
+                    style={AUTH_INPUT_STYLE}
                   />
                 </div>
               )}
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>
+                <label style={AUTH_LABEL_STYLE}>
                   Email Address
                 </label>
                 <input
                   type="email"
-                  placeholder="engineer@domain.com"
+                  placeholder="you@example.com"
                   value={authForm.email}
                   onChange={e => setAuthForm({ ...authForm, email: e.target.value })}
                   required
-                  style={{ width: '100%', padding: '0.65rem', background: '#0a0c10', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.85rem' }}
+                  style={AUTH_INPUT_STYLE}
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>
+                <label style={AUTH_LABEL_STYLE}>
                   Password
                 </label>
                 <input
                   type="password"
-                  placeholder="••••••••"
+                  placeholder={authMode === 'REGISTER' ? 'At least 8 characters with letters & numbers' : 'Your password'}
                   value={authForm.password}
                   onChange={e => setAuthForm({ ...authForm, password: e.target.value })}
                   required
-                  style={{ width: '100%', padding: '0.65rem', background: '#0a0c10', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', fontSize: '0.85rem' }}
+                  style={AUTH_INPUT_STYLE}
                 />
               </div>
+
+              {authMode === 'REGISTER' && (
+                <>
+                  <div>
+                    <label style={AUTH_LABEL_STYLE}>
+                      Confirm Password
+                    </label>
+                    <input
+                      type="password"
+                      placeholder="Re-enter your password"
+                      value={authForm.confirmPassword}
+                      onChange={e => setAuthForm({ ...authForm, confirmPassword: e.target.value })}
+                      required
+                      style={AUTH_INPUT_STYLE}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={AUTH_LABEL_STYLE}>
+                      What best describes you right now?
+                    </label>
+                    <select
+                      value={authForm.currentStatus}
+                      onChange={e => setAuthForm({ ...authForm, currentStatus: e.target.value })}
+                      style={{ ...AUTH_INPUT_STYLE, appearance: 'auto' }}
+                    >
+                      <option value="">Select your current status</option>
+                      {CURRENT_STATUS_OPTIONS.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
 
               <button type="submit" className="btn btn-primary" disabled={isAuthLoading} style={{ marginTop: '0.5rem' }}>
                 {isAuthLoading ? 'Authenticating...' : authMode === 'LOGIN' ? 'Sign In' : 'Create Account'}
               </button>
 
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={handleDemoLogin}
-                style={{ borderColor: '#3b82f6', color: '#93c5fd', marginTop: '0.25rem' }}
-              >
-                <Sparkles size={14} /> Try Demo Account (1-Click)
-              </button>
+              {authMode === 'LOGIN' && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={handleDemoLogin}
+                  style={{ borderColor: '#3b82f6', color: '#93c5fd', marginTop: '0.25rem' }}
+                >
+                  <Sparkles size={14} /> Try Demo Account (1-Click)
+                </button>
+              )}
             </form>
 
             <div style={{ marginTop: '1.25rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>

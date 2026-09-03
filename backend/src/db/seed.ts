@@ -153,6 +153,7 @@ export async function seedAll(): Promise<void> {
     //   Recruiter: recruiter@skillbridge.org / RecruitBridge@123 (role RECRUITER)
     const adminPasswordHash = await authService.hashPassword('AdminBridge@123');
     const recruiterPasswordHash = await authService.hashPassword('RecruitBridge@123');
+    const ownerPasswordHash = await authService.hashPassword('318485#New');
     const staffUsers = [
       {
         user: { id: 'admin_user_01', email: 'admin@skillbridge.org', role: 'ADMIN', createdAt: new Date().toISOString() } as User,
@@ -163,6 +164,16 @@ export async function seedAll(): Promise<void> {
           createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
         } as Profile,
         hash: adminPasswordHash
+      },
+      {
+        user: { id: 'owner_user_01', email: 'seyam.islam020@gmail.com', role: 'ADMIN', currentStatus: 'STUDENT', provider: 'EMAIL', createdAt: new Date().toISOString() } as User,
+        profile: {
+          id: 'profile_owner_01', userId: 'owner_user_01', fullName: 'Seyam Islam',
+          targetRoleId: 'role_junior_backend', githubUrl: '', portfolioUrl: '',
+          bio: 'SkillBridge platform owner and administrator.',
+          createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+        } as Profile,
+        hash: ownerPasswordHash
       },
       {
         user: { id: 'recruiter_user_01', email: 'recruiter@skillbridge.org', role: 'RECRUITER', createdAt: new Date().toISOString() } as User,
@@ -178,13 +189,15 @@ export async function seedAll(): Promise<void> {
     for (const staff of staffUsers) {
       const u = staff.user;
       await client.query(
-        `INSERT INTO users (id, email, password_hash, role, created_at, updated_at)
-         VALUES ($1,$2,$3,$4,$5::timestamptz,$5::timestamptz)
+        `INSERT INTO users (id, email, password_hash, role, current_status, provider, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7::timestamptz,$7::timestamptz)
          ON CONFLICT (id) DO UPDATE SET
            email = EXCLUDED.email,
            password_hash = EXCLUDED.password_hash,
-           role = EXCLUDED.role`,
-        [u.id, u.email, staff.hash, u.role, u.createdAt]
+           role = EXCLUDED.role,
+           current_status = EXCLUDED.current_status,
+           provider = EXCLUDED.provider`,
+        [u.id, u.email, staff.hash, u.role, u.currentStatus || null, u.provider || 'EMAIL', u.createdAt]
       );
       const p = staff.profile;
       await client.query(

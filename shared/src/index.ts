@@ -2,10 +2,15 @@
 
 export type UserRole = 'USER' | 'ADMIN' | 'RECRUITER';
 
+export type CurrentStatus = 'STUDENT' | 'JOB_HOLDER' | 'JOB_SEEKER' | 'OTHER';
+
 export interface User {
   id: string;
   email: string;
   role: UserRole;
+  currentStatus?: CurrentStatus;
+  googleId?: string;
+  provider?: 'EMAIL' | 'GOOGLE';
   createdAt: string;
 }
 

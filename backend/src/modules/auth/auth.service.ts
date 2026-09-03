@@ -3,15 +3,26 @@ import { User, Profile, SkillEvidence, ActionRecommendation } from '@skillbridge
 import { authService, AuthPayload } from '../../services/auth.service';
 import { store } from '../../store';
 import { gapService } from '../../services/gap.service';
+import { googleVerifier } from '../../services/google-verifier.service';
 
 @Injectable()
 export class NestAuthService {
-  async register(email: string, password: string, fullName: string, targetRoleId?: string) {
-    return authService.register(email, password, fullName, targetRoleId);
+  async register(email: string, password: string, fullName: string, targetRoleId?: string, currentStatus?: string) {
+    return authService.register(email, password, fullName, targetRoleId, currentStatus);
   }
 
   async login(email: string, password: string) {
     return authService.login(email, password);
+  }
+
+  async googleAuth(idToken: string, currentStatus?: string) {
+    let profileInfo;
+    try {
+      profileInfo = await googleVerifier.verifyGoogleIdToken(idToken);
+    } catch (err: any) {
+      throw new UnauthorizedException(err?.message || 'Google login failed.');
+    }
+    return authService.registerOrLoginWithGoogle(profileInfo, currentStatus);
   }
 
   async getCurrentUser(userId: string) {

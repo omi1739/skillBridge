@@ -10,9 +10,17 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255),
     role VARCHAR(50) DEFAULT 'USER',            -- USER, ADMIN, RECRUITER
+    current_status VARCHAR(50),                 -- STUDENT, JOB_HOLDER, JOB_SEEKER, OTHER
+    google_id VARCHAR(255),
+    provider VARCHAR(50) DEFAULT 'EMAIL',       -- EMAIL, GOOGLE
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Idempotent upgrades for databases created before these columns existed.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS current_status VARCHAR(50);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(255);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS provider VARCHAR(50) DEFAULT 'EMAIL';
 
 CREATE TABLE IF NOT EXISTS profiles (
     id VARCHAR(100) PRIMARY KEY,                -- e.g. 'profile_01'

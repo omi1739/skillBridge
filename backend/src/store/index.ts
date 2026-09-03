@@ -203,7 +203,15 @@ export class AppDataStore {
     const rows = await query<any>(`SELECT * FROM users WHERE id = $1`, [id]);
     if (rows.length === 0) return undefined;
     const r = rows[0];
-    return { id: r.id, email: r.email, role: r.role, createdAt: r.created_at };
+    return {
+      id: r.id,
+      email: r.email,
+      role: r.role,
+      currentStatus: r.current_status || undefined,
+      googleId: r.google_id || undefined,
+      provider: r.provider || 'EMAIL',
+      createdAt: r.created_at
+    };
   }
 
   async getProfile(userId: string): Promise<Profile | undefined> {

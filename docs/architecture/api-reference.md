@@ -24,8 +24,9 @@ prefix `/api`. Requests are validated with a global `ValidationPipe`
 
 | Method | Route                          | Notes                          |
 |--------|--------------------------------|--------------------------------|
-| POST   | `/api/auth/register`           | `RegisterDto`                  |
+| POST   | `/api/auth/register`           | `RegisterDto` (email, password, confirmPassword, fullName, currentStatus?, targetRoleId?) |
 | POST   | `/api/auth/login`              | `LoginDto`                     |
+| POST   | `/api/auth/google`             | `GoogleAuthDto` (idToken, currentStatus?) — Google Sign-In, creates or logs in a user |
 | GET    | `/api/me?userId=`              | User + profile                 |
 | GET    | `/api/me/account`              | Auth account                    |
 | PATCH  | `/api/me/profile`              | `UpdateProfileDto`             |

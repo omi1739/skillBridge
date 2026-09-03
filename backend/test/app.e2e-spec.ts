@@ -46,6 +46,15 @@ describe('SkillBridge API (e2e)', () => {
     app.useGlobalPipes(
       new ValidationPipe({ whitelist: true, forbidNonWhitelisted: false, transform: true })
     );
+
+    // Stub the network used by the Google ID-token verifier so the auth test is
+    // deterministic and does not depend on (or make) real calls to Google.
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: false,
+      status: 401,
+      text: jest.fn().mockResolvedValue('')
+    } as unknown as Response);
+
     await app.init();
   });
 
@@ -100,6 +109,25 @@ describe('SkillBridge API (e2e)', () => {
       .post('/api/auth/register')
       .send({ email: 'not-an-email', password: 'longenoughpass', fullName: 'Test User' })
       .expect(400);
+  });
+
+  it('POST /api/auth/register rejects mismatched passwords', () => {
+    return request(app.getHttpServer())
+      .post('/api/auth/register')
+      .send({
+        email: 'test@example.com',
+        password: 'password123',
+        confirmPassword: 'different',
+        fullName: 'Test User'
+      })
+      .expect(400);
+  });
+
+  it('POST /api/auth/google rejects an invalid credential', () => {
+    return request(app.getHttpServer())
+      .post('/api/auth/google')
+      .send({ idToken: 'not-a-real-google-token' })
+      .expect(401);
   });
 
   it('POST /api/admin/skills/alias returns 401 without a token', () => {

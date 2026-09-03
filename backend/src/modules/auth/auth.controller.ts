@@ -8,13 +8,14 @@ import {
   UseGuards,
   Inject,
   HttpCode,
-  HttpStatus
+  HttpStatus,
+  BadRequestException
 } from '@nestjs/common';
 import { NestAuthService } from './auth.service';
 import { JwtAuthGuard, OptionalJwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { AuthPayload } from '../../services/auth.service';
-import { RegisterDto, LoginDto, DeclareSkillDto, UpdateProfileDto } from '../../dto/auth.dto';
+import { RegisterDto, LoginDto, DeclareSkillDto, UpdateProfileDto, GoogleAuthDto } from '../../dto/auth.dto';
 
 @Controller()
 export class AuthController {
@@ -22,13 +23,22 @@ export class AuthController {
 
   @Post('auth/register')
   async register(@Body() body: RegisterDto) {
-    return this.authService.register(body.email, body.password, body.fullName, body.targetRoleId);
+    if (body.password !== body.confirmPassword) {
+      throw new BadRequestException('Passwords do not match.');
+    }
+    return this.authService.register(body.email, body.password, body.fullName, body.targetRoleId, body.currentStatus);
   }
 
   @Post('auth/login')
   @HttpCode(HttpStatus.OK)
   async login(@Body() body: LoginDto) {
     return this.authService.login(body.email, body.password);
+  }
+
+  @Post('auth/google')
+  @HttpCode(HttpStatus.OK)
+  async google(@Body() body: GoogleAuthDto) {
+    return this.authService.googleAuth(body.idToken, body.currentStatus);
   }
 
   @Get('me')

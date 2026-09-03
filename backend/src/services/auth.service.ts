@@ -67,7 +67,8 @@ export class AuthService {
     email: string,
     password: string,
     fullName: string,
-    targetRoleId: string = 'role_junior_backend'
+    targetRoleId: string = 'role_junior_backend',
+    currentStatus?: string
   ): Promise<{ token: string; user: User; profile: Profile }> {
     const cleanEmail = email.trim().toLowerCase();
     if (!this.isValidEmail(cleanEmail)) {
@@ -92,8 +93,16 @@ export class AuthService {
     const profileId = `profile_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
     const now = new Date().toISOString();
     const passwordHash = await this.hashPassword(password);
+    const status = currentStatus ? currentStatus.trim().toUpperCase() : undefined;
 
-    const user: User = { id: userId, email: cleanEmail, role: 'USER', createdAt: now };
+    const user: User = {
+      id: userId,
+      email: cleanEmail,
+      role: 'USER',
+      currentStatus: status as User['currentStatus'],
+      provider: 'EMAIL',
+      createdAt: now
+    };
     const profile: Profile = {
       id: profileId,
       userId,
@@ -105,9 +114,9 @@ export class AuthService {
 
     await withTransaction(async client => {
       await client.query(
-        `INSERT INTO users (id, email, password_hash, role, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5::timestamptz, $6::timestamptz)`,
-        [userId, cleanEmail, passwordHash, 'USER', now, now]
+        `INSERT INTO users (id, email, password_hash, role, current_status, provider, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7::timestamptz, $8::timestamptz)`,
+        [userId, cleanEmail, passwordHash, 'USER', status || null, 'EMAIL', now, now]
       );
       await client.query(
         `INSERT INTO profiles (id, user_id, full_name, target_role_id, created_at, updated_at)
@@ -118,6 +127,73 @@ export class AuthService {
 
     const token = this.signToken({ userId, email: cleanEmail, role: 'USER' });
     return { token, user, profile };
+  }
+
+  /**
+   * Google sign-in: given a verified Google profile, log in an existing account
+   * (matched by email) or provision a new one. Passwords are never required.
+   */
+  public async registerOrLoginWithGoogle(
+    profileInfo: {
+      email: string;
+      fullName: string;
+      googleId: string;
+    },
+    currentStatus?: string
+  ): Promise<{ token: string; user: User; profile: Profile; isNewUser: boolean }> {
+    const cleanEmail = profileInfo.email.trim().toLowerCase();
+    if (!this.isValidEmail(cleanEmail)) {
+      throw new Error('Google account has no valid email address.');
+    }
+
+    const existing = await this.findUserByEmail(cleanEmail);
+    if (existing) {
+      const profile = await this.findProfile(existing.id);
+      if (!profile) {
+        throw new Error('User profile record not found.');
+      }
+      const token = this.signToken({ userId: existing.id, email: existing.email, role: existing.role });
+      return { token, user: existing, profile, isNewUser: false };
+    }
+
+    const userId = `user_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+    const profileId = `profile_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+    const now = new Date().toISOString();
+    const status = currentStatus ? currentStatus.trim().toUpperCase() : undefined;
+
+    const user: User = {
+      id: userId,
+      email: cleanEmail,
+      role: 'USER',
+      currentStatus: status as User['currentStatus'],
+      googleId: profileInfo.googleId,
+      provider: 'GOOGLE',
+      createdAt: now
+    };
+    const profile: Profile = {
+      id: profileId,
+      userId,
+      fullName: profileInfo.fullName.trim() || 'Google User',
+      targetRoleId: 'role_junior_backend',
+      createdAt: now,
+      updatedAt: now
+    };
+
+    await withTransaction(async client => {
+      await client.query(
+        `INSERT INTO users (id, email, role, current_status, google_id, provider, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7::timestamptz, $8::timestamptz)`,
+        [userId, cleanEmail, 'USER', status || null, profileInfo.googleId, 'GOOGLE', now, now]
+      );
+      await client.query(
+        `INSERT INTO profiles (id, user_id, full_name, target_role_id, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5::timestamptz, $6::timestamptz)`,
+        [profileId, userId, profile.fullName, profile.targetRoleId, now, now]
+      );
+    });
+
+    const token = this.signToken({ userId, email: cleanEmail, role: 'USER' });
+    return { token, user, profile, isNewUser: true };
   }
 
   /** Authenticate an existing user against stored bcrypt credentials. */
@@ -138,12 +214,7 @@ export class AuthService {
       throw new Error('Invalid email or password.');
     }
 
-    const user: User = {
-      id: u.id,
-      email: u.email,
-      role: u.role,
-      createdAt: u.created_at
-    };
+    const user = this.mapUserRow(u);
     const profile = await this.findProfile(user.id);
     if (!profile) {
       throw new Error('User profile record not found.');
@@ -156,12 +227,7 @@ export class AuthService {
   public async findUserByEmail(email: string): Promise<User | undefined> {
     const rows = await query<any>('SELECT * FROM users WHERE email = $1', [email.trim().toLowerCase()]);
     if (rows.length === 0) return undefined;
-    return {
-      id: rows[0].id,
-      email: rows[0].email,
-      role: rows[0].role,
-      createdAt: rows[0].created_at
-    };
+    return this.mapUserRow(rows[0]);
   }
 
   public async findProfile(userId: string): Promise<Profile | undefined> {
@@ -177,6 +243,18 @@ export class AuthService {
       bio: rows[0].bio || undefined,
       createdAt: rows[0].created_at,
       updatedAt: rows[0].updated_at
+    };
+  }
+
+  private mapUserRow(r: any): User {
+    return {
+      id: r.id,
+      email: r.email,
+      role: r.role,
+      currentStatus: r.current_status || undefined,
+      googleId: r.google_id || undefined,
+      provider: r.provider || 'EMAIL',
+      createdAt: r.created_at
     };
   }
 
