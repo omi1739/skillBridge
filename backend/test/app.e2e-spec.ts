@@ -53,14 +53,21 @@ describe('SkillBridge API (e2e)', () => {
     await app.close();
   });
 
-  it('GET /api/health returns ok', () => {
+  it('GET /api/health returns ok and reports DB connectivity', () => {
     return request(app.getHttpServer())
       .get('/api/health')
       .expect(200)
       .expect(res => {
         expect(res.body.status).toBe('ok');
         expect(res.body.service).toBe('skillbridge-api');
+        expect(res.body.database).toBe('connected');
       });
+  });
+
+  it('GET /api/jobs/:id/match returns 404 for an unknown job', () => {
+    return request(app.getHttpServer())
+      .get('/api/jobs/job_does_not_exist/match?userId=demo_user_01')
+      .expect(404);
   });
 
   it('POST /api/auth/register rejects missing fields', () => {

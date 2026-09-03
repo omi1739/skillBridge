@@ -11,13 +11,20 @@ export interface AuthPayload {
 }
 
 /**
- * JWT signing secret. In production supply a strong value via JWT_SECRET.
- * For local/dev convenience we fall back to an ephemeral random secret, which
- * means tokens only stay valid for the lifetime of a single server boot. Every
- * deployment should set JWT_SECRET explicitly.
+ * JWT signing secret. Production MUST supply a strong value via JWT_SECRET;
+ * boot fails fast if it is missing so tokens are not minted with a throwaway
+ * key. In local/dev we fall back to an ephemeral random secret, which means
+ * tokens only stay valid for the lifetime of a single server boot.
  */
-const JWT_SECRET: string =
-  process.env.JWT_SECRET || crypto.randomBytes(48).toString('hex');
+const JWT_SECRET: string = ((): string => {
+  if (process.env.JWT_SECRET) {
+    return process.env.JWT_SECRET;
+  }
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('JWT_SECRET must be set with a strong value in production.');
+  }
+  return crypto.randomBytes(48).toString('hex');
+})();
 const JWT_EXPIRES_IN: jwt.SignOptions['expiresIn'] =
   (process.env.JWT_EXPIRES_IN as jwt.SignOptions['expiresIn']) || '7d';
 
