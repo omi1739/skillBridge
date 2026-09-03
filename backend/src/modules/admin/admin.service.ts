@@ -218,8 +218,8 @@ export class AdminService {
 
   // --- User Management ---
 
-  async getUsers() {
-    return store.getAllUsers();
+  async getUsers(options?: { page?: number; pageSize?: number; search?: string }) {
+    return store.getAllUsers(options);
   }
 
   async getDashboard() {

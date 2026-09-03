@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, Inject, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, Inject, UseGuards, Query } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -115,8 +115,16 @@ export class AdminController {
   @Get('users')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
-  async getUsers() {
-    return this.adminService.getUsers();
+  async getUsers(
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+    @Query('search') search?: string
+  ) {
+    return this.adminService.getUsers({
+      page: page ? Number(page) : undefined,
+      pageSize: pageSize ? Number(pageSize) : undefined,
+      search
+    });
   }
 
   @Get('dashboard')

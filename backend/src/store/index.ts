@@ -661,18 +661,44 @@ export class AppDataStore {
 
   // --- User Management ---
 
-  async getAllUsers(): Promise<Array<{
-    id: string;
-    email: string;
-    role: string;
-    currentStatus: string | null;
-    provider: string;
-    googleId: string | null;
-    createdAt: string;
-    updatedAt: string | null;
-    fullName: string | null;
-    hasPassword: boolean;
-  }>> {
+  async getAllUsers(options?: { page?: number; pageSize?: number; search?: string }): Promise<{
+    items: Array<{
+      id: string;
+      email: string;
+      role: string;
+      currentStatus: string | null;
+      provider: string;
+      googleId: string | null;
+      createdAt: string;
+      updatedAt: string | null;
+      fullName: string | null;
+      hasPassword: boolean;
+    }>;
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+  }> {
+    const page = Math.max(1, Number(options?.page) || 1);
+    const pageSize = Math.min(100, Math.max(1, Number(options?.pageSize) || 10));
+    const search = (options?.search || '').trim().toLowerCase();
+
+    const whereClause = search
+      ? `WHERE LOWER(u.email) LIKE $1 OR LOWER(p.full_name) LIKE $1`
+      : '';
+    const params: any[] = search ? [`%${search}%`] : [];
+
+    const countRows = await query<{ c: string }>(
+      `SELECT COUNT(*)::text AS c
+       FROM users u
+       LEFT JOIN profiles p ON p.user_id = u.id
+       ${whereClause}`,
+      params
+    );
+    const total = Number(countRows[0]?.c || 0);
+
+    const offset = (page - 1) * pageSize;
+    const paramList: any[] = [...params, pageSize, offset];
     const rows = await query<any>(
       `SELECT u.id, u.email, u.role, u.current_status, u.provider, u.google_id,
               u.created_at, u.updated_at,
@@ -680,20 +706,30 @@ export class AppDataStore {
               (u.password_hash IS NOT NULL AND u.password_hash != '') AS has_password
        FROM users u
        LEFT JOIN profiles p ON p.user_id = u.id
-       ORDER BY u.created_at DESC`
+       ${whereClause}
+       ORDER BY u.created_at DESC
+       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+      paramList
     );
-    return rows.map(r => ({
-      id: r.id,
-      email: r.email,
-      role: r.role || 'USER',
-      currentStatus: r.current_status || null,
-      provider: r.provider || 'EMAIL',
-      googleId: r.google_id || null,
-      createdAt: r.created_at ? new Date(r.created_at).toISOString() : new Date(0).toISOString(),
-      updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : null,
-      fullName: r.full_name || null,
-      hasPassword: Boolean(r.has_password)
-    }));
+
+    return {
+      items: rows.map(r => ({
+        id: r.id,
+        email: r.email,
+        role: r.role || 'USER',
+        currentStatus: r.current_status || null,
+        provider: r.provider || 'EMAIL',
+        googleId: r.google_id || null,
+        createdAt: r.created_at ? new Date(r.created_at).toISOString() : new Date(0).toISOString(),
+        updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : null,
+        fullName: r.full_name || null,
+        hasPassword: Boolean(r.has_password)
+      })),
+      total,
+      page,
+      pageSize,
+      totalPages: Math.max(1, Math.ceil(total / pageSize))
+    };
   }
 
   async countAdmins(): Promise<number> {

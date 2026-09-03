@@ -203,6 +203,11 @@ export default function SkillBridgeApp() {
   const [adminOverview, setAdminOverview] = useState<any | null>(null);
   const [adminDashboard, setAdminDashboard] = useState<any | null>(null);
   const [adminUsers, setAdminUsers] = useState<any[]>([]);
+  const [adminUsersTotal, setAdminUsersTotal] = useState(0);
+  const [adminUsersPage, setAdminUsersPage] = useState(1);
+  const [adminUsersTotalPages, setAdminUsersTotalPages] = useState(1);
+  const [adminUsersPageSize, setAdminUsersPageSize] = useState(10);
+  const [adminUsersSearch, setAdminUsersSearch] = useState('');
   const [adminUserMsg, setAdminUserMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [editingSkillWeight, setEditingSkillWeight] = useState<{ skillId: string; roleWeight: number; marketDemandFrequency: number } | null>(null);
   const [aliasForm, setAliasForm] = useState({ rawAlias: '', canonicalSkillId: '' });
@@ -297,7 +302,7 @@ export default function SkillBridgeApp() {
           console.error('[SkillBridge] Admin dashboard load failed:', err);
           setAdminDashboard(null);
         });
-      fetchAdminUsers(token);
+      loadUsers();
     } else {
       setAdminOverview(null);
       setAdminDashboard(null);
@@ -307,16 +312,28 @@ export default function SkillBridgeApp() {
     fetchJobs(token);
   };
 
-  const fetchAdminUsers = (t?: string | null) => {
-    const token = t || authToken;
+  const loadUsers = (opts?: { page?: number; pageSize?: number; search?: string }) => {
+    const token = authToken;
     if (!token) {
       setAdminUsers([]);
+      setAdminUsersTotal(0);
+      setAdminUsersTotalPages(1);
       return;
     }
-    fetch(`${API_BASE}/admin/users`, { headers: headersFor(token) })
+    const page = opts?.page ?? adminUsersPage;
+    const pageSize = opts?.pageSize ?? adminUsersPageSize;
+    const search = opts?.search !== undefined ? opts.search : adminUsersSearch;
+    const qs = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+    if (search) qs.set('search', search);
+    fetch(`${API_BASE}/admin/users?${qs.toString()}`, { headers: headersFor(token) })
       .then(res => (res.ok ? res.json() : Promise.reject(res)))
-      .then(data => {
-        if (Array.isArray(data)) setAdminUsers(data);
+      .then((data: any) => {
+        if (data && Array.isArray(data.items)) {
+          setAdminUsers(data.items);
+          setAdminUsersTotal(data.total);
+          setAdminUsersPage(data.page);
+          setAdminUsersTotalPages(data.totalPages);
+        }
       })
       .catch((err) => {
         console.error('[SkillBridge] Admin users load failed:', err);
@@ -335,7 +352,7 @@ export default function SkillBridgeApp() {
       .then(({ ok, data }) => {
         if (ok && data?.success) {
           setAdminUserMsg({ ok: true, text: 'Role updated.' });
-          fetchAdminUsers();
+          loadUsers();
         } else {
           setAdminUserMsg({ ok: false, text: (data?.message) || 'Could not update role.' });
         }
@@ -354,7 +371,11 @@ export default function SkillBridgeApp() {
       .then(({ ok, data }) => {
         if (ok && data?.success) {
           setAdminUserMsg({ ok: true, text: 'User deleted.' });
-          fetchAdminUsers();
+          if (adminUsers.length === 1 && adminUsersPage > 1) {
+            loadUsers({ page: adminUsersPage - 1 });
+          } else {
+            loadUsers();
+          }
         } else {
           setAdminUserMsg({ ok: false, text: (data?.message) || 'Could not delete user.' });
         }
@@ -1966,6 +1987,38 @@ export default function SkillBridgeApp() {
             </div>
           )}
 
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.9rem' }}>
+            <input
+              type="text"
+              placeholder="Search by name or email…"
+              value={adminUsersSearch}
+              onChange={e => {
+                setAdminUsersSearch(e.target.value);
+                if (!e.target.value) loadUsers({ search: '', page: 1 });
+              }}
+              onKeyDown={e => { if (e.key === 'Enter') loadUsers({ search: adminUsersSearch, page: 1 }); }}
+              style={{ padding: '0.5rem 0.7rem', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '0.82rem', minWidth: 220 }}
+            />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+              <span>Show</span>
+              <select
+                value={adminUsersPageSize}
+                onChange={e => {
+                  const size = Number(e.target.value);
+                  setAdminUsersPageSize(size);
+                  loadUsers({ page: 1, pageSize: size });
+                }}
+                style={{ padding: '0.35rem 0.5rem', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '0.78rem' }}
+              >
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+              </select>
+              <span>per page</span>
+            </div>
+          </div>
+
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
             <thead>
               <tr style={{ textAlign: 'left', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-color)' }}>
@@ -2022,10 +2075,50 @@ export default function SkillBridgeApp() {
                 );
               })}
               {adminUsers.length === 0 && (
-                <tr><td colSpan={5} style={{ padding: '1rem', color: 'var(--text-muted)' }}>No users loaded.</td></tr>
+                <tr>
+                  <td colSpan={5} style={{ padding: '1rem', color: 'var(--text-muted)' }}>
+                    {adminUsersSearch ? `No users match "${adminUsersSearch}".` : 'No users loaded.'}
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
+
+          {/* Pagination */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.9rem' }}>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+              {adminUsersTotal === 0 ? '0 users' : `Page ${adminUsersPage} of ${adminUsersTotalPages} · ${adminUsersTotal} user${adminUsersTotal === 1 ? '' : 's'}`}
+            </span>
+            <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <button
+                className="btn"
+                disabled={adminUsersPage <= 1}
+                onClick={() => loadUsers({ page: adminUsersPage - 1 })}
+                style={{ padding: '0.4rem 0.8rem', fontSize: '0.78rem' }}
+              >
+                ← Prev
+              </button>
+              {Array.from({ length: adminUsersTotalPages }, (_, i) => i + 1).map(p => (
+                <button
+                  key={p}
+                  className="btn"
+                  disabled={p === adminUsersPage}
+                  onClick={() => loadUsers({ page: p })}
+                  style={{ padding: '0.4rem 0.68rem', fontSize: '0.78rem', opacity: p === adminUsersPage ? 0.6 : 1 }}
+                >
+                  {p}
+                </button>
+              ))}
+              <button
+                className="btn"
+                disabled={adminUsersPage >= adminUsersTotalPages}
+                onClick={() => loadUsers({ page: adminUsersPage + 1 })}
+                style={{ padding: '0.4rem 0.8rem', fontSize: '0.78rem' }}
+              >
+                Next →
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     );
