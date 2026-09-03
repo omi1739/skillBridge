@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Query, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Query, Body, UseGuards, InternalServerErrorException } from '@nestjs/common';
 import { IngestionService } from './ingestion.service';
 import { store } from '../../store';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -25,9 +25,15 @@ export class IngestionController {
   async runIngestion(
     @Body() body: { sourceUrl?: string; minMatches?: number } = {}
   ) {
-    return this.ingestionService.ingest({
-      sourceUrl: body.sourceUrl,
-      minMatches: body.minMatches
-    });
+    try {
+      return await this.ingestionService.ingest({
+        sourceUrl: body.sourceUrl,
+        minMatches: body.minMatches
+      });
+    } catch (err: any) {
+      // Surface the underlying reason for diagnosis during rollout. The
+      // response body is only truthful for ADMIN callers (guard above).
+      throw new InternalServerErrorException(err?.message || String(err));
+    }
   }
 }
