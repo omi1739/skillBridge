@@ -4,7 +4,6 @@ import {
   Skill,
   Role,
   Assessment,
-  JobListing,
   ActionRecommendation,
   User,
   Profile,
@@ -14,8 +13,7 @@ import {
   INITIAL_SKILLS,
   INITIAL_ROLES,
   INITIAL_ASSESSMENT,
-  INITIAL_RECOMMENDATIONS,
-  INITIAL_JOBS
+  INITIAL_RECOMMENDATIONS
 } from '../data/seed';
 import { query, withTransaction } from './client';
 import { authService } from '../services/auth.service';
@@ -82,30 +80,6 @@ export async function seedAll(): Promise<void> {
          q.options ? JSON.stringify(q.options) : null, q.correctAnswer,
          q.explanation, q.subSkill, q.difficulty, q.points]
       );
-    }
-
-    // --- Jobs + job_skills ---
-    for (const j of INITIAL_JOBS as JobListing[]) {
-      await client.query(
-        `INSERT INTO jobs (id, title, company, location, experience_level, role_id, description, posted_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8::timestamptz)
-         ON CONFLICT (id) DO NOTHING`,
-        [j.id, j.title, j.company, j.location, j.experienceLevel, j.roleId, j.description, j.postedAt]
-      );
-      for (const sId of j.requiredSkillIds || []) {
-        await client.query(
-          `INSERT INTO job_skills (job_id, skill_id, is_required) VALUES ($1,$2,true)
-           ON CONFLICT (job_id, skill_id) DO NOTHING`,
-          [j.id, sId]
-        );
-      }
-      for (const sId of j.preferredSkillIds || []) {
-        await client.query(
-          `INSERT INTO job_skills (job_id, skill_id, is_required) VALUES ($1,$2,false)
-           ON CONFLICT (job_id, skill_id) DO NOTHING`,
-          [j.id, sId]
-        );
-      }
     }
 
     // --- Demo user + profile ---
