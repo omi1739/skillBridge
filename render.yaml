@@ -1,0 +1,31 @@
+# Render blueprint for the SkillBridge API (NestJS backend).
+# The backend is one of three npm workspaces (shared, backend, frontend), so the
+# rootRuntime/build run from the repo while service builds target the workspace.
+# Deploy this API separately from the frontend (frontend is deployed on Vercel
+# via /vercel.json with rootDirectory: frontend).
+services:
+  - type: web
+    name: skillbridge-api
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install && npm run build --workspace=@skillbridge/types && npm run build --workspace=@skillbridge/api
+    startCommand: npm run start --workspace=@skillbridge/api
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false

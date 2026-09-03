@@ -1,0 +1,7 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "rootDirectory": "frontend",
+  "installCommand": "npm install && npm run build --workspace=@skillbridge/types",
+  "buildCommand": "npm run build"
+}

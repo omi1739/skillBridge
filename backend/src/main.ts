@@ -16,9 +16,14 @@ async function bootstrap() {
   const logger = new Logger('SkillBridgeBootstrap');
   const app = await NestFactory.create(AppModule);
 
-  // Enable CORS for frontend applications
+  // Enable CORS for the frontend. In development reflect any origin (true); in
+  // production restrict to the frontend origin(s) via the CORS_ORIGIN env var
+  // (comma-separated), e.g. CORS_ORIGIN=https://skillbridge.vercel.app
+  const corsOrigin = process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(',').map(o => o.trim()).filter(Boolean)
+    : true;
   app.enableCors({
-    origin: true,
+    origin: corsOrigin,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
   });
