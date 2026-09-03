@@ -1599,27 +1599,16 @@ export default function SkillBridgeApp() {
           {/* Vertical Sidebar */}
           <aside className="app-sidebar">
             <div className="sidebar-header">
-              <div className="sidebar-brand-row">
-                <div className="sidebar-brand">
-                  <div className="sidebar-brand-icon">
-                    <Terminal size={17} />
-                  </div>
-                  <span>SkillBridge</span>
+              <div className="sidebar-brand">
+                <div className="sidebar-brand-icon">
+                  <Terminal size={17} />
                 </div>
-                <div className="sidebar-status-pill">
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#5eead4', display: 'inline-block' }} />
-                  <span>LIVE</span>
-                </div>
+                <span>SkillBridge</span>
               </div>
-
               <div className="sidebar-track-card">
-                <div className="sidebar-track-label">ACTIVE ROLE TRACK</div>
+                <div className="sidebar-track-label">Active Track</div>
                 <div className="sidebar-track-title">
                   <span>{role?.title || 'Junior Backend Engineer'}</span>
-                </div>
-                <div className="sidebar-track-meta">
-                  <span className="sidebar-meta-chip">Bangladesh</span>
-                  <span className="sidebar-meta-chip">N = {totalJobsCount} Jobs</span>
                 </div>
               </div>
             </div>
@@ -1635,7 +1624,6 @@ export default function SkillBridgeApp() {
                     <TrendingUp size={16} />
                     <span>Job Market Demand</span>
                   </span>
-                  <span className="sidebar-item-badge">{totalJobsCount}</span>
                 </button>
                 <button
                   className={`sidebar-item ${activeTab === 'curriculum' ? 'active' : ''}`}
@@ -1645,7 +1633,6 @@ export default function SkillBridgeApp() {
                     <GraduationCap size={16} />
                     <span>University Syllabi</span>
                   </span>
-                  <span className="sidebar-item-badge">{totalCurriculaCount} CS</span>
                 </button>
               </div>
 
@@ -1659,7 +1646,6 @@ export default function SkillBridgeApp() {
                     <BrainCircuit size={16} />
                     <span>Diagnostic Test</span>
                   </span>
-                  <span className="sidebar-item-badge">{assessment?.questions?.length ? `${assessment.questions.length} Qs` : 'Timed'}</span>
                 </button>
                 <button
                   className={`sidebar-item ${activeTab === 'sandbox' ? 'active' : ''}`}
@@ -1669,7 +1655,6 @@ export default function SkillBridgeApp() {
                     <Terminal size={16} />
                     <span>SQL & Code Sandbox</span>
                   </span>
-                  <span className="sidebar-item-badge">{challenges.length > 0 ? `${challenges.length} Chans` : 'Interactive'}</span>
                 </button>
               </div>
 
@@ -1683,9 +1668,6 @@ export default function SkillBridgeApp() {
                     <BarChart3 size={16} />
                     <span>My Skill Gaps</span>
                   </span>
-                  <span className="sidebar-item-badge" style={{ color: '#fb7185', background: 'rgba(244,63,94,0.12)' }}>
-                    {gaps.length > 0 ? `${gaps.length} Gaps` : 'Priority'}
-                  </span>
                 </button>
                 <button
                   className={`sidebar-item ${activeTab === 'actions' ? 'active' : ''}`}
@@ -1695,7 +1677,6 @@ export default function SkillBridgeApp() {
                     <Rocket size={16} />
                     <span>Projects to Build</span>
                   </span>
-                  <span className="sidebar-item-badge">{userProjects.length > 0 ? `${userProjects.length} Verified` : 'Projects'}</span>
                 </button>
                 <button
                   className={`sidebar-item ${activeTab === 'jobs' ? 'active' : ''}`}
@@ -1705,15 +1686,12 @@ export default function SkillBridgeApp() {
                     <Briefcase size={16} />
                     <span>Matching Jobs</span>
                   </span>
-                  <span className="sidebar-item-badge" style={{ color: '#34d399', background: 'rgba(16,185,129,0.12)' }}>
-                    {jobMatches.length > 0 ? `${jobMatches.length} Roles` : 'Live'}
-                  </span>
                 </button>
               </div>
 
-              <div>
-                <div className="sidebar-section-title">Platform</div>
-                {currentUser?.role === 'ADMIN' && (
+              {currentUser?.role === 'ADMIN' && (
+                <div>
+                  <div className="sidebar-section-title">Platform</div>
                   <button
                     className={`sidebar-item ${activeTab === 'admin' ? 'active' : ''}`}
                     onClick={() => setActiveTab('admin')}
@@ -1722,27 +1700,10 @@ export default function SkillBridgeApp() {
                       <Sliders size={16} />
                       <span>Admin & Weights</span>
                     </span>
-                    <span className="sidebar-item-badge">Tuner</span>
                   </button>
-                )}
-              </div>
+                </div>
+              )}
             </nav>
-
-            {/* Quick Readiness Widget */}
-            <div className="sidebar-progress-box">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Diagnostic Benchmark</span>
-                  <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', fontWeight: 700, color: attemptResult ? (attemptResult.passed ? '#10b981' : '#f59e0b') : '#5eead4' }}>
-                  {attemptResult ? `${attemptResult.score}%` : 'Not Taken'}
-                </span>
-              </div>
-              <div className="progress-container" style={{ margin: 0, height: '4px', background: 'var(--bg-app)' }}>
-                <div
-                  className="progress-bar progress-indigo"
-                  style={{ width: attemptResult ? `${attemptResult.score}%` : '20%' }}
-                />
-              </div>
-            </div>
 
             <div className="sidebar-footer">
               <div className="sidebar-user-card">
@@ -1754,30 +1715,17 @@ export default function SkillBridgeApp() {
                     {currentProfile?.fullName || currentUser.email.split('@')[0]}
                   </div>
                   <div className="sidebar-user-role">
-                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
-                    <span>{currentUser.role === 'ADMIN' ? 'Administrator' : currentUser.role === 'RECRUITER' ? 'Recruiter' : 'Verified Candidate'}</span>
+                    {currentUser.role === 'ADMIN' ? 'Administrator' : currentUser.role === 'RECRUITER' ? 'Recruiter' : 'Verified Candidate'}
                   </div>
                 </div>
-              </div>
-
-              <div className="sidebar-actions-row">
-                <button
-                  className="btn btn-secondary"
-                  onClick={handleOpenPassport}
-                  style={{ flex: 1, padding: '0.45rem 0.65rem', fontSize: '0.775rem' }}
-                >
-                  <FileText size={14} color="#5eead4" />
-                  <span>Skill Passport</span>
-                </button>
-                <button
-                  className="btn btn-secondary"
-                  onClick={handleLogout}
-                  title="Sign Out"
-                  style={{ padding: '0.45rem 0.65rem' }}
-                >
-                  <LogOut size={14} />
+                <button className="sidebar-icon-btn" onClick={handleLogout} title="Sign Out">
+                  <LogOut size={15} />
                 </button>
               </div>
+              <button className="btn btn-secondary sidebar-passport-btn" onClick={handleOpenPassport}>
+                <FileText size={14} />
+                <span>Skill Passport</span>
+              </button>
             </div>
           </aside>
 
