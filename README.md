@@ -6,7 +6,7 @@ SkillBridge is an open-source labor market intelligence and skill assessment pla
 
 Unlike conventional job boards or generic course aggregators, SkillBridge focuses on an evidence-based pipeline:
 
-- **Market Demand Ingestion**: Ingests and normalizes local job postings to extract current technology requirements.
+- **Market Demand Ingestion**: Ingests and normalizes live, real job postings (Arbeitnow for international remote roles + BdJobs for Bangladesh) to extract current technology requirements.
 - **Competency Verification**: Tests candidate skills through objective assessments (MCQs, code debugging, and SQL/logic queries) rather than self-reported checkboxes.
 - **Deterministic Gap Analysis**: Calculates missing competencies against target roles using transparent mathematical weights.
 - **Actionable Project Roadmaps**: Recommends multi-skill portfolio projects tailored to bridge identified gaps.
@@ -37,20 +37,22 @@ SkillBridge/
 │   │   │   └── seed.ts              # applySchema() + seedAll()
 │   │   ├── database/                # NestJS DatabaseModule (connection ping)
 │   │   ├── modules/                 # Feature modules (one per domain)
-│   │   │   ├── auth/                # register/login, /me, guards, decorators
+│   │   │   ├── auth/                # register/login (email + Google), /me, guards, decorators
 │   │   │   │   ├── guards/          # JwtAuthGuard, OptionalJwtAuthGuard, RolesGuard
 │   │   │   │   └── decorators/      # @CurrentUser(), @Roles()
 │   │   │   ├── admin/               # ontology management (aliases, weights, questions)
 │   │   │   ├── assessments/         # MCQ diagnostic + grading
 │   │   │   ├── curriculum/          # institution curricula comparison
+│   │   │   ├── ingestion/           # job-board ingestion (market/demand, ingest/run)
 │   │   │   ├── jobs/                # job listings + matching
 │   │   │   ├── projects/            # portfolio project verification
 │   │   │   ├── roles/               # role catalog + demand context
 │   │   │   ├── sandbox/             # SQL / JS challenge runners
 │   │   │   └── skills/              # canonical skill ontology
-│   │   ├── services/                # core domain logic (match, gap, sandbox, auth)
+│   │   ├── services/                # core domain logic (match, gap, sandbox, auth, scrapers)
+│   │   │   └── bdjobs-scraper.service.ts  # BdJobs (Bangladesh) scraping + classification
 │   │   ├── store/                   # data-access layer over PostgreSQL
-│   │   └── data/                    # seed data (skills, roles, assessment, jobs)
+│   │   └── data/                    # seed data (skills, roles, assessment)
 │   └── package.json
 │
 ├── frontend/                        # Next.js 14 interactive dashboard (@skillbridge/web)
@@ -82,6 +84,7 @@ SkillBridge/
 | GET | `/api/health` | Liveness check | – |
 | POST | `/api/auth/register` | Create account | – |
 | POST | `/api/auth/login` | Sign in, returns JWT | – |
+| POST | `/api/auth/google` | Sign in with Google (id token) | – |
 | GET | `/api/me` | Current user + profile | Optional |
 | GET | `/api/me/account` | Account details | JWT |
 | PATCH | `/api/me/profile` | Update profile | JWT |
@@ -100,8 +103,11 @@ SkillBridge/
 | POST | `/api/sandbox/run-code` | Run JS challenge | JWT |
 | GET | `/api/curriculum/institutions` | List curricula | – |
 | GET | `/api/curriculum/analyze` | Compare curriculum to role | – |
-| GET | `/api/jobs` | Job listings | – |
+| GET | `/api/jobs` | Live job listings (Arbeitnow + BdJobs; auth required) | Bearer |
 | GET | `/api/jobs/matches` | Matched jobs for user | – |
+| GET | `/api/market/demand` | Demand metrics for a role | – |
+| GET | `/api/ingest/sources` | List configured ingestion sources | – |
+| POST | `/api/ingest/run` | Trigger a manual ingestion run | Admin |
 | GET | `/api/admin/overview` | Ontology stats | Admin |
 | POST | `/api/admin/skills/alias` | Add skill alias | Admin |
 | PATCH | `/api/admin/roles/:id/weights` | Tune role skill weights | Admin |
@@ -170,9 +176,15 @@ JWT_SECRET=<a-long-random-secret>
 Frontend reads `NEXT_PUBLIC_API_BASE` (defaults to `http://localhost:4000/api`). See `frontend/.env.example`.
 
 ### 3. Prepare the Database
-Applies the relational schema and seeds demo data (skills, roles, assessment, jobs, demo user):
+Applies the relational schema and seeds demo data (skills, roles, assessment, demo user). Note: job listings are **not** seeded with hardcoded data — they come from live ingestion:
 ```bash
 npm run db:setup
+```
+
+Ingest real job postings (Arbeitnow international + BdJobs Bangladesh):
+```bash
+npm run db:ingest --workspace=@skillbridge/api bdjobs   # Bangladesh scraper
+npm run db:ingest --workspace=@skillbridge/api arbeitnow # international remote
 ```
 
 ### 4. Run in Development
@@ -216,13 +228,26 @@ Roles are resolved from the database and enforced end-to-end. The demo login is 
 
 ## Current Status
 
-The core platform is fully scaffolded and functional as a demo:
-- **9 NestJS modules**: Auth, Roles, Skills, Assessments, Sandbox, Projects, Jobs, Curriculum, Admin.
+The core platform is fully scaffolded, functional, and deployed to production (backend on Render, frontend on Vercel, PostgreSQL on Neon):
+- **9 NestJS modules**: Auth, Roles, Skills, Assessments, Sandbox, Projects, Jobs, Curriculum, Admin + a dedicated ingestion module.
+- **Live, real job data only** — no hardcoded job listings. The feed is populated by two scrapers: **Arbeitnow** (international/remote) and **BdJobs** (Bangladesh). Job demand percentages are computed from verifiable postings with `source_id` provenance.
+- **Scheduled ingestion** — a Render cron job (`skillbridge-api-bdjobs-ingest`) runs the BdJobs scraper three times a day (00/08/16 UTC).
 - **8-tab interactive UI**: Market, Curriculum, Assessment, Sandbox, Gaps, Actions, Jobs, Admin.
+- **Modern sign-in / sign-up modal** with email + Google authentication, branded Google button, and role-based tabs.
 - **JWT authentication** with role-based protection on admin writes (`RolesGuard` + `@Roles('ADMIN')`).
 - **Practical evaluation**: MCQ assessment grading and SQL/JS sandbox challenge runners that elevate skill evidence to `HIGH` confidence.
 - **Real execution**: SQL challenges run against an in-memory SQLite engine (sql.js) with ordered result-set grading; JS challenges run in an isolated VM sandbox with a hard time limit; GitHub repositories are verified against the live GitHub REST API (test files, Dockerfile, README, commit count) instead of keyword guessing.
 - **Evidence-based pipeline**: deterministic gap analysis, recommendations, job matching, and skill passports.
+
+### Production Deployments
+| Component | Host | URL |
+|-----------|------|-----|
+| Web frontend | Vercel | `https://skillbridge-dev-1739.vercel.app` |
+| API backend | Render | `https://skillbridge-cv3e.onrender.com` |
+| Job ingestion (cron) | Render | runs every 8h on `main` push |
+| PostgreSQL | Neon Serverless | via `backend/.env` |
+
+> **Uptime note:** The free Render web service sleeps after ~15 min of inactivity. An external uptime monitor (e.g. UptimeRobot) pings `GET /api/health` every 5 minutes to keep it warm. `GET /api/jobs` requires a `Bearer` token (e.g. `demo_token_verify`).
 
 > GitHub verification requires network access to `api.github.com`; set `GITHUB_TOKEN` in `backend/.env` for higher rate limits. Unverifiable repos are stored as `PENDING`/`NEEDS_REVIEW` rather than falsely marked verified.
 

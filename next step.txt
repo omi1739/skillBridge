@@ -1,0 +1,53 @@
+SkillBridge — Next Steps
+========================
+
+Current live state (as of this update)
+--------------------------------------
+- Backend: Render  -> https://skillbridge-cv3e.onrender.com
+- Frontend: Vercel -> https://skillbridge-dev-1739.vercel.app
+- DB: Neon Serverless PostgreSQL (backend/.env -> DATABASE_URL)
+- Job data: 95 real postings (93 Arbeitnow + 2 BdJobs). No hardcoded jobs.
+- Uptime: UptimeRobot pings /api/health every 5 min to keep the free Render
+  web service from sleeping.
+- Auth: email/password + Google sign-in; modern login/signup modal redesigned.
+
+Immediate next steps
+--------------------
+1. VISUALLY VERIFY the new login/signup modal on the live site
+   - Open https://skillbridge-dev-1739.vercel.app, click Sign In.
+   - Confirm the Google button is centered/full-width and the signup form
+     renders cleanly. Report any remaining layout issues.
+
+2. LOOK AT THE SIGNUP FLOW END-TO-END
+   - Confirm Register creates a real account and stores it.
+   - Confirm Google sign-in actually returns a token and logs in.
+     (Requires NEXT_PUBLIC_GOOGLE_CLIENT_ID + GOOGLE_CLIENT_ID to be set in
+     frontend/.env and Render; a valid GCP OAuth client + authorized origin.)
+
+3. GROW AND HARDEN THE JOB PIPELINE
+   - Add more BdJobs pages depth (JOB_BD_PAGES) or additional BD job sources
+     (e.g. bdjobs categories, chorki, glassdoorBD) to move past 2 BD postings.
+   - Improve deduplication on externalId + title to avoid re-inserting rows.
+   - Add per-source last-ingested timestamps surfaced in the Market view.
+
+4. EXPAND THE ROLE ONTOLOGY
+   - Replicate the single "Junior Backend Engineer" archetype for other roles
+     (e.g. Frontend, DevOps, Data) so the platform is not single-role.
+
+5. MATCH/SEARCH QUALITY
+   - Review job-matching relevance; tune weights and market occurrences.
+   - Add employer/recruiter-facing job management if that is a target persona.
+
+6. OPS / RELIABILITY
+   - Consider a paid Render plan if cold starts still feel slow (removes the
+     need for UptimeRobot).
+   - Add a scheduled DB backup / snapshot for the Neon database.
+   - Wire Vercel preview deploys into CI so PRs are auto-tested + previewed.
+
+7. CLOSE TEST COVERAGE GAPS
+   - Backend: 8 suites / 44 tests pass; add tests for the ingestion controller
+     and deduplication logic.
+   - Frontend: 4 contract tests pass; add a test that renders the signup form
+     and asserts Google button payload behavior.
+
+Report blockers or open questions here after clicking through each step.
