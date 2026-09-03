@@ -38,26 +38,43 @@ describe('SandboxService', () => {
       expect(result.message).toMatch(/Destructive/);
     });
 
-    it('fails when required SQL keywords are missing', async () => {
+    it('fails when the query returns a result set that does not match the expected aggregate', async () => {
       const result = await service.executeSQL('challenge_sql_01', 'SELECT * FROM employees', 'user_1');
       expect(result.passed).toBe(false);
-      expect(result.message).toMatch(/JOIN/);
+      expect(result.message).toMatch(/did not match|match/i);
+      expect(mockedStore.saveEvidence).not.toHaveBeenCalled();
     });
 
     it('passes challenge_sql_01 and records verified evidence for a valid query', async () => {
       const query = `
-        SELECT d.name, COUNT(e.id) AS c, AVG(e.salary) AS avg
+        SELECT d.name AS department_name, COUNT(e.id) AS employee_count, AVG(e.salary) AS avg_salary
         FROM departments d
         JOIN employees e ON d.id = e.department_id
         GROUP BY d.name
-        HAVING COUNT(e.id) > 1
+        HAVING COUNT(e.id) > 1 AND AVG(e.salary) > 60000
+        ORDER BY avg_salary DESC
       `;
       const result = await service.executeSQL('challenge_sql_01', query, 'user_1');
       expect(result.passed).toBe(true);
       expect(result.outputRows).toBeDefined();
+      expect(result.outputRows!.length).toBe(2);
       expect(result.verifiedEvidence).toBeDefined();
       expect(result.verifiedEvidence!.confidence).toBe('HIGH');
       expect(mockedStore.saveEvidence).toHaveBeenCalled();
+    });
+
+    it('fails when the result set does not match the expected dataset', async () => {
+      const wrongQuery = `SELECT name FROM departments ORDER BY name ASC`;
+      const result = await service.executeSQL('challenge_sql_01', wrongQuery, 'user_1');
+      expect(result.passed).toBe(false);
+      expect(result.message).toMatch(/did not match|match/i);
+      expect(mockedStore.saveEvidence).not.toHaveBeenCalled();
+    });
+
+    it('returns a SQL error message for an invalid query', async () => {
+      const result = await service.executeSQL('challenge_sql_01', 'SELECT * FROM nonexistent_table', 'user_1');
+      expect(result.passed).toBe(false);
+      expect(result.message).toMatch(/SQL Error/i);
     });
   });
 
@@ -95,6 +112,13 @@ describe('SandboxService', () => {
 
     it('does not record evidence when the challenge fails', async () => {
       await service.executeJavaScript('challenge_js_01', 'const x = 1;', 'user_1');
+      expect(mockedStore.saveEvidence).not.toHaveBeenCalled();
+    });
+
+    it('isolates user code from Node globals (require/process are blocked)', async () => {
+      const malicious = `async function batchMap() { return process.version; }`;
+      const result = await service.executeJavaScript('challenge_js_01', malicious, 'user_1');
+      expect(result.passed).toBe(false);
       expect(mockedStore.saveEvidence).not.toHaveBeenCalled();
     });
   });

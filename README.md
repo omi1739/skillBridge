@@ -218,9 +218,10 @@ The core platform is fully scaffolded and functional as a demo:
 - **8-tab interactive UI**: Market, Curriculum, Assessment, Sandbox, Gaps, Actions, Jobs, Admin.
 - **JWT authentication** with role-based protection on admin writes (`RolesGuard` + `@Roles('ADMIN')`).
 - **Practical evaluation**: MCQ assessment grading and SQL/JS sandbox challenge runners that elevate skill evidence to `HIGH` confidence.
+- **Real execution**: SQL challenges run against an in-memory SQLite engine (sql.js) with ordered result-set grading; JS challenges run in an isolated VM sandbox with a hard time limit; GitHub repositories are verified against the live GitHub REST API (test files, Dockerfile, README, commit count) instead of keyword guessing.
 - **Evidence-based pipeline**: deterministic gap analysis, recommendations, job matching, and skill passports.
 
-> Note: Sandbox SQL evaluation and GitHub project verification are simulated (keyword-checked / inferred) rather than backed by a real engine, and are listed as follow-up work in `NEXT_STEPS.txt`.
+> GitHub verification requires network access to `api.github.com`; set `GITHUB_TOKEN` in `backend/.env` for higher rate limits. Unverifiable repos are stored as `PENDING`/`NEEDS_REVIEW` rather than falsely marked verified.
 
 ---
 

@@ -24,7 +24,8 @@
     "jsonwebtoken": "^9.0.2",
     "pg": "^8.23.0",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "sql.js": "^1.14.2"
   },
   "devDependencies": {
     "@nestjs/testing": "^10.3.8",
@@ -35,6 +36,7 @@
     "@types/jsonwebtoken": "^9.0.6",
     "@types/node": "^20.12.12",
     "@types/pg": "^8.23.1",
+    "@types/sql.js": "^1.4.11",
     "@types/supertest": "^7.2.1",
     "jest": "^30.5.1",
     "supertest": "^7.2.2",

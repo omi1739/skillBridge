@@ -472,13 +472,20 @@ export default function SkillBridgeApp() {
 
       const data = await res.json();
       if (data.project) {
-        setProjectSuccessMsg(`Successfully verified ${data.project.title}! Detected stack: ${data.project.detectedStack.join(', ')}.`);
+        const status = data.project.verificationStatus;
+        const statusMsg =
+          status === 'VERIFIED'
+            ? `Successfully verified ${data.project.title}! Detected stack: ${data.project.detectedStack.join(', ')}.`
+            : status === 'NEEDS_REVIEW'
+              ? `${data.project.title} was received, but no test suite was detected — status: Needs Review.`
+              : `${data.project.title} could not be verified against GitHub — status: Pending Review.`;
+        setProjectSuccessMsg(statusMsg);
         setProjectForm({ title: '', repoUrl: '', description: '', primarySkills: [] });
         refreshUserData();
         setTimeout(() => {
           setShowProjectModal(false);
           setProjectSuccessMsg('');
-        }, 2500);
+        }, 3000);
       }
     } catch (err) {
       console.error(err);

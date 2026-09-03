@@ -1,4 +1,6 @@
 import { SkillEvidence } from '@skillbridge/types';
+import * as vm from 'vm';
+import initSqlJs, { Database, SqlJsStatic } from 'sql.js';
 import { store } from '../store';
 import { gapService } from './gap.service';
 
@@ -27,6 +29,56 @@ export interface ExecutionResult {
   testResults?: Array<{ testName: string; passed: boolean; expected: any; actual: any }>;
   verifiedEvidence?: SkillEvidence;
 }
+
+interface SqlFixture {
+  skillId: string;
+  proficiency: number;
+  schemaSql: string;
+  seedSql: string;
+  referenceQuery: string;
+}
+
+const SQL_FIXTURES: Record<string, SqlFixture> = {
+  challenge_sql_01: {
+    skillId: 'skill_sql',
+    proficiency: 0.95,
+    schemaSql: `CREATE TABLE departments (id INT, name VARCHAR);
+CREATE TABLE employees (id INT, name VARCHAR, department_id INT, salary NUMERIC);`,
+    seedSql: `INSERT INTO departments (id, name) VALUES
+  (1, 'Engineering'), (2, 'Marketing'), (3, 'Sales'), (4, 'Support');
+INSERT INTO employees (id, name, department_id, salary) VALUES
+  (1, 'Alice', 1, 80000), (2, 'Bob', 1, 90000),
+  (3, 'Charlie', 1, 85000), (4, 'Diana', 1, 95000),
+  (5, 'Eve', 2, 65000), (6, 'Frank', 2, 65000),
+  (7, 'Grace', 3, 70000), (8, 'Heidi', 4, 50000);`,
+    referenceQuery: `SELECT d.name AS department_name, COUNT(e.id) AS employee_count, AVG(e.salary) AS avg_salary
+FROM departments d
+JOIN employees e ON d.id = e.department_id
+GROUP BY d.name
+HAVING COUNT(e.id) > 1 AND AVG(e.salary) > 60000
+ORDER BY avg_salary DESC;`
+  },
+  challenge_sql_02: {
+    skillId: 'skill_postgresql',
+    proficiency: 0.90,
+    schemaSql: `CREATE TABLE customers (id INT, name VARCHAR, email VARCHAR);
+CREATE TABLE orders (id INT, customer_id INT, order_date DATE, total NUMERIC);`,
+    seedSql: `INSERT INTO customers (id, name, email) VALUES
+  (1, 'Nafis Ahmed', 'nafis@example.com'),
+  (2, 'Tanvir Hossain', 'tanvir@example.com'),
+  (3, 'Rahim Uddin', 'rahim@example.com'),
+  (4, 'Sadia Rahman', 'sadia@example.com');
+INSERT INTO orders (id, customer_id, order_date, total) VALUES
+  (1, 3, '2024-01-10', 150.00),
+  (2, 4, '2024-02-15', 320.50),
+  (3, 3, '2024-03-01', 85.00);`,
+    referenceQuery: `SELECT c.name, c.email
+FROM customers c
+LEFT JOIN orders o ON c.id = o.customer_id
+WHERE o.id IS NULL
+ORDER BY c.name ASC;`
+  }
+};
 
 export class SandboxService {
   // Predefined Hands-On Challenges
@@ -92,13 +144,23 @@ ORDER BY c.name ASC;`,
   }
 
   /**
-   * Safe in-memory SQL execution against test tables.
+   * Real in-memory SQL evaluation via SQLite (sql.js/WASM) against per-challenge
+   * test data. The user's query runs against the same seeded dataset as a canonical
+   * reference query, and the ordered result sets are compared for an exact match.
    */
   public async executeSQL(challengeId: string, query: string, userId: string = 'demo_user_01'): Promise<ExecutionResult> {
     const startTime = Date.now();
-    const cleanQuery = query.trim().toUpperCase();
+    const fixture = SQL_FIXTURES[challengeId];
 
-    // Guard against destructive commands
+    if (!fixture) {
+      return {
+        passed: false,
+        message: 'Unknown challenge ID.',
+        executionTimeMs: Date.now() - startTime
+      };
+    }
+
+    const cleanQuery = query.trim().toUpperCase();
     if (cleanQuery.includes('DROP ') || cleanQuery.includes('DELETE ') || cleanQuery.includes('TRUNCATE ') || cleanQuery.includes('ALTER ')) {
       return {
         passed: false,
@@ -107,81 +169,57 @@ ORDER BY c.name ASC;`,
       };
     }
 
-    if (challengeId === 'challenge_sql_01') {
-      // Validate SQL criteria for Challenge 1: JOIN, GROUP BY, HAVING, ORDER BY
-      const hasJoin = cleanQuery.includes('JOIN');
-      const hasGroupBy = cleanQuery.includes('GROUP BY');
-      const hasHaving = cleanQuery.includes('HAVING');
-      const hasOrderBy = cleanQuery.includes('ORDER BY');
+    try {
+      const db = await runInMemoryDb(fixture.schemaSql, fixture.seedSql);
+      const expected = normalizeRows(mapResult(db, fixture.referenceQuery));
+      const actual = normalizeRows(mapResult(db, query));
+      db.close();
 
-      if (!hasJoin || !hasGroupBy || !hasHaving) {
+      if (rowsMatch(expected, actual)) {
+        const verifiedEvidence = await this.recordVerifiedEvidence(userId, fixture.skillId, fixture.proficiency);
         return {
-          passed: false,
-          message: 'Query failed test validation: must utilize JOIN, GROUP BY, and a HAVING clause to filter aggregates.',
-          executionTimeMs: Date.now() - startTime
+          passed: true,
+          message: `All test cases passed! Result table (${actual.length} row(s)) matches the expected dataset perfectly.`,
+          executionTimeMs: Date.now() - startTime,
+          outputRows: actual,
+          verifiedEvidence
         };
       }
 
-      // Simulated expected output rows from seed dataset
-      const outputRows: SQLRow[] = [
-        { department_name: 'Engineering', employee_count: 4, avg_salary: 87500.00 },
-        { department_name: 'Marketing', employee_count: 2, avg_salary: 65000.00 }
-      ];
-
-      const verifiedEvidence = await this.recordVerifiedEvidence(userId, 'skill_sql', 0.95);
-
       return {
-        passed: true,
-        message: 'All 2 test cases passed! Result table matches expected dataset perfectly.',
+        passed: false,
+        message: `Result set did not match the expected output. Expected ${expected.length} row(s), got ${actual.length}.`,
         executionTimeMs: Date.now() - startTime,
-        outputRows,
-        verifiedEvidence
+        outputRows: actual,
+        testResults: [
+          {
+            testName: 'Result set equality (rows and ordering)',
+            passed: false,
+            expected,
+            actual
+          }
+        ]
+      };
+    } catch (err: any) {
+      return {
+        passed: false,
+        message: `SQL Error: ${err.message}`,
+        executionTimeMs: Date.now() - startTime
       };
     }
-
-    if (challengeId === 'challenge_sql_02') {
-      const hasLeftJoinOrNotExists = cleanQuery.includes('LEFT JOIN') || cleanQuery.includes('NOT EXISTS') || cleanQuery.includes('NOT IN');
-      if (!hasLeftJoinOrNotExists) {
-        return {
-          passed: false,
-          message: 'Query must identify unmatched rows using LEFT JOIN (with NULL check), NOT EXISTS, or NOT IN.',
-          executionTimeMs: Date.now() - startTime
-        };
-      }
-
-      const outputRows: SQLRow[] = [
-        { name: 'Nafis Ahmed', email: 'nafis@example.com' },
-        { name: 'Tanvir Hossain', email: 'tanvir@example.com' }
-      ];
-
-      const verifiedEvidence = await this.recordVerifiedEvidence(userId, 'skill_postgresql', 0.90);
-
-      return {
-        passed: true,
-        message: 'All test cases passed! Correctly identified customers with zero orders.',
-        executionTimeMs: Date.now() - startTime,
-        outputRows,
-        verifiedEvidence
-      };
-    }
-
-    return {
-      passed: false,
-      message: 'Unknown challenge ID.',
-      executionTimeMs: Date.now() - startTime
-    };
   }
 
   /**
-   * Safe deterministic JavaScript challenge evaluation.
+   * Deterministic JS challenge evaluation with VM isolation and a hard time limit
+   * so user code cannot touch Node globals (require/process) or run forever.
    */
   public async executeJavaScript(challengeId: string, userCode: string, userId: string = 'demo_user_01'): Promise<ExecutionResult> {
     const startTime = Date.now();
+    const timeoutMs = 5000;
 
     try {
       if (challengeId === 'challenge_js_01') {
-        // Compile user function safely
-        const userFunction = new Function(`${userCode}; return batchMap;`)();
+        const userFunction = this.runUserFunction(userCode, timeoutMs);
         if (typeof userFunction !== 'function') {
           return {
             passed: false,
@@ -190,9 +228,9 @@ ORDER BY c.name ASC;`,
           };
         }
 
-        // Run Test Case 1: Simple array doubling
+        // Run Test Case 1: Simple array doubling preserving order
         const items1 = [1, 2, 3, 4, 5];
-        const res1 = await userFunction(items1, 2, async (x: number) => x * 2);
+        const res1 = await withTimeout(userFunction(items1, 2, async (x: number) => x * 2), timeoutMs);
         const expected1 = [2, 4, 6, 8, 10];
         const pass1 = JSON.stringify(res1) === JSON.stringify(expected1);
 
@@ -200,17 +238,19 @@ ORDER BY c.name ASC;`,
         let activeConcurrent = 0;
         let maxConcurrentObserved = 0;
         const items2 = [10, 20, 30, 40, 50, 60];
-        const res2 = await userFunction(items2, 2, async (x: number) => {
-          activeConcurrent++;
-          maxConcurrentObserved = Math.max(maxConcurrentObserved, activeConcurrent);
-          await new Promise(r => setTimeout(r, 10));
-          activeConcurrent--;
-          return x + 1;
-        });
+        const res2: any = await withTimeout(
+          userFunction(items2, 2, async (x: number) => {
+            activeConcurrent++;
+            maxConcurrentObserved = Math.max(maxConcurrentObserved, activeConcurrent);
+            await new Promise(r => setTimeout(r, 10));
+            activeConcurrent--;
+            return x + 1;
+          }),
+          timeoutMs
+        );
         const pass2 = maxConcurrentObserved <= 2 && res2.length === 6;
 
         const allPassed = pass1 && pass2;
-
         const testResults = [
           { testName: 'Preserves item order and return values', passed: pass1, expected: expected1, actual: res1 },
           { testName: 'Enforces maximum concurrency limit <= 2', passed: pass2, expected: 'max 2 concurrent', actual: `${maxConcurrentObserved} concurrent` }
@@ -223,7 +263,7 @@ ORDER BY c.name ASC;`,
 
         return {
           passed: allPassed,
-          message: allPassed ? 'All 3 test cases passed! Async concurrency bounded correctly.' : 'Some test assertions failed.',
+          message: allPassed ? 'All test cases passed! Async concurrency bounded correctly.' : 'Some test assertions failed.',
           executionTimeMs: Date.now() - startTime,
           testResults,
           verifiedEvidence
@@ -232,7 +272,7 @@ ORDER BY c.name ASC;`,
     } catch (err: any) {
       return {
         passed: false,
-        message: `Runtime Error: ${err.message}`,
+        message: `${err && err.message ? 'Runtime Error: ' + err.message : 'Runtime Error: execution timed out or was interrupted.'}`,
         executionTimeMs: Date.now() - startTime
       };
     }
@@ -242,6 +282,38 @@ ORDER BY c.name ASC;`,
       message: 'Unknown challenge ID.',
       executionTimeMs: Date.now() - startTime
     };
+  }
+
+  /**
+   * Evaluates candidate code inside a Node VM context that exposes only a safe
+   * subset of globals, and returns the exported `batchMap` function reference.
+   */
+  private runUserFunction(code: string, timeoutMs: number): ((...args: any[]) => any) | undefined {
+    const sandboxGlobals = {
+      Promise,
+      setTimeout,
+      clearTimeout,
+      console,
+      Math,
+      Number,
+      String,
+      Array,
+      Object,
+      Boolean,
+      JSON,
+      Symbol,
+      Error,
+      Date,
+      RegExp
+    };
+
+    const context = vm.createContext(Object.assign(Object.create(null), sandboxGlobals));
+    const script = new vm.Script(`${code}\n;batchMap;`);
+    const candidate = script.runInContext(context, { timeout: timeoutMs });
+    if (typeof candidate !== 'function') {
+      return undefined;
+    }
+    return candidate;
   }
 
   private async recordVerifiedEvidence(userId: string, skillId: string, proficiency: number): Promise<SkillEvidence> {
@@ -273,6 +345,104 @@ ORDER BY c.name ASC;`,
 
     return newEv;
   }
+}
+
+function normalizeValue(value: any): any {
+  if (typeof value === 'number') {
+    return Math.round(value * 100) / 100;
+  }
+  if (value instanceof Uint8Array) {
+    return Array.from(value);
+  }
+  return value;
+}
+
+function normalizeRows(rows: any[]): Array<Record<string, any>> {
+  return rows.map(row => {
+    const out: Record<string, any> = {};
+    for (const key of Object.keys(row)) {
+      out[key] = normalizeValue(row[key]);
+    }
+    return out;
+  });
+}
+
+let sqlJsPromise: Promise<SqlJsStatic> | null = null;
+
+function getSqlJs(): Promise<SqlJsStatic> {
+  if (!sqlJsPromise) {
+    // Locate the WASM binary shipped with sql.js, regardless of CJS/ESM loader.
+    let wasmPath = '';
+    try {
+      wasmPath = require.resolve('sql.js/dist/sql-wasm.wasm');
+    } catch {
+      wasmPath = '';
+    }
+    sqlJsPromise = initSqlJs({
+      locateFile: () => wasmPath || 'sql-wasm.wasm'
+    });
+  }
+  return sqlJsPromise;
+}
+
+async function runInMemoryDb(schemaSql: string, seedSql: string): Promise<Database> {
+  const SQL = await getSqlJs();
+  const db = new SQL.Database();
+  db.run(schemaSql);
+  db.run(seedSql);
+  return db;
+}
+
+function mapResult(db: Database, sql: string): any[] {
+  const results = db.exec(sql);
+  if (!results || results.length === 0) {
+    return [];
+  }
+  const { columns, values } = results[0];
+  return values.map(row => {
+    const obj: Record<string, any> = {};
+    columns.forEach((col, idx) => {
+      obj[col] = row[idx];
+    });
+    return obj;
+  });
+}
+
+function rowsMatch(expected: Array<Record<string, any>>, actual: Array<Record<string, any>>): boolean {
+  if (expected.length !== actual.length) {
+    return false;
+  }
+  for (let i = 0; i < expected.length; i++) {
+    const e = expected[i];
+    const a = actual[i];
+    const eKeys = Object.keys(e).sort();
+    const aKeys = Object.keys(a).sort();
+    if (JSON.stringify(eKeys) !== JSON.stringify(aKeys)) {
+      return false;
+    }
+    for (const key of eKeys) {
+      if (JSON.stringify(a[key]) !== JSON.stringify(e[key])) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('Execution timed out')), ms);
+    promise.then(
+      value => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      err => {
+        clearTimeout(timer);
+        reject(err);
+      }
+    );
+  });
 }
 
 export const sandboxService = new SandboxService();

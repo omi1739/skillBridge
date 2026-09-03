@@ -1,6 +1,7 @@
 import { ProjectEvidence, SkillEvidence } from '@skillbridge/types';
 import { store } from '../store';
 import { gapService } from './gap.service';
+import { GitHubVerifier, githubVerifier, RepoVerification } from './github-verifier.service';
 
 const SKILL_MAPPING: Record<string, string> = {
   'JavaScript': 'skill_javascript',
@@ -14,6 +15,12 @@ const SKILL_MAPPING: Record<string, string> = {
 };
 
 export class ProjectService {
+  private readonly verifier: GitHubVerifier;
+
+  constructor(verifier: GitHubVerifier = githubVerifier) {
+    this.verifier = verifier;
+  }
+
   public async getProjects(userId: string = 'demo_user_01'): Promise<ProjectEvidence[]> {
     return store.getProjects(userId);
   }
@@ -26,20 +33,27 @@ export class ProjectService {
       description: string;
       primarySkills: string[];
     }
-  ): Promise<{ project: ProjectEvidence; verifiedSkills: string[] }> {
+  ): Promise<{ project: ProjectEvidence; verifiedSkills: string[]; verification?: RepoVerification }> {
     const userProjects = await store.getProjects(userId);
 
     const descLower = (data.description + ' ' + data.title + ' ' + data.repoUrl).toLowerCase();
 
-    const hasDocker = descLower.includes('docker') || descLower.includes('compose');
-    const hasTests = descLower.includes('test') || descLower.includes('jest') || descLower.includes('mocha');
-    const hasReadme = true;
-
     const detectedStack: string[] = ['JavaScript / TypeScript'];
     if (descLower.includes('node') || descLower.includes('express')) detectedStack.push('Node.js / Express');
     if (descLower.includes('postgres') || descLower.includes('sql')) detectedStack.push('PostgreSQL');
-    if (hasDocker) detectedStack.push('Docker');
-    if (hasTests) detectedStack.push('Unit & Integration Tests');
+    if (descLower.includes('docker')) detectedStack.push('Docker');
+    if (descLower.includes('test') || descLower.includes('jest') || descLower.includes('mocha')) detectedStack.push('Unit & Integration Tests');
+
+    // Verify the real repository against GitHub
+    const verification = await this.verifier.verify(data.repoUrl);
+    const hasTests = verification.hasTests;
+    const hasDocker = verification.hasDocker;
+    const hasReadme = verification.hasReadme;
+    const verificationStatus: ProjectEvidence['verificationStatus'] = verification.verified
+      ? 'VERIFIED'
+      : verification.reachable
+        ? 'NEEDS_REVIEW'
+        : 'PENDING';
 
     const project: ProjectEvidence = {
       id: `proj_${Date.now()}`,
@@ -52,21 +66,24 @@ export class ProjectService {
       hasTests,
       hasDocker,
       hasReadme,
-      commitCountEstimate: Math.floor(Math.random() * 30) + 20,
-      verificationStatus: 'VERIFIED',
+      commitCountEstimate: verification.commitCount,
+      verificationStatus,
       submittedAt: new Date().toISOString()
     };
 
     userProjects.push(project);
     await store.saveProjects(userId, userProjects);
 
-    // Record high-confidence PROJECT evidence for primary skills
+    // Record project evidence with confidence that reflects real verification.
     const userEvidence = await store.getEvidence(userId);
     const verifiedSkills: string[] = [];
+    const confidence = verification.verified ? 'HIGH' : 'MEDIUM';
 
     for (const skillName of data.primarySkills) {
       const skillId = SKILL_MAPPING[skillName] || `skill_${skillName.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
-      verifiedSkills.push(skillName);
+      if (verification.verified) {
+        verifiedSkills.push(skillName);
+      }
 
       const existingIdx = userEvidence.findIndex(e => e.skillId === skillId && e.sourceType === 'PROJECT');
       const newEv: SkillEvidence = {
@@ -75,12 +92,13 @@ export class ProjectService {
         skillId,
         sourceType: 'PROJECT',
         sourceId: project.id,
-        proficiencyScore: 0.90,
-        confidence: 'HIGH',
+        proficiencyScore: verification.verified ? 0.90 : 0.65,
+        confidence: confidence as SkillEvidence['confidence'],
         metadata: {
           repoUrl: project.repoUrl,
           hasTests,
-          hasDocker
+          hasDocker,
+          verificationStatus
         },
         createdAt: new Date().toISOString()
       };
@@ -94,18 +112,20 @@ export class ProjectService {
 
     await store.saveEvidence(userId, userEvidence);
 
-    // Mark matching CAPSTONE recommendations completed
-    const recs = await store.getRecommendations(userId);
-    for (const rec of recs) {
-      if (rec.type === 'CAPSTONE_PROJECT') {
-        await store.updateRecommendationStatus(userId, rec.id, 'COMPLETED');
+    // Mark matching CAPSTONE recommendations completed only for verified repos
+    if (verification.verified) {
+      const recs = await store.getRecommendations(userId);
+      for (const rec of recs) {
+        if (rec.type === 'CAPSTONE_PROJECT') {
+          await store.updateRecommendationStatus(userId, rec.id, 'COMPLETED');
+        }
       }
     }
 
     // Recalculate skill gaps
     await gapService.calculateGaps(userId, 'role_junior_backend');
 
-    return { project, verifiedSkills };
+    return { project, verifiedSkills, verification };
   }
 }
 
