@@ -15,6 +15,17 @@ const BACKEND_HINTS = [
   'server', 'server-side', 'cloud', 'devops', 'docker', 'redis'
 ];
 
+// Job families that are clearly NOT software engineering roles — reject even
+// if the description happens to mention a dev skill keyword.
+const NON_DEV_TITLE = [
+  'account executive', 'account manager', 'sales', 'marketing', 'customer success',
+  'customer service', 'business development', 'recruiter', 'hr ', 'human resource',
+  'finance', 'accountant', 'support specialist', 'content', 'copywriter',
+  'designer', 'product manager', 'scrum master', 'analyst', 'data analyst',
+  'operations', 'administrative', 'sales representative', 'accountant',
+  'talent', 'people ops', 'community', 'brand', 'legal', 'compliance'
+];
+
 interface RawJob {
   externalId: string;
   title: string;
@@ -52,19 +63,29 @@ export class IngestionService {
    * them (with full provenance: source, external id, posting url) into the
    * store, then recompute market demand from the resulting dataset.
    */
-  async ingest(params?: { sourceUrl?: string; minMatches?: number }): Promise<{
+  async ingest(params?: { sourceUrl?: string; minMatches?: number; replace?: boolean }): Promise<{
     fetched: number;
     classified: number;
     inserted: number;
     updated: number;
+    removed: number;
     recomputedRoles: number;
     totalJobs: number;
     source: string;
   }> {
     const sourceUrl = params?.sourceUrl || process.env.JOB_API_URL || 'https://www.arbeitnow.com/api/job-board-api';
     const minMatches = params?.minMatches ?? 1;
+    const replace = params?.replace ?? false;
     const sourceName = (process.env.JOB_SOURCE_NAME || 'Arbeitnow').trim();
     const sourceId = await store.ensureJobSource(sourceName, 'API', 'Free public job-board API. Link back and do not abuse. See Arbeitnow terms of service.');
+
+    // Replacing clears this source's previously-ingested jobs first so a
+    // re-sync with a stricter classifier (or expired listings) stays accurate.
+    let removed = 0;
+    if (replace) {
+      removed = await store.deleteJobsBySource(sourceId);
+      this.logger.log(`Cleared ${removed} previously ingested jobs for source "${sourceName}".`);
+    }
 
     const skills = await store.getSkills();
     const raw = await this.fetchRaw(sourceUrl);
@@ -101,13 +122,14 @@ export class IngestionService {
     await this.bustCaches();
 
     this.logger.log(
-      `Ingestion complete: fetched=${raw.length} classified=${built.length} inserted=${inserted} updated=${updated} totalJobs=${recomputed.totalJobs}`
+      `Ingestion complete: fetched=${raw.length} classified=${built.length} inserted=${inserted} updated=${updated} removed=${removed} totalJobs=${recomputed.totalJobs}`
     );
     return {
       fetched: raw.length,
       classified: built.length,
       inserted,
       updated,
+      removed,
       recomputedRoles: recomputed.updatedRoles,
       totalJobs: recomputed.totalJobs,
       source: sourceName
@@ -248,9 +270,19 @@ export class IngestionService {
 
     // A backend hint alone is a weak signal; require the min skill matches
     // unless a strong backend title keyword was present.
-    const strongTitleHint = /backend|back-end|back end|node|express|nest|devops|api/.test(item.title.toLowerCase());
-    if (!isBackendByHint && !strongTitleHint) return null;
-    if (!strongTitleHint && matched.length < minMatches) return null;
+    const titleLower = item.title.toLowerCase();
+    const strongTitleHint = /backend|back-end|back end|node|express|nest|devops|api|software|engineer|developer/.test(titleLower);
+
+    // Reject obvious non-engineering job families even if the description
+    // contains a dev skill keyword (e.g. a sales role mentioning "SQL").
+    if (NON_DEV_TITLE.some(t => titleLower.includes(t))) return null;
+
+    // Every ingested job must actually reference at least one real skill.
+    if (matched.length < Math.max(1, minMatches)) return null;
+
+    // Require a backend/dev signal. A title hint is a strong signal; a body
+    // hint alone still needs at least one matched skill (guaranteed above).
+    if (!strongTitleHint && !isBackendByHint) return null;
 
     const required = matched.map(m => m.skill.id);
     // Jobs that reference a backend skill almost always REQUIRE it; anything

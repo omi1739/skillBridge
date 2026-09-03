@@ -473,6 +473,15 @@ export class AppDataStore {
     }));
   }
 
+  async deleteJobsBySource(sourceId: string): Promise<number> {
+    const rows = await query<{ c: string }>(
+      `WITH removed AS (DELETE FROM jobs WHERE source_id = $1 AND source_id IS NOT NULL RETURNING id)
+       SELECT COUNT(*)::text AS c FROM removed`,
+      [sourceId]
+    );
+    return Number(rows[0]?.c || 0);
+  }
+
   async ensureJobSource(name: string, accessMethod: string, licenseNotes?: string): Promise<string> {
     const rows = await query<any>(
       `INSERT INTO job_sources (name, access_method, license_notes, is_active)
