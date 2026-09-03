@@ -827,7 +827,7 @@ export default function SkillBridgeApp() {
         <div className="page-header">
           <div>
             <h1 className="page-title">{assessment.title}</h1>
-            <p className="page-subtitle">{assessment.questions.length} multi-part questions testing practical Node.js, SQL, and HTTP engineering skills.</p>
+            <p className="page-subtitle">{questions.length} multi-part questions testing practical Node.js, SQL, and HTTP engineering skills.</p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#131722', border: '1px solid var(--border-color)', padding: '0.45rem 0.85rem', borderRadius: '6px', fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}>
             <Clock size={15} color="#93c5fd" />
