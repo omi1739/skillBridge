@@ -695,6 +695,19 @@ body {
   margin-bottom: 1.6rem;
 }
 
+.trust-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.32rem 0.85rem;
+  border-radius: var(--radius-pill);
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(94, 234, 212, 0.28);
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
 .dev-hero-title {
   font-size: clamp(2.1rem, 4.5vw, 3.1rem);
   font-weight: 800;

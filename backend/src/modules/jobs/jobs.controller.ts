@@ -1,7 +1,9 @@
-import { Controller, Get, Param, Query, Inject } from '@nestjs/common';
+import { Controller, Get, Param, Query, Inject, UseGuards } from '@nestjs/common';
 import { JobsService } from './jobs.service';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller('jobs')
+@UseGuards(JwtAuthGuard)
 export class JobsController {
   constructor(@Inject(JobsService) private readonly jobsService: JobsService) {}
 

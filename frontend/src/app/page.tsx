@@ -45,7 +45,10 @@ import {
   Sliders,
   LogIn,
   LogOut,
-  RotateCcw
+  RotateCcw,
+  ShieldCheck,
+  Lock,
+  MapPin
 } from 'lucide-react';
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000/api').replace(/\/$/, '');
@@ -78,6 +81,23 @@ function VerificationBadge({ status }: { status?: VerificationStatus }) {
       lineHeight: 1.4, whiteSpace: 'nowrap' as const
     }}>
       {s === 'EXPIRED' ? '✕' : s === 'EMPLOYER_VERIFIED' ? '★' : '✓'} {badge.label}
+    </span>
+  );
+}
+
+function RemoteBadge({ isRemote, location }: { isRemote?: boolean; location?: string }) {
+  const remote = !!isRemote;
+  const loc = remote ? (location && !/remote|work from home|wfh/i.test(location) ? location : 'Work from Home') : (location || 'Onsite');
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
+      fontSize: '0.6rem', fontWeight: 600, padding: '0.1rem 0.45rem',
+      borderRadius: '9999px', whiteSpace: 'nowrap' as const,
+      background: remote ? '#ccfbf1' : '#e2e8f0',
+      color: remote ? '#0f766e' : '#475569',
+      border: remote ? '1px solid #5eead4' : '1px solid #cbd5e1'
+    }}>
+      {remote ? '🏠' : '🏢'} {remote ? 'Remote / WFH' : loc}
     </span>
   );
 }
@@ -159,6 +179,7 @@ export default function SkillBridgeApp() {
   const [recommendations, setRecommendations] = useState<ActionRecommendation[]>([]);
   const [jobMatches, setJobMatches] = useState<JobMatchResult[]>([]);
   const [expandedMatchId, setExpandedMatchId] = useState<string | null>(null);
+  const [jobRemoteFilter, setJobRemoteFilter] = useState<'ALL' | 'REMOTE' | 'ONSITE'>('ALL');
   const [userProjects, setUserProjects] = useState<ProjectEvidence[]>([]);
 
   // Project submission modal state
@@ -201,29 +222,64 @@ export default function SkillBridgeApp() {
     return headers;
   };
 
-  const refreshUserData = (userId = activeUserId, role?: string) => {
-    fetch(`${API_BASE}/me/gaps?userId=${userId}&roleId=role_junior_backend`)
+  const headersFor = (t?: string | null) => {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const token = t || authToken;
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    return headers;
+  };
+
+  // Raw job postings are only served to authenticated members. This also
+  // powers the public market view's posting drilldown once a user signs in.
+  const fetchJobs = (t?: string | null) => {
+    if (!(t || authToken)) {
+      setAllJobs([]);
+      return;
+    }
+    fetch(`${API_BASE}/jobs`, { headers: headersFor(t) })
+      .then(res => (res.ok ? res.json() : Promise.reject(res)))
+      .then(data => {
+        if (Array.isArray(data)) {
+          setAllJobs(data);
+          setExpandedSkillPostings(null);
+        }
+      })
+      .catch(() => setAllJobs([]));
+  };
+
+  const refreshUserData = (userId = activeUserId, role?: string, t?: string | null) => {
+    if (!(t || authToken)) {
+      setGaps([]);
+      setRecommendations([]);
+      setJobMatches([]);
+      setUserProjects([]);
+      setAdminOverview(null);
+      return;
+    }
+    const token = t || authToken;
+
+    fetch(`${API_BASE}/me/gaps?userId=${userId}&roleId=role_junior_backend`, { headers: headersFor(token) })
       .then(res => res.json())
       .then(data => { if (Array.isArray(data)) setGaps(data); })
       .catch((err) => console.error('[SkillBridge] Data load failed:', err));
 
-    fetch(`${API_BASE}/me/recommendations?userId=${userId}&roleId=role_junior_backend`)
+    fetch(`${API_BASE}/me/recommendations?userId=${userId}&roleId=role_junior_backend`, { headers: headersFor(token) })
       .then(res => res.json())
       .then(data => { if (Array.isArray(data)) setRecommendations(data); })
       .catch((err) => console.error('[SkillBridge] Data load failed:', err));
 
-    fetch(`${API_BASE}/jobs/matches?userId=${userId}&roleId=role_junior_backend`)
+    fetch(`${API_BASE}/jobs/matches?userId=${userId}&roleId=role_junior_backend`, { headers: headersFor(token) })
       .then(res => res.json())
       .then(data => { if (Array.isArray(data)) setJobMatches(data); })
       .catch((err) => console.error('[SkillBridge] Data load failed:', err));
 
-    fetch(`${API_BASE}/me/projects?userId=${userId}`)
+    fetch(`${API_BASE}/me/projects?userId=${userId}`, { headers: headersFor(token) })
       .then(res => res.json())
       .then(data => setUserProjects(data))
       .catch((err) => console.error('[SkillBridge] Data load failed:', err));
 
     if (role === 'ADMIN') {
-      fetch(`${API_BASE}/admin/overview`, { headers: authHeaders() })
+      fetch(`${API_BASE}/admin/overview`, { headers: headersFor(token) })
         .then(res => (res.ok ? res.json() : Promise.reject(res)))
         .then(data => setAdminOverview(data))
         .catch((err) => {
@@ -233,6 +289,8 @@ export default function SkillBridgeApp() {
     } else {
       setAdminOverview(null);
     }
+
+    fetchJobs(token);
   };
 
   const fetchRoleAndSkills = () => {
@@ -289,11 +347,6 @@ export default function SkillBridgeApp() {
       .then(data => setCurriculumAnalysis(data))
       .catch((err) => console.error('[SkillBridge] Data load failed:', err));
 
-    fetch(`${API_BASE}/jobs`)
-      .then(res => res.json())
-      .then(data => { if (Array.isArray(data)) setAllJobs(data); })
-      .catch((err) => console.error('[SkillBridge] Jobs load failed:', err));
-
     fetch(`${API_BASE}/stats`)
       .then(res => res.json())
       .then(data => setLandingStats(data))
@@ -318,17 +371,21 @@ export default function SkillBridgeApp() {
     const savedProfile = localStorage.getItem('skillbridge_profile');
     if (savedToken && savedUser && savedProfile) {
       try {
-        setCurrentUser(JSON.parse(savedUser));
-        setCurrentProfile(JSON.parse(savedProfile));
+        const restoredUser = JSON.parse(savedUser);
+        const restoredProfile = JSON.parse(savedProfile);
+        setCurrentUser(restoredUser);
+        setCurrentProfile(restoredProfile);
         setAuthToken(savedToken);
+        refreshUserData(restoredUser.id, restoredUser.role, savedToken);
       } catch {
         localStorage.removeItem('skillbridge_token');
         localStorage.removeItem('skillbridge_user');
         localStorage.removeItem('skillbridge_profile');
       }
+    } else {
+      setAllJobs([]);
+      setJobMatches([]);
     }
-
-    refreshUserData();
   }, []);
 
   useEffect(() => {
@@ -360,7 +417,7 @@ export default function SkillBridgeApp() {
         localStorage.setItem('skillbridge_profile', JSON.stringify(data.profile));
         setShowAuthModal(false);
         setActiveTab('market');
-        refreshUserData('demo_user_01', data.user.role);
+        refreshUserData('demo_user_01', data.user.role, token);
       }
     } catch (err) {
       console.error(err);
@@ -424,7 +481,7 @@ export default function SkillBridgeApp() {
     setShowAuthModal(false);
     setAuthForm({ email: '', password: '', confirmPassword: '', fullName: '', currentStatus: '', targetRoleId: 'role_junior_backend' });
     setActiveTab('market');
-    refreshUserData(data.user.id, data.user.role);
+    refreshUserData(data.user.id, data.user.role, data.token);
   };
 
   const handleGoogleCredential = async (credential: string) => {
@@ -460,6 +517,12 @@ export default function SkillBridgeApp() {
     setCurrentUser(null);
     setCurrentProfile(null);
     setAuthToken(null);
+    setAllJobs([]);
+    setJobMatches([]);
+    setGaps([]);
+    setRecommendations([]);
+    setUserProjects([]);
+    setExpandedSkillPostings(null);
     setPublicView('home');
     setActiveTab('market');
   };
@@ -728,13 +791,18 @@ export default function SkillBridgeApp() {
       ? `${employerCount} tech employers ${sourceList ? `• Source: ${sourceList}` : ''} • Synced ${lastSync}`
       : 'Live data loading…';
 
+    const remoteCount = allJobs.filter(j => j.isRemote).length;
+    const remoteSplit = currentUser
+      ? `• ${remoteCount} remote/WFH • ${allJobs.length - remoteCount} onsite`
+      : '• Login to see remote/WFH vs onsite breakout';
+
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         <div className="page-header">
           <div>
             <h1 className="page-title">Junior Backend Job Market Demand</h1>
             <p className="page-subtitle">
-              Empirical market requirements derived dynamically from {totalJobsCount} verified junior backend job postings in {role.marketContext.region}.
+              Empirical market requirements derived dynamically from {totalJobsCount} verified junior backend job postings — remote / work-from-home and onsite — in {role.marketContext.region}.
             </p>
           </div>
         </div>
@@ -754,6 +822,7 @@ export default function SkillBridgeApp() {
             <div className="stat-label">Live Postings Catalog</div>
             <div className="stat-value" style={{ fontSize: '1.25rem', color: 'var(--text-link)' }}>N = {totalJobsCount} Postings</div>
             <div className="stat-sub">{sourcesText}</div>
+            <div className="stat-sub">{remoteSplit}</div>
           </div>
         </div>
 
@@ -794,9 +863,16 @@ export default function SkillBridgeApp() {
                       </span>
                     </div>
                     <button
-                      onClick={() => setExpandedSkillPostings(
-                        isExpanded ? null : { skillId: rs.skillId, postings: matchingPostings }
-                      )}
+                      onClick={() => {
+                        if (!currentUser) {
+                          setAuthMode('LOGIN');
+                          setShowAuthModal(true);
+                          return;
+                        }
+                        setExpandedSkillPostings(
+                          isExpanded ? null : { skillId: rs.skillId, postings: matchingPostings }
+                        );
+                      }}
                       style={{
                         fontWeight: 700,
                         fontFamily: 'var(--font-mono)',
@@ -806,7 +882,7 @@ export default function SkillBridgeApp() {
                         cursor: 'pointer',
                         textDecoration: 'underline dotted'
                       }}
-                      title="Show the real postings used to compute this value"
+                      title={currentUser ? "Show the real postings used to compute this value" : "Sign in to see the real postings behind this percentage"}
                     >
                       {pct}% of jobs
                     </button>
@@ -820,10 +896,30 @@ export default function SkillBridgeApp() {
                   </div>
 
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                    Target Level: <strong>{rs.proficiencyTarget}</strong> • Role Weight: <strong>{rs.roleWeight * 100}%</strong> • {matchingPostings.length} of {totalJobsCount} postings
+                    Target Level: <strong>{rs.proficiencyTarget}</strong> • Role Weight: <strong>{rs.roleWeight * 100}%</strong>
+                    {currentUser ? <> • {matchingPostings.length} of {totalJobsCount} postings</> : null}
                   </div>
 
-                  {isExpanded && (
+                  {isExpanded && !currentUser && (
+                    <div style={{ marginTop: '0.6rem', border: '1px solid var(--border-faint)', borderRadius: '6px', padding: '1rem', background: 'var(--bg-row)', textAlign: 'center' }}>
+                      <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
+                        See the individual job postings
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+                        Create a free account or log in to view the real, verified postings behind each percentage.
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                        <button className="btn btn-primary" style={{ fontSize: '0.8rem', padding: '0.4rem 0.9rem' }} onClick={handleDemoLogin}>
+                          Try Live Demo <Sparkles size={13} />
+                        </button>
+                        <button className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '0.4rem 0.9rem' }} onClick={() => { setAuthMode('REGISTER'); setShowAuthModal(true); }}>
+                          Register Free
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {isExpanded && currentUser && (
                     <div style={{ marginTop: '0.6rem', border: '1px solid var(--border-faint)', borderRadius: '6px', padding: '0.7rem', background: 'var(--bg-row)' }}>
                       <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
                         Verifiable source postings
@@ -1395,25 +1491,60 @@ export default function SkillBridgeApp() {
   };
 
   const renderJobsView = () => {
+    const filteredMatches = jobMatches.filter(match => {
+      if (jobRemoteFilter === 'REMOTE') return !!match.job.isRemote;
+      if (jobRemoteFilter === 'ONSITE') return !match.job.isRemote;
+      return true;
+    });
+    const remoteCount = jobMatches.filter(m => m.job.isRemote).length;
+
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         <div className="page-header">
           <div>
             <h1 className="page-title">Matching Backend Jobs</h1>
             <p className="page-subtitle">
-              Compatibility scores computed directly against your demonstrated skill evidence with full requirement traceability.
+              Compatibility scores computed directly against your demonstrated skill evidence, with full requirement traceability and verified remote / work-from-home availability.
             </p>
           </div>
         </div>
 
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            {([
+              { key: 'ALL', label: `All (${jobMatches.length})` },
+              { key: 'REMOTE', label: `Remote / WFH (${remoteCount})` },
+              { key: 'ONSITE', label: `Onsite (${jobMatches.length - remoteCount})` }
+            ] as const).map(o => (
+              <button
+                key={o.key}
+                className={`btn ${jobRemoteFilter === o.key ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setJobRemoteFilter(o.key)}
+                style={{ fontSize: '0.8rem', padding: '0.4rem 0.85rem' }}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {jobMatches.map(match => (
+          {filteredMatches.length === 0 && (
+            <div className="card" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+              {jobMatches.length === 0
+                ? 'No matching jobs yet — sign in and take the diagnostic to see tailored backend postings.'
+                : 'No jobs match the selected filter.'}
+            </div>
+          )}
+          {filteredMatches.map(match => (
             <div key={match.job.id} className="card">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
                 <div>
                   <h3 style={{ fontSize: '1.15rem', fontWeight: 700 }}>{match.job.title}</h3>
-                  <div style={{ color: '#60a5fa', fontSize: '0.85rem', fontWeight: 500, marginTop: '0.15rem' }}>
-                    {match.job.company} • <span style={{ color: 'var(--text-muted)' }}>{match.job.location}</span>
+                  <div style={{ color: '#60a5fa', fontSize: '0.85rem', fontWeight: 500, marginTop: '0.15rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    {match.job.company}
+                    {match.job.location ? <span style={{ color: 'var(--text-muted)' }}>• {match.job.location}</span> : null}
+                    <RemoteBadge isRemote={match.job.isRemote} location={match.job.location} />
                   </div>
                 </div>
 
@@ -1629,7 +1760,7 @@ export default function SkillBridgeApp() {
             Real job requirements, measured against real skills.
           </h1>
           <p className="dev-hero-desc">
-            SkillBridge continuously analyzes junior backend job postings from verified employers, then tests your SQL and Node.js skills in a live sandbox to show exactly what to learn next.
+            SkillBridge continuously analyzes junior backend job postings from verified employers — including remote / work-from-home roles — then tests your SQL and Node.js skills in a live sandbox to show exactly what to learn next.
           </p>
 
           <div className="landing-actions">
@@ -1642,6 +1773,13 @@ export default function SkillBridgeApp() {
             <button className="btn btn-secondary" onClick={() => setPublicView('curriculum')} style={{ padding: '0.7rem 1.4rem', fontSize: '0.9rem' }}>
               <GraduationCap size={16} /> University vs Reality ({totalCurriculaCount})
             </button>
+          </div>
+
+          <div style={{ marginTop: '1.5rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <span className="trust-pill"><CheckCircle2 size={13} color="#5eead4" /> 100% real &amp; safe</span>
+            <span className="trust-pill"><ShieldCheck size={13} color="#5eead4" /> Source-verified postings</span>
+            <span className="trust-pill"><Lock size={13} color="#5eead4" /> Job listings for registered users only</span>
+            <span className="trust-pill"><Briefcase size={13} color="#5eead4" /> Remote / Work-from-home &amp; onsite</span>
           </div>
 
           <div className="stat-grid-3" style={{ marginTop: '2.5rem', textAlign: 'left' }}>

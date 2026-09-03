@@ -460,7 +460,8 @@ export class AppDataStore {
       sourceAccessMethod: j.source_access_method || undefined,
       externalId: j.external_id || undefined,
       verificationStatus: j.verification_status || 'UNVERIFIED',
-      lastVerifiedAt: j.last_verified_at || null
+      lastVerifiedAt: j.last_verified_at || null,
+      isRemote: j.is_remote ? true : false
     }));
   }
 
@@ -702,6 +703,7 @@ export class AppDataStore {
     description: string;
     postingUrl: string;
     postedAt?: string;
+    isRemote?: boolean;
     requiredSkillIds?: string[];
     preferredSkillIds?: string[];
   }>): Promise<{ inserted: number; updated: number }> {
@@ -712,18 +714,20 @@ export class AppDataStore {
         const id = `job_src_${this.effectiveCompanyKey(j)}_${this.hashExternal(j.externalId)}`;
         const upsert = await client.query(
           `INSERT INTO jobs
-             (id, source_id, external_id, title, company, location, experience_level, role_id, description, posting_url, posted_at, verification_status, last_verified_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::timestamptz,'SOURCE_VERIFIED',CURRENT_TIMESTAMP)
+             (id, source_id, external_id, title, company, location, experience_level, role_id, description, posting_url, posted_at, is_remote, verification_status, last_verified_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::timestamptz,$12::boolean,'SOURCE_VERIFIED',CURRENT_TIMESTAMP)
            ON CONFLICT (source_id, external_id)
            DO UPDATE SET title=EXCLUDED.title, company=EXCLUDED.company,
              location=EXCLUDED.location, experience_level=EXCLUDED.experience_level,
              role_id=EXCLUDED.role_id, description=EXCLUDED.description,
              posting_url=EXCLUDED.posting_url, posted_at=EXCLUDED.posted_at,
+             is_remote=EXCLUDED.is_remote,
              verification_status='SOURCE_VERIFIED', last_verified_at=CURRENT_TIMESTAMP
            RETURNING (xmax = 0) AS freshly_inserted`,
           [id, j.sourceId, j.externalId, j.title, j.company, j.location,
            j.experienceLevel, j.roleId, j.description, j.postingUrl,
-           j.postedAt || new Date().toISOString()]
+           j.postedAt || new Date().toISOString(),
+           j.isRemote ? true : false]
         );
         if (upsert.rows[0]?.freshly_inserted) inserted++;
         else if (upsert.rows.length) updated++;

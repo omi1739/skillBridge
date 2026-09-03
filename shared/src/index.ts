@@ -224,6 +224,7 @@ export interface JobListing {
   externalId?: string;
   verificationStatus?: VerificationStatus;
   lastVerifiedAt?: string | null;
+  isRemote?: boolean;
 }
 
 export type JobSourceType =

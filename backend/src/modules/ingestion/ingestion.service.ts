@@ -34,6 +34,7 @@ interface RawJob {
   description: string;
   postingUrl: string;
   postedAt?: string;
+  isRemote?: boolean;
 }
 
 interface ArbeitnowItem {
@@ -113,6 +114,7 @@ export class IngestionService {
         description: classification.description,
         postingUrl: classification.postingUrl,
         postedAt: classification.postedAt,
+        isRemote: classification.isRemote,
         requiredSkillIds: classification.requiredSkills,
         preferredSkillIds: classification.preferredSkills
       });
@@ -242,7 +244,8 @@ export class IngestionService {
             location: it.location || '',
             description,
             postingUrl: it.url || '',
-            postedAt: this.toIsoDate(it.created_at)
+            postedAt: this.toIsoDate(it.created_at),
+            isRemote: this.isRemotePosting(it)
           });
         }
         // Polite throttle between pages.
@@ -266,6 +269,7 @@ export class IngestionService {
     description: string;
     postingUrl: string;
     postedAt?: string;
+    isRemote?: boolean;
     requiredSkills: string[];
     preferredSkills: string[];
   } | null {
@@ -314,9 +318,30 @@ export class IngestionService {
       description: item.description.slice(0, 4000),
       postingUrl: item.postingUrl,
       postedAt: item.postedAt,
+      isRemote: item.isRemote,
       requiredSkills,
       preferredSkills
     };
+  }
+
+  private isRemotePosting(it: ArbeitnowItem): boolean {
+    // Strongest signal first: the API explicitly marks the role as remote.
+    if (it.remote === true) return true;
+    // "Remote-friendly" job types (e.g. remote, hybrid as remote-capable).
+    const types = (it.job_types || []).map(t => t.toLowerCase());
+    if (types.some(t => /remote|work from home|wfh|fully remote/.test(t))) return true;
+
+    const location = (it.location || '').toLowerCase();
+    if (/remote|work from home|wfh|anywhere|worldwide|fully remote/i.test(location)) return true;
+
+    const title = (it.title || '').toLowerCase();
+    if (/remote|work from home|\bwfh\b|fully remote|remote-first/i.test(title)) return true;
+
+    const desc = this.stripHtml(it.description || '').toLowerCase();
+    // Avoid over-matching; only flag when the description strongly commits to remote.
+    if (/(fully remote|100% remote|remote-first|work from anywhere|work from home)/.test(desc)) return true;
+
+    return false;
   }
 
   private stripHtml(html: string): string {

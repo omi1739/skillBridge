@@ -107,6 +107,8 @@ CREATE TABLE IF NOT EXISTS jobs (
     posting_url VARCHAR(500),
     verification_status VARCHAR(50) DEFAULT 'UNVERIFIED',  -- EMPLOYER_VERIFIED, SOURCE_VERIFIED, RECENTLY_CHECKED, EXTERNAL_SOURCE, EXPIRED, UNVERIFIED
     last_verified_at TIMESTAMP WITH TIME ZONE,
+    is_remote BOOLEAN DEFAULT FALSE,        -- true = remote / work-from-home
+    deadline TIMESTAMP WITH TIME ZONE,
     posted_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -250,6 +252,8 @@ CREATE INDEX IF NOT EXISTS idx_projects_user ON projects(user_id);
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS posting_url VARCHAR(500);
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS verification_status VARCHAR(50) DEFAULT 'UNVERIFIED';
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS last_verified_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS is_remote BOOLEAN DEFAULT FALSE;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS deadline TIMESTAMP WITH TIME ZONE;
 
 ALTER TABLE job_sources ADD COLUMN IF NOT EXISTS source_type VARCHAR(50) DEFAULT 'API';
 ALTER TABLE job_sources ADD COLUMN IF NOT EXISTS website VARCHAR(255);
@@ -269,3 +273,4 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_job_sources_name ON job_sources(name);
 CREATE INDEX IF NOT EXISTS idx_jobs_role ON jobs(role_id);
 CREATE INDEX IF NOT EXISTS idx_job_skills_skill ON job_skills(skill_id);
 CREATE INDEX IF NOT EXISTS idx_jobs_verification ON jobs(verification_status);
+CREATE INDEX IF NOT EXISTS idx_jobs_remote ON jobs(is_remote);
