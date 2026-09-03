@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Role,
   Assessment,
@@ -59,19 +59,20 @@ const CURRENT_STATUS_OPTIONS = [
 
 const AUTH_INPUT_STYLE: React.CSSProperties = {
   width: '100%',
-  padding: '0.65rem',
-  background: '#0a0c10',
+  padding: '0.65rem 0.85rem',
+  background: 'var(--bg-input)',
   border: '1px solid var(--border-color)',
-  borderRadius: '6px',
-  color: '#fff',
+  borderRadius: '7px',
+  color: 'var(--text-primary)',
   fontSize: '0.85rem'
 };
 
 const AUTH_LABEL_STYLE: React.CSSProperties = {
   display: 'block',
   fontSize: '0.75rem',
-  color: 'var(--text-muted)',
-  marginBottom: '0.3rem'
+  color: 'var(--text-secondary)',
+  fontWeight: 500,
+  marginBottom: '0.35rem'
 };
 
 export default function SkillBridgeApp() {
@@ -99,6 +100,7 @@ export default function SkillBridgeApp() {
   // Core domain data
   const [role, setRole] = useState<Role | null>(null);
   const [skills, setSkills] = useState<Skill[]>([]);
+  const [allJobs, setAllJobs] = useState<any[]>([]);
   const [assessment, setAssessment] = useState<Assessment | null>(null);
   const [challenges, setChallenges] = useState<any[]>([]);
   const [curricula, setCurricula] = useState<CurriculumProfile[]>([]);
@@ -149,7 +151,13 @@ export default function SkillBridgeApp() {
   const [aliasSaveSuccess, setAliasSaveSuccess] = useState(false);
 
   // Landing page market stats (dynamic counts)
-  const [landingStats, setLandingStats] = useState<{ jobPostings: number; canonicalSkills: number; validationPercent: number } | null>(null);
+  const [landingStats, setLandingStats] = useState<{
+    jobPostings: number;
+    canonicalSkills: number;
+    validationPercent: number;
+    curriculaCount?: number;
+    activeCompanies?: number;
+  } | null>(null);
 
   const activeUserId = currentUser ? currentUser.id : 'demo_user_01';
 
@@ -246,6 +254,11 @@ export default function SkillBridgeApp() {
       .then(res => res.json())
       .then(data => setCurriculumAnalysis(data))
       .catch((err) => console.error('[SkillBridge] Data load failed:', err));
+
+    fetch(`${API_BASE}/jobs`)
+      .then(res => res.json())
+      .then(data => { if (Array.isArray(data)) setAllJobs(data); })
+      .catch((err) => console.error('[SkillBridge] Jobs load failed:', err));
 
     fetch(`${API_BASE}/stats`)
       .then(res => res.json())
@@ -391,18 +404,7 @@ export default function SkillBridgeApp() {
     }
   };
 
-  const handleGoogleLogin = () => {
-    const g = (window as any).google?.accounts?.id;
-    if (!g) {
-      setAuthError('Google Sign-In is not available. Try a different sign-in method.');
-      return;
-    }
-    g.prompt((notification: any) => {
-      if (notification?.isNotDisplayed || notification?.isSkippedMoment) {
-        setAuthError('Google Sign-In popup did not appear. Please try again.');
-      }
-    });
-  };
+  const googleBtnRef = useRef<HTMLDivElement>(null);
 
   const handleLogout = () => {
     localStorage.removeItem('skillbridge_token');
@@ -505,22 +507,27 @@ export default function SkillBridgeApp() {
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID || !showAuthModal) return;
     const w = window as any;
-    if (w.google?.accounts?.id) {
+    const initGoogle = () => {
       w.google.accounts.id.initialize({
         client_id: GOOGLE_CLIENT_ID,
-        callback: (resp: any) => { if (resp?.credential) handleGoogleCredential(resp.credential); }
+        callback: (resp: any) => { if (resp?.credential) handleGoogleCredential(resp.credential); },
+        auto_select: false,
       });
-      return;
-    }
+      if (googleBtnRef.current) {
+        googleBtnRef.current.innerHTML = '';
+        w.google.accounts.id.renderButton(googleBtnRef.current, {
+          theme: 'outline',
+          size: 'large',
+          text: 'continue_with',
+          width: googleBtnRef.current.clientWidth || 300,
+        });
+      }
+    };
+    if (w.google?.accounts?.id) { initGoogle(); return; }
     const script = document.createElement('script');
     script.src = 'https://accounts.google.com/gsi/client';
     script.async = true;
-    script.onload = () => {
-      w.google?.accounts?.id?.initialize({
-        client_id: GOOGLE_CLIENT_ID,
-        callback: (resp: any) => { if (resp?.credential) handleGoogleCredential(resp.credential); }
-      });
-    };
+    script.onload = initGoogle;
     document.body.appendChild(script);
     return () => { script.remove(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -662,13 +669,19 @@ export default function SkillBridgeApp() {
 
   const renderMarketView = () => {
     if (!role) return null;
+    const totalJobsCount = landingStats?.jobPostings ?? allJobs.length;
+    const employerCount = new Set(allJobs.map(j => j.company)).size;
+    const sourcesText = employerCount > 0
+      ? `${employerCount} tech employers across the target region`
+      : 'Live data loading…';
+
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         <div className="page-header">
           <div>
             <h1 className="page-title">Junior Backend Job Market Demand</h1>
             <p className="page-subtitle">
-              Empirical data from {landingStats?.jobPostings ?? 142} junior backend job postings in Bangladesh (Dhaka, Chittagong, and remote positions).
+              Empirical market requirements derived dynamically from {totalJobsCount} verified junior backend job postings in {role.marketContext.region}.
             </p>
           </div>
         </div>
@@ -676,18 +689,18 @@ export default function SkillBridgeApp() {
         <div className="stat-grid-3">
           <div className="stat-card">
             <div className="stat-label">Focus Region</div>
-            <div className="stat-value" style={{ fontSize: '1.3rem' }}>{role.marketContext.region}</div>
-            <div className="stat-sub">Dhaka & Regional Tech Hubs</div>
+            <div className="stat-value" style={{ fontSize: '1.25rem' }}>{role.marketContext.region}</div>
+            <div className="stat-sub">{role.marketContext.region}</div>
           </div>
           <div className="stat-card">
             <div className="stat-label">Experience Tier</div>
-            <div className="stat-value" style={{ fontSize: '1.3rem' }}>{role.marketContext.experienceLevel}</div>
-            <div className="stat-sub">0 - 2 Years Experience</div>
+            <div className="stat-value" style={{ fontSize: '1.25rem' }}>{role.marketContext.experienceLevel}</div>
+            <div className="stat-sub">Primary hiring tier for this track</div>
           </div>
           <div className="stat-card">
-            <div className="stat-label">Sample Size</div>
-            <div className="stat-value" style={{ fontSize: '1.3rem', color: '#60a5fa' }}>N = {landingStats?.jobPostings ?? 142} Postings</div>
-            <div className="stat-sub">Bdjobs, LinkedIn & GitHub</div>
+            <div className="stat-label">Live Postings Catalog</div>
+            <div className="stat-value" style={{ fontSize: '1.25rem', color: 'var(--text-link)' }}>N = {totalJobsCount} Postings</div>
+            <div className="stat-sub">{sourcesText}</div>
           </div>
         </div>
 
@@ -1489,71 +1502,83 @@ export default function SkillBridgeApp() {
   };
 
   const renderPublicHome = () => {
+    const totalJobsCount = landingStats?.jobPostings ?? allJobs.length;
+    const totalSkillsCount = landingStats?.canonicalSkills ?? skills.length;
+    const totalCurriculaCount = landingStats?.curriculaCount ?? curricula.length;
+    const totalCompaniesCount = landingStats?.activeCompanies ?? new Set(allJobs.map(j => j.company)).size;
+    const topSkills = (role?.roleSkills || [])
+      .slice()
+      .sort((a, b) => b.marketDemandFrequency - a.marketDemandFrequency)
+      .slice(0, 6);
+
     return (
       <div>
         <div className="dev-hero">
           <div className="dev-hero-tag">
-            <Database size={13} /> {landingStats?.jobPostings ?? 142} Junior Backend Jobs Analyzed in Bangladesh
+            <Database size={13} /> {totalJobsCount} Junior Backend Jobs Analyzed
           </div>
           <h1 className="dev-hero-title">
-            Real job requirements vs what you can actually build.
+            Real job requirements, measured against real skills.
           </h1>
           <p className="dev-hero-desc">
-            We analyzed {landingStats?.jobPostings ?? 142} junior backend engineer job postings in Dhaka and regional tech hubs. Test your SQL and Node.js skills in live sandboxes, see your exact gaps, and build projects that hire.
+            SkillBridge continuously analyzes junior backend job postings from verified employers, then tests your SQL and Node.js skills in a live sandbox to show exactly what to learn next.
           </p>
 
-          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <button className="btn btn-primary" onClick={handleDemoLogin} style={{ padding: '0.65rem 1.25rem', fontSize: '0.9rem' }}>
-              <Sparkles size={16} /> Continue as Demo Candidate (1-Click)
+          <div className="landing-actions">
+            <button className="btn btn-primary" onClick={handleDemoLogin} style={{ padding: '0.7rem 1.4rem', fontSize: '0.9rem' }}>
+              <Sparkles size={16} /> Try a Live Demo
             </button>
-            <button className="btn btn-secondary" onClick={() => setPublicView('market')} style={{ padding: '0.65rem 1.25rem', fontSize: '0.9rem' }}>
-              <TrendingUp size={16} /> View Market Demand
+            <button className="btn btn-secondary" onClick={() => setPublicView('market')} style={{ padding: '0.7rem 1.4rem', fontSize: '0.9rem' }}>
+              <TrendingUp size={16} /> View Market Demand ({totalJobsCount})
             </button>
-            <button className="btn btn-secondary" onClick={() => setPublicView('curriculum')} style={{ padding: '0.65rem 1.25rem', fontSize: '0.9rem' }}>
-              <GraduationCap size={16} /> University vs Reality
+            <button className="btn btn-secondary" onClick={() => setPublicView('curriculum')} style={{ padding: '0.7rem 1.4rem', fontSize: '0.9rem' }}>
+              <GraduationCap size={16} /> University vs Reality ({totalCurriculaCount})
             </button>
           </div>
 
           <div className="stat-grid-3" style={{ marginTop: '2.5rem', textAlign: 'left' }}>
             <div className="stat-card">
               <div className="stat-label">Active Job Postings</div>
-              <div className="stat-value">{landingStats?.jobPostings ?? 142}</div>
-              <div className="stat-sub">Scraped from Bdjobs, LinkedIn & GitHub</div>
+              <div className="stat-value">{totalJobsCount}</div>
+              <div className="stat-sub">Across {totalCompaniesCount} hiring companies</div>
             </div>
             <div className="stat-card">
-              <div className="stat-label">Canonical Backend Skills</div>
-              <div className="stat-value">{landingStats?.canonicalSkills ?? 9}</div>
-              <div className="stat-sub">Mapped with all alias synonyms</div>
+              <div className="stat-label">Canonical Skills</div>
+              <div className="stat-value">{totalSkillsCount}</div>
+              <div className="stat-sub">Normalized ontology with synonyms</div>
             </div>
             <div className="stat-card">
-              <div className="stat-label">Practical Validation</div>
-              <div className="stat-value">{landingStats?.validationPercent ?? 100}%</div>
-              <div className="stat-sub">Live SQL & concurrency test cases</div>
+              <div className="stat-label">Curricula Mapped</div>
+              <div className="stat-value">{totalCurriculaCount}</div>
+              <div className="stat-sub">University syllabi compared in detail</div>
             </div>
           </div>
 
-          <div className="dev-pipeline-grid">
-            <div className="dev-pipeline-card">
-              <div className="dev-pipeline-step">01 / MARKET DATA</div>
-              <h3>Real Job Demands</h3>
-              <p>Frequencies of technologies required by companies in Bangladesh. Know whether Docker or Redis is asked for more often.</p>
+          {topSkills.length > 0 && (
+            <div className="demand-panel">
+              <div className="demand-panel-title">Live Market Data</div>
+              <h2 className="demand-panel-heading">What employers ask for most</h2>
+              <div className="demand-list">
+                {topSkills.map(rs => {
+                  const pct = Math.round(rs.marketDemandFrequency * 100);
+                  return (
+                    <div key={rs.skillId}>
+                      <div className="demand-row-label">
+                        <span className="demand-skill">
+                          <CheckCircle2 size={14} color="#5eead4" />
+                          <span>{rs.skill?.canonicalName || rs.skillId}</span>
+                        </span>
+                        <span className="demand-pct">{pct}% of jobs</span>
+                      </div>
+                      <div className="progress-container" style={{ margin: 0 }}>
+                        <div className="progress-bar progress-indigo" style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-            <div className="dev-pipeline-card">
-              <div className="dev-pipeline-step">02 / PRACTICAL TEST</div>
-              <h3>Live Coding & SQL</h3>
-              <p>Not multiple-choice guessing. Write real queries and solve async concurrency puzzles evaluated against test cases.</p>
-            </div>
-            <div className="dev-pipeline-card">
-              <div className="dev-pipeline-step">03 / GAP ANALYSIS</div>
-              <h3>What to Learn Next</h3>
-              <p>Transparent gap priorities based on role importance and employer demand. Focus on the high-leverage missing skills.</p>
-            </div>
-            <div className="dev-pipeline-card">
-              <div className="dev-pipeline-step">04 / PROOF OF SKILL</div>
-              <h3>Verified Talent Passport</h3>
-              <p>Submit your GitHub repo for automated checks and export a printable, verifiable skills report for your resume.</p>
-            </div>
-          </div>
+          )}
         </div>
       </div>
     );
@@ -1563,13 +1588,15 @@ export default function SkillBridgeApp() {
   // MAIN RETURN
   // ==========================================
 
+  const totalJobsCount = landingStats?.jobPostings ?? allJobs.length;
+  const totalCurriculaCount = landingStats?.curriculaCount ?? curricula.length;
+
   return (
     <div>
       {/* CASE A: LOGGED IN CANDIDATE -> FULL SIDEBAR APP LAYOUT */}
       {currentUser ? (
         <div className="app-shell">
           {/* Vertical Sidebar */}
-          {/* Modern Polished Sidebar */}
           <aside className="app-sidebar">
             <div className="sidebar-header">
               <div className="sidebar-brand-row">
@@ -1592,7 +1619,7 @@ export default function SkillBridgeApp() {
                 </div>
                 <div className="sidebar-track-meta">
                   <span className="sidebar-meta-chip">Bangladesh</span>
-                  <span className="sidebar-meta-chip">N = {landingStats?.jobPostings ?? 142} Jobs</span>
+                  <span className="sidebar-meta-chip">N = {totalJobsCount} Jobs</span>
                 </div>
               </div>
             </div>
@@ -1608,7 +1635,7 @@ export default function SkillBridgeApp() {
                     <TrendingUp size={16} />
                     <span>Job Market Demand</span>
                   </span>
-                  <span className="sidebar-item-badge">{landingStats?.jobPostings ?? 142}</span>
+                  <span className="sidebar-item-badge">{totalJobsCount}</span>
                 </button>
                 <button
                   className={`sidebar-item ${activeTab === 'curriculum' ? 'active' : ''}`}
@@ -1618,7 +1645,7 @@ export default function SkillBridgeApp() {
                     <GraduationCap size={16} />
                     <span>University Syllabi</span>
                   </span>
-                  <span className="sidebar-item-badge">Gap</span>
+                  <span className="sidebar-item-badge">{totalCurriculaCount} CS</span>
                 </button>
               </div>
 
@@ -1632,7 +1659,7 @@ export default function SkillBridgeApp() {
                     <BrainCircuit size={16} />
                     <span>Diagnostic Test</span>
                   </span>
-                  <span className="sidebar-item-badge">6 Qs</span>
+                  <span className="sidebar-item-badge">{assessment?.questions?.length ? `${assessment.questions.length} Qs` : 'Timed'}</span>
                 </button>
                 <button
                   className={`sidebar-item ${activeTab === 'sandbox' ? 'active' : ''}`}
@@ -1642,7 +1669,7 @@ export default function SkillBridgeApp() {
                     <Terminal size={16} />
                     <span>SQL & Code Sandbox</span>
                   </span>
-                  <span className="sidebar-item-badge">Interactive</span>
+                  <span className="sidebar-item-badge">{challenges.length > 0 ? `${challenges.length} Chans` : 'Interactive'}</span>
                 </button>
               </div>
 
@@ -1668,7 +1695,7 @@ export default function SkillBridgeApp() {
                     <Rocket size={16} />
                     <span>Projects to Build</span>
                   </span>
-                  <span className="sidebar-item-badge">Portfolio</span>
+                  <span className="sidebar-item-badge">{userProjects.length > 0 ? `${userProjects.length} Verified` : 'Projects'}</span>
                 </button>
                 <button
                   className={`sidebar-item ${activeTab === 'jobs' ? 'active' : ''}`}
@@ -1678,7 +1705,7 @@ export default function SkillBridgeApp() {
                     <Briefcase size={16} />
                     <span>Matching Jobs</span>
                   </span>
-                  <span className="sidebar-item-badge" style={{ color: '#6ee7b7', background: 'rgba(16,185,129,0.12)' }}>
+                  <span className="sidebar-item-badge" style={{ color: '#34d399', background: 'rgba(16,185,129,0.12)' }}>
                     {jobMatches.length > 0 ? `${jobMatches.length} Roles` : 'Live'}
                   </span>
                 </button>
@@ -1705,11 +1732,11 @@ export default function SkillBridgeApp() {
             <div className="sidebar-progress-box">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
                 <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Diagnostic Benchmark</span>
-                <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', fontWeight: 700, color: attemptResult ? (attemptResult.passed ? '#10b981' : '#f59e0b') : '#60a5fa' }}>
+                  <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', fontWeight: 700, color: attemptResult ? (attemptResult.passed ? '#10b981' : '#f59e0b') : '#5eead4' }}>
                   {attemptResult ? `${attemptResult.score}%` : 'Not Taken'}
                 </span>
               </div>
-              <div className="progress-container" style={{ margin: 0, height: '4px', background: '#0a0c12' }}>
+              <div className="progress-container" style={{ margin: 0, height: '4px', background: 'var(--bg-app)' }}>
                 <div
                   className="progress-bar progress-indigo"
                   style={{ width: attemptResult ? `${attemptResult.score}%` : '20%' }}
@@ -1739,7 +1766,7 @@ export default function SkillBridgeApp() {
                   onClick={handleOpenPassport}
                   style={{ flex: 1, padding: '0.45rem 0.65rem', fontSize: '0.775rem' }}
                 >
-                  <FileText size={14} color="#60a5fa" />
+                  <FileText size={14} color="#5eead4" />
                   <span>Skill Passport</span>
                 </button>
                 <button
@@ -1781,13 +1808,13 @@ export default function SkillBridgeApp() {
                   className={`btn btn-ghost ${publicView === 'market' ? 'active' : ''}`}
                   onClick={() => setPublicView('market')}
                 >
-                  <TrendingUp size={15} /> Job Demand (N={landingStats?.jobPostings ?? 142})
+                  <TrendingUp size={15} /> Job Demand ({totalJobsCount})
                 </button>
                 <button
                   className={`btn btn-ghost ${publicView === 'curriculum' ? 'active' : ''}`}
                   onClick={() => setPublicView('curriculum')}
                 >
-                  <GraduationCap size={15} /> University Syllabi
+                  <GraduationCap size={15} /> University Syllabi ({totalCurriculaCount})
                 </button>
 
                 <button
@@ -1919,7 +1946,7 @@ export default function SkillBridgeApp() {
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Target Alignment</div>
                   <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#10b981', fontFamily: 'var(--font-mono)' }}>
-                    {passportData.metrics?.overallAlignment ?? passportData.alignmentScore ?? 74}%
+                    {passportData.metrics?.overallAlignment ?? passportData.alignmentScore ?? 0}%
                   </div>
                 </div>
               </div>
@@ -1977,21 +2004,7 @@ export default function SkillBridgeApp() {
 
             {GOOGLE_CLIENT_ID && (
               <div style={{ marginBottom: '1.25rem' }}>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={handleGoogleLogin}
-                  disabled={isAuthLoading}
-                  style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
-                >
-                  <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
-                    <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-                    <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-                    <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-                    <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-                  </svg>
-                  {isAuthLoading ? 'Signing in...' : 'Continue with Google'}
-                </button>
+                <div ref={googleBtnRef} style={{ width: '100%' }} />
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', margin: '1rem 0 0.25rem', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
                   <span style={{ flex: 1, height: 1, background: 'var(--border-color)' }} />
                   or continue with email

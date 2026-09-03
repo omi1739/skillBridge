@@ -173,7 +173,7 @@ describe('SkillBridge page API contract', () => {
 
   it('shows the real job posting count from /stats on the public landing page', async () => {
     render(<Page />);
-    await screen.findByText(/Real job requirements vs what you can actually build/i);
+    await screen.findByText(/Real job requirements, measured against real skills/i);
     const matches = await screen.findAllByText('27');
     expect(matches).not.toHaveLength(0);
   }, 20000);
