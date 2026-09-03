@@ -20,7 +20,6 @@ import {
   TrendingUp,
   BrainCircuit,
   BarChart3,
-  Rocket,
   Briefcase,
   CheckCircle2,
   AlertCircle,
@@ -30,7 +29,6 @@ import {
   Code2,
   Play,
   Terminal,
-  Sparkles,
   Github,
   FolderGit2,
   ExternalLink,
@@ -62,26 +60,22 @@ const CURRENT_STATUS_OPTIONS = [
   { value: 'OTHER', label: 'Other' }
 ] as const;
 
-const VERIFICATION_BADGES: Record<VerificationStatus, { label: string; color: string; bg: string }> = {
-  EMPLOYER_VERIFIED: { label: 'Employer Verified', color: '#16a34a', bg: '#dcfce7' },
-  SOURCE_VERIFIED:   { label: 'Source Verified',   color: '#0d9488', bg: '#ccfbf1' },
-  RECENTLY_CHECKED:  { label: 'Recently Checked',  color: '#2563eb', bg: '#dbeafe' },
-  EXTERNAL_SOURCE:   { label: 'External Source',    color: '#9333ea', bg: '#f3e8ff' },
-  EXPIRED:           { label: 'Expired',            color: '#dc2626', bg: '#fee2e2' },
-  UNVERIFIED:        { label: 'Unverified',         color: '#6b7280', bg: '#f3f4f6' },
+const VERIFICATION_BADGES: Record<VerificationStatus, { label: string; color: string; bg: string; border: string }> = {
+  EMPLOYER_VERIFIED: { label: 'Employer Verified', color: '#34d399', bg: 'rgba(16, 185, 129, 0.1)', border: 'rgba(16, 185, 129, 0.25)' },
+  SOURCE_VERIFIED:   { label: 'Source Verified',   color: '#5eead4', bg: 'rgba(45, 212, 191, 0.1)', border: 'rgba(45, 212, 191, 0.25)' },
+  RECENTLY_CHECKED:  { label: 'Recently Checked',  color: '#38bdf8', bg: 'rgba(56, 189, 248, 0.1)', border: 'rgba(56, 189, 248, 0.25)' },
+  EXTERNAL_SOURCE:   { label: 'External Source',   color: '#a78bfa', bg: 'rgba(167, 139, 250, 0.1)', border: 'rgba(167, 139, 250, 0.25)' },
+  EXPIRED:           { label: 'Expired',           color: '#f87171', bg: 'rgba(248, 113, 113, 0.1)', border: 'rgba(248, 113, 113, 0.25)' },
+  UNVERIFIED:        { label: 'Unverified',        color: '#94a3b8', bg: 'rgba(255, 255, 255, 0.05)', border: 'rgba(255, 255, 255, 0.08)' },
 };
 
 function VerificationBadge({ status }: { status?: VerificationStatus }) {
   const s = status || 'UNVERIFIED';
   const badge = VERIFICATION_BADGES[s];
   return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
-      fontSize: '0.6rem', fontWeight: 600, padding: '0.1rem 0.4rem',
-      borderRadius: '9999px', background: badge.bg, color: badge.color,
-      lineHeight: 1.4, whiteSpace: 'nowrap' as const
-    }}>
-      {s === 'EXPIRED' ? '✕' : s === 'EMPLOYER_VERIFIED' ? '★' : '✓'} {badge.label}
+    <span className="badge-chip" style={{ background: badge.bg, color: badge.color, border: `1px solid ${badge.border}` }}>
+      <span className="badge-chip-dot" style={{ background: badge.color }} />
+      {badge.label}
     </span>
   );
 }
@@ -90,15 +84,13 @@ function RemoteBadge({ isRemote, location }: { isRemote?: boolean; location?: st
   const remote = !!isRemote;
   const loc = remote ? (location && !/remote|work from home|wfh/i.test(location) ? location : 'Work from Home') : (location || 'Onsite');
   return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
-      fontSize: '0.6rem', fontWeight: 600, padding: '0.1rem 0.45rem',
-      borderRadius: '9999px', whiteSpace: 'nowrap' as const,
-      background: remote ? '#ccfbf1' : '#e2e8f0',
-      color: remote ? '#0f766e' : '#475569',
-      border: remote ? '1px solid #5eead4' : '1px solid #cbd5e1'
+    <span className="badge-chip" style={{
+      background: remote ? 'rgba(45, 212, 191, 0.1)' : 'rgba(255, 255, 255, 0.05)',
+      color: remote ? '#5eead4' : 'var(--text-secondary)',
+      border: remote ? '1px solid rgba(45, 212, 191, 0.25)' : '1px solid var(--border-color)'
     }}>
-      {remote ? '🏠' : '🏢'} {remote ? 'Remote / WFH' : loc}
+      <span className="badge-chip-dot" style={{ background: remote ? '#2dd4bf' : 'var(--text-muted)' }} />
+      {remote ? 'Remote · WFH' : loc}
     </span>
   );
 }
@@ -903,7 +895,7 @@ export default function SkillBridgeApp() {
           <div className="stat-card">
             <div className="stat-label">Focus Region</div>
             <div className="stat-value" style={{ fontSize: '1.25rem' }}>{role.marketContext.region}</div>
-            <div className="stat-sub">{role.marketContext.region}</div>
+            <div className="stat-sub">Dhaka, Chittagong & Remote Hubs</div>
           </div>
           <div className="stat-card">
             <div className="stat-label">Experience Tier</div>
@@ -1002,7 +994,7 @@ export default function SkillBridgeApp() {
                       </div>
                       <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
                         <button className="btn btn-primary" style={{ fontSize: '0.8rem', padding: '0.4rem 0.9rem' }} onClick={handleDemoLogin}>
-                          Try Live Demo <Sparkles size={13} />
+                          Explore Demo <ArrowRight size={13} />
                         </button>
                         <button className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '0.4rem 0.9rem' }} onClick={() => { setAuthMode('REGISTER'); setShowAuthModal(true); }}>
                           Register Free
@@ -1622,61 +1614,68 @@ export default function SkillBridgeApp() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-              {([
-                { key: 'ALL', label: `All (${jobMatches.length})` },
-                { key: 'BANGLADESH', label: `🇧🇩 Bangladesh (${bdCount})` },
-                { key: 'INTERNATIONAL', label: `International (${internationalCount})` }
-              ] as const).map(o => (
-                <button
-                  key={o.key}
-                  className={`btn ${jobRegionFilter === o.key ? 'btn-primary' : 'btn-secondary'}`}
-                  onClick={() => setJobRegionFilter(o.key)}
-                  style={{ fontSize: '0.8rem', padding: '0.4rem 0.85rem' }}
-                >
-                  {o.label}
-                </button>
-              ))}
+        <div className="filter-bar">
+          <div className="filter-row">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>Region:</span>
+              <div className="filter-segment-group">
+                {([
+                  { key: 'ALL', label: `All (${jobMatches.length})` },
+                  { key: 'BANGLADESH', label: `Bangladesh (${bdCount})` },
+                  { key: 'INTERNATIONAL', label: `International (${internationalCount})` }
+                ] as const).map(o => (
+                  <button
+                    key={o.key}
+                    className={`filter-segment-btn ${jobRegionFilter === o.key ? 'active' : ''}`}
+                    onClick={() => setJobRegionFilter(o.key)}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-              {([
-                { key: 'ALL', label: 'Onsite / Remote' },
-                { key: 'REMOTE', label: `Remote / WFH (${remoteCount})` },
-                { key: 'ONSITE', label: `Onsite (${jobMatches.length - remoteCount})` }
-              ] as const).map(o => (
-                <button
-                  key={o.key}
-                  className={`btn ${jobRemoteFilter === o.key ? 'btn-primary' : 'btn-secondary'}`}
-                  onClick={() => setJobRemoteFilter(o.key)}
-                  style={{ fontSize: '0.8rem', padding: '0.4rem 0.85rem' }}
-                >
-                  {o.label}
-                </button>
-              ))}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>Work Mode:</span>
+              <div className="filter-segment-group">
+                {([
+                  { key: 'ALL', label: 'All Modes' },
+                  { key: 'REMOTE', label: `Remote / WFH (${remoteCount})` },
+                  { key: 'ONSITE', label: `Onsite (${jobMatches.length - remoteCount})` }
+                ] as const).map(o => (
+                  <button
+                    key={o.key}
+                    className={`filter-segment-btn ${jobRemoteFilter === o.key ? 'active' : ''}`}
+                    onClick={() => setJobRemoteFilter(o.key)}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-            <span>Sort:</span>
-            {([
-              { key: 'priority', label: '🇧🇩 Bangladesh onsite → Remote' },
-              { key: 'recent', label: 'Most recent' }
-            ] as const).map(o => (
-              <button
-                key={o.key}
-                className={`btn ${jobSort === o.key ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => setJobSort(o.key)}
-                style={{ fontSize: '0.78rem', padding: '0.35rem 0.75rem' }}
-              >
-                {o.label}
-              </button>
-            ))}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', paddingTop: '0.65rem', borderTop: '1px solid var(--border-subtle)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>Sort by:</span>
+              <div className="filter-segment-group">
+                {([
+                  { key: 'priority', label: 'Prioritize BD Onsite → Remote' },
+                  { key: 'recent', label: 'Most Recent' }
+                ] as const).map(o => (
+                  <button
+                    key={o.key}
+                    className={`filter-segment-btn ${jobSort === o.key ? 'active' : ''}`}
+                    onClick={() => setJobSort(o.key)}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+            </div>
             {jobSort === 'priority' && bdCount > 0 && (
               <span style={{ color: 'var(--text-muted)', fontSize: '0.74rem' }}>
-                • {bdOnsite} on-site in BD, {bdRemote} remote in BD
+                {bdOnsite} on-site in BD · {bdRemote} remote in BD
               </span>
             )}
           </div>
@@ -1695,12 +1694,13 @@ export default function SkillBridgeApp() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
                 <div>
                   <h3 style={{ fontSize: '1.15rem', fontWeight: 700 }}>{match.job.title}</h3>
-                  <div style={{ color: '#60a5fa', fontSize: '0.85rem', fontWeight: 500, marginTop: '0.15rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <div style={{ color: 'var(--accent-text)', fontSize: '0.85rem', fontWeight: 500, marginTop: '0.15rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                     {match.job.company}
                     {match.job.location ? <span style={{ color: 'var(--text-muted)' }}>• {match.job.location}</span> : null}
                     {match.job.isBangladesh && (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.6rem', fontWeight: 700, padding: '0.1rem 0.45rem', borderRadius: '9999px', whiteSpace: 'nowrap', background: 'rgba(251,146,60,0.12)', color: '#fb923c', border: '1px solid rgba(251,146,60,0.4)' }}>
-                        🇧🇩 Bangladesh
+                      <span className="badge-chip" style={{ background: 'rgba(20, 184, 166, 0.1)', color: 'var(--accent-text)', border: '1px solid rgba(45, 212, 191, 0.25)' }}>
+                        <span className="badge-chip-dot" style={{ background: '#2dd4bf' }} />
+                        Bangladesh
                       </span>
                     )}
                     <RemoteBadge isRemote={match.job.isRemote} location={match.job.location} />
@@ -1820,10 +1820,7 @@ export default function SkillBridgeApp() {
         {/* ---- User Dashboard ---- */}
         {(dash || !adminUsers.length) && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Users size={18} color="#a78bfa" />
-              <h2 className="card-title" style={{ marginBottom: 0 }}>User Dashboard</h2>
-            </div>
+            <h2 className="card-title" style={{ marginBottom: 0 }}>User Dashboard</h2>
 
             <div className="stat-grid-4">
               <div className="stat-card">
@@ -1936,10 +1933,7 @@ export default function SkillBridgeApp() {
 
         <div className="grid-2">
           <div className="card">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-              <Sliders size={18} color="#60a5fa" />
-              <h2 className="card-title">Add Skill Alias Mapping</h2>
-            </div>
+            <h2 className="card-title" style={{ marginBottom: '1rem' }}>Add Skill Alias Mapping</h2>
             <form onSubmit={handleCreateAlias} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>
@@ -1981,10 +1975,7 @@ export default function SkillBridgeApp() {
           </div>
 
           <div className="card">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-              <Sliders size={18} color="#f59e0b" />
-              <h2 className="card-title">Role Skill Importance Tuner</h2>
-            </div>
+            <h2 className="card-title" style={{ marginBottom: '1rem' }}>Role Skill Importance Tuner</h2>
             {role && editingSkillWeight && (
               <form onSubmit={handleUpdateRoleWeight} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <div>
@@ -2042,10 +2033,7 @@ export default function SkillBridgeApp() {
         </div>
 
         <div className="card" style={{ padding: '1.25rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-            <Users size={18} color="#a78bfa" />
-            <h2 className="card-title" style={{ marginBottom: 0 }}>User Management</h2>
-          </div>
+          <h2 className="card-title" style={{ marginBottom: '0.25rem' }}>User Management</h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginBottom: '1rem' }}>
             List, change roles, and remove registered accounts. You cannot change your own role or delete your own account.
           </p>
@@ -2218,21 +2206,21 @@ export default function SkillBridgeApp() {
 
           <div className="landing-actions">
             <button className="btn btn-primary" onClick={handleDemoLogin} style={{ padding: '0.7rem 1.4rem', fontSize: '0.9rem' }}>
-              <Sparkles size={16} /> Try a Live Demo
+              Explore Live Demo <ArrowRight size={15} />
             </button>
             <button className="btn btn-secondary" onClick={() => setPublicView('market')} style={{ padding: '0.7rem 1.4rem', fontSize: '0.9rem' }}>
-              <TrendingUp size={16} /> View Market Demand ({totalJobsCount})
+              Market Demand ({totalJobsCount})
             </button>
             <button className="btn btn-secondary" onClick={() => setPublicView('curriculum')} style={{ padding: '0.7rem 1.4rem', fontSize: '0.9rem' }}>
-              <GraduationCap size={16} /> University vs Reality ({totalCurriculaCount})
+              University Syllabi ({totalCurriculaCount})
             </button>
           </div>
 
           <div style={{ marginTop: '1.5rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-            <span className="trust-pill"><CheckCircle2 size={13} color="#5eead4" /> 100% real &amp; safe</span>
-            <span className="trust-pill"><ShieldCheck size={13} color="#5eead4" /> Source-verified postings</span>
-            <span className="trust-pill"><Lock size={13} color="#5eead4" /> Job listings for registered users only</span>
-            <span className="trust-pill"><Briefcase size={13} color="#5eead4" /> Remote / Work-from-home &amp; onsite</span>
+            <span className="trust-pill"><span style={{ width: 6, height: 6, borderRadius: '50%', background: '#2dd4bf', display: 'inline-block' }} /> Verified Postings</span>
+            <span className="trust-pill"><span style={{ width: 6, height: 6, borderRadius: '50%', background: '#34d399', display: 'inline-block' }} /> Live Ingestion</span>
+            <span className="trust-pill"><span style={{ width: 6, height: 6, borderRadius: '50%', background: '#38bdf8', display: 'inline-block' }} /> Remote &amp; Onsite Roles</span>
+            <span className="trust-pill"><span style={{ width: 6, height: 6, borderRadius: '50%', background: '#a78bfa', display: 'inline-block' }} /> Verifiable Evidence</span>
           </div>
 
           <div className="stat-grid-3" style={{ marginTop: '2.5rem', textAlign: 'left' }}>
@@ -2292,35 +2280,29 @@ export default function SkillBridgeApp() {
           <div className="about-section">
             <div className="about-heading">
               <span className="about-kicker">About SkillBridge</span>
-              <h2 className="about-title">Built for Bangladeshi developers ready for real backend work.</h2>
+              <h2 className="about-title">Built for developers ready for real backend work.</h2>
             </div>
             <div className="about-grid">
               <div className="about-card">
-                <Briefcase size={22} color="#5eead4" />
-                <div>
-                  <h3>Real, verified job intelligence</h3>
-                  <p>
-                    We continuously digest live junior backend postings — remote / work-from-home and onsite — from trusted sources, so the skills we tell you to learn are exactly what employers actually ask for.
-                  </p>
-                </div>
+                <span className="about-card-kicker">Live Intelligence</span>
+                <h3>Real, verified job postings</h3>
+                <p>
+                  Continuously ingested junior backend roles — remote / work-from-home and onsite — from verified employers. Skills are derived from production requirements rather than speculative advice.
+                </p>
               </div>
               <div className="about-card">
-                <Rocket size={22} color="#5eead4" />
-                <div>
-                  <h3>Skills measured, not guessed</h3>
-                  <p>
-                    Instead of generic advice, SkillBridge benchmarks your SQL and Node.js skills against the real market, then shows precisely which gaps stand between you and the roles you want.
-                  </p>
-                </div>
+                <span className="about-card-kicker">Empirical Baseline</span>
+                <h3>Skills measured, not guessed</h3>
+                <p>
+                  Benchmark your SQL queries and Node.js code against production test assertions, pinpointing deterministic gaps standing between you and target roles.
+                </p>
               </div>
               <div className="about-card">
-                <ShieldCheck size={22} color="#5eead4" />
-                <div>
-                  <h3>Safe, honest &amp; verified</h3>
-                  <p>
-                    Every job posting is source-verified and clearly badged. No fake listings, no bait — only registered members see the raw postings, and everything is 100% real.
-                  </p>
-                </div>
+                <span className="about-card-kicker">Transparent Matching</span>
+                <h3>Verifiable evidence passport</h3>
+                <p>
+                  Traceable match scores with full requirement breakdown. Export verified skill passports backed by live sandbox results and GitHub code verification.
+                </p>
               </div>
             </div>
           </div>
@@ -2332,15 +2314,15 @@ export default function SkillBridgeApp() {
             </div>
             <div className="steps-grid">
               {[
-                { icon: <BarChart3 size={20} />, title: '1. See the live market', desc: 'Explore what junior backend employers really ask for — the exact skill percentages computed from live, verified postings.' },
-                { icon: <BrainCircuit size={20} />, title: '2. Test your skills', desc: 'Take a short diagnostic and run SQL & Node.js challenges in a live sandbox to get an honest baseline of where you stand.' },
-                { icon: <TrendingUp size={20} />, title: '3. Close your gaps', desc: 'SkillBridge pinpoints the missing skills and ranks the roles that match your evidence, so you always know the next best move.' },
-                { icon: <Briefcase size={20} />, title: '4. Apply with confidence', desc: 'See matching jobs (remote / WFH and onsite) with source links, match scores, and full requirement traceability.' }
-              ].map(step => (
-                <div key={step.title} className="step-card">
-                  <div className="step-icon">{step.icon}</div>
-                  <h3>{step.title}</h3>
-                  <p>{step.desc}</p>
+                { step: '01', title: 'Market Intelligence', desc: 'Explore exact technologies junior backend employers ask for, derived dynamically from live postings.' },
+                { step: '02', title: 'Diagnostic Benchmarks', desc: 'Take practical timed challenges and run SQL & code queries against test assertions in a live sandbox.' },
+                { step: '03', title: 'Gap Prioritization', desc: 'Identify high-leverage missing skills prioritized by role weight, employer frequency, and demonstrated proficiency.' },
+                { step: '04', title: 'Matching Applications', desc: 'Browse matched remote and onsite postings with explainable compatibility scores and verified skill passports.' }
+              ].map(item => (
+                <div key={item.step} className="step-card">
+                  <span className="step-number">{item.step}</span>
+                  <h3>{item.title}</h3>
+                  <p>{item.desc}</p>
                 </div>
               ))}
             </div>
@@ -2440,7 +2422,7 @@ export default function SkillBridgeApp() {
                   onClick={() => setActiveTab('actions')}
                 >
                   <span className="sidebar-item-content">
-                    <Rocket size={16} />
+                    <FolderGit2 size={16} />
                     <span>Projects to Build</span>
                   </span>
                 </button>
@@ -2514,7 +2496,6 @@ export default function SkillBridgeApp() {
             <div className="public-nav-container">
               <a href="#" className="brand" onClick={(e) => { e.preventDefault(); setPublicView('home'); }}>
                 <span>SkillBridge</span>
-                <span className="brand-badge-pill">BENCHMARK</span>
               </a>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -2541,7 +2522,7 @@ export default function SkillBridgeApp() {
                   className="btn btn-primary"
                   onClick={handleDemoLogin}
                 >
-                  <Sparkles size={15} /> Try Demo (1-Click)
+                  Try Demo (1-Click)
                 </button>
               </div>
             </div>
@@ -2815,9 +2796,9 @@ export default function SkillBridgeApp() {
                   type="button"
                   className="btn btn-secondary"
                   onClick={handleDemoLogin}
-                  style={{ borderColor: '#3b82f6', color: '#93c5fd', marginTop: '0.25rem' }}
+                  style={{ borderColor: 'var(--accent-primary-border)', color: 'var(--accent-text)', marginTop: '0.25rem' }}
                 >
-                  <Sparkles size={14} /> Try Demo Account (1-Click)
+                  Try Demo Account (1-Click)
                 </button>
               )}
             </form>

@@ -76,6 +76,7 @@ describe('SkillBridge API (e2e)', () => {
   it('GET /api/jobs/:id/match returns 404 for an unknown job', () => {
     return request(app.getHttpServer())
       .get('/api/jobs/job_does_not_exist/match?userId=demo_user_01')
+      .set('Authorization', 'Bearer demo_token_demo_user_01')
       .expect(404);
   });
 
