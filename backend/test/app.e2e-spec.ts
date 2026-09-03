@@ -70,6 +70,17 @@ describe('SkillBridge API (e2e)', () => {
       .expect(404);
   });
 
+  it('GET /api/stats returns landing page market counts', () => {
+    return request(app.getHttpServer())
+      .get('/api/stats')
+      .expect(200)
+      .expect(res => {
+        expect(typeof res.body.jobPostings).toBe('number');
+        expect(typeof res.body.canonicalSkills).toBe('number');
+        expect(res.body.validationPercent).toBe(100);
+      });
+  });
+
   it('POST /api/auth/register rejects missing fields', () => {
     return request(app.getHttpServer())
       .post('/api/auth/register')

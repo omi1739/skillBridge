@@ -81,6 +81,9 @@ function setupFetch() {
     if (url.includes('/skills')) {
       return response([]);
     }
+    if (url.includes('/stats')) {
+      return response({ jobPostings: 27, canonicalSkills: 9, validationPercent: 100 });
+    }
     return response([]);
   });
 }
@@ -166,5 +169,12 @@ describe('SkillBridge page API contract', () => {
 
     await screen.findByText(/matching jobs/i);
     expect(screen.queryByRole('button', { name: /Admin & Weights/i })).toBeNull();
+  }, 20000);
+
+  it('shows the real job posting count from /stats on the public landing page', async () => {
+    render(<Page />);
+    await screen.findByText(/Real job requirements vs what you can actually build/i);
+    const matches = await screen.findAllByText('27');
+    expect(matches).not.toHaveLength(0);
   }, 20000);
 });

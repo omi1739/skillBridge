@@ -121,6 +121,9 @@ export default function SkillBridgeApp() {
   const [weightSaveSuccess, setWeightSaveSuccess] = useState(false);
   const [aliasSaveSuccess, setAliasSaveSuccess] = useState(false);
 
+  // Landing page market stats (dynamic counts)
+  const [landingStats, setLandingStats] = useState<{ jobPostings: number; canonicalSkills: number; validationPercent: number } | null>(null);
+
   const activeUserId = currentUser ? currentUser.id : 'demo_user_01';
 
   const authHeaders = () => {
@@ -215,6 +218,11 @@ export default function SkillBridgeApp() {
     fetch(`${API_BASE}/curriculum/analyze?institutionId=curr_bsc_cse&roleId=role_junior_backend`)
       .then(res => res.json())
       .then(data => setCurriculumAnalysis(data))
+      .catch((err) => console.error('[SkillBridge] Data load failed:', err));
+
+    fetch(`${API_BASE}/stats`)
+      .then(res => res.json())
+      .then(data => setLandingStats(data))
       .catch((err) => console.error('[SkillBridge] Data load failed:', err));
 
     // Restore saved session if available
@@ -562,7 +570,7 @@ export default function SkillBridgeApp() {
           <div>
             <h1 className="page-title">Junior Backend Job Market Demand</h1>
             <p className="page-subtitle">
-              Empirical data from 142 junior backend job postings in Bangladesh (Dhaka, Chittagong, and remote positions).
+              Empirical data from {landingStats?.jobPostings ?? 142} junior backend job postings in Bangladesh (Dhaka, Chittagong, and remote positions).
             </p>
           </div>
         </div>
@@ -580,7 +588,7 @@ export default function SkillBridgeApp() {
           </div>
           <div className="stat-card">
             <div className="stat-label">Sample Size</div>
-            <div className="stat-value" style={{ fontSize: '1.3rem', color: '#60a5fa' }}>N = 142 Postings</div>
+            <div className="stat-value" style={{ fontSize: '1.3rem', color: '#60a5fa' }}>N = {landingStats?.jobPostings ?? 142} Postings</div>
             <div className="stat-sub">Bdjobs, LinkedIn & GitHub</div>
           </div>
         </div>
@@ -819,7 +827,7 @@ export default function SkillBridgeApp() {
         <div className="page-header">
           <div>
             <h1 className="page-title">{assessment.title}</h1>
-            <p className="page-subtitle">6 multi-part questions testing practical Node.js, SQL, and HTTP engineering skills.</p>
+            <p className="page-subtitle">{assessment.questions.length} multi-part questions testing practical Node.js, SQL, and HTTP engineering skills.</p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#131722', border: '1px solid var(--border-color)', padding: '0.45rem 0.85rem', borderRadius: '6px', fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}>
             <Clock size={15} color="#93c5fd" />
@@ -1387,13 +1395,13 @@ export default function SkillBridgeApp() {
       <div>
         <div className="dev-hero">
           <div className="dev-hero-tag">
-            <Database size={13} /> 142 Junior Backend Jobs Analyzed in Bangladesh
+            <Database size={13} /> {landingStats?.jobPostings ?? 142} Junior Backend Jobs Analyzed in Bangladesh
           </div>
           <h1 className="dev-hero-title">
             Real job requirements vs what you can actually build.
           </h1>
           <p className="dev-hero-desc">
-            We analyzed 142 junior backend engineer job postings in Dhaka and regional tech hubs. Test your SQL and Node.js skills in live sandboxes, see your exact gaps, and build projects that hire.
+            We analyzed {landingStats?.jobPostings ?? 142} junior backend engineer job postings in Dhaka and regional tech hubs. Test your SQL and Node.js skills in live sandboxes, see your exact gaps, and build projects that hire.
           </p>
 
           <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -1411,17 +1419,17 @@ export default function SkillBridgeApp() {
           <div className="stat-grid-3" style={{ marginTop: '2.5rem', textAlign: 'left' }}>
             <div className="stat-card">
               <div className="stat-label">Active Job Postings</div>
-              <div className="stat-value">142</div>
+              <div className="stat-value">{landingStats?.jobPostings ?? 142}</div>
               <div className="stat-sub">Scraped from Bdjobs, LinkedIn & GitHub</div>
             </div>
             <div className="stat-card">
               <div className="stat-label">Canonical Backend Skills</div>
-              <div className="stat-value">9</div>
+              <div className="stat-value">{landingStats?.canonicalSkills ?? 9}</div>
               <div className="stat-sub">Mapped with all alias synonyms</div>
             </div>
             <div className="stat-card">
               <div className="stat-label">Practical Validation</div>
-              <div className="stat-value">100%</div>
+              <div className="stat-value">{landingStats?.validationPercent ?? 100}%</div>
               <div className="stat-sub">Live SQL & concurrency test cases</div>
             </div>
           </div>
@@ -1486,7 +1494,7 @@ export default function SkillBridgeApp() {
                 </div>
                 <div className="sidebar-track-meta">
                   <span className="sidebar-meta-chip">Bangladesh</span>
-                  <span className="sidebar-meta-chip">N = 142 Jobs</span>
+                  <span className="sidebar-meta-chip">N = {landingStats?.jobPostings ?? 142} Jobs</span>
                 </div>
               </div>
             </div>
@@ -1502,7 +1510,7 @@ export default function SkillBridgeApp() {
                     <TrendingUp size={16} />
                     <span>Job Market Demand</span>
                   </span>
-                  <span className="sidebar-item-badge">142</span>
+                  <span className="sidebar-item-badge">{landingStats?.jobPostings ?? 142}</span>
                 </button>
                 <button
                   className={`sidebar-item ${activeTab === 'curriculum' ? 'active' : ''}`}
@@ -1675,7 +1683,7 @@ export default function SkillBridgeApp() {
                   className={`btn btn-ghost ${publicView === 'market' ? 'active' : ''}`}
                   onClick={() => setPublicView('market')}
                 >
-                  <TrendingUp size={15} /> Job Demand (N=142)
+                  <TrendingUp size={15} /> Job Demand (N={landingStats?.jobPostings ?? 142})
                 </button>
                 <button
                   className={`btn btn-ghost ${publicView === 'curriculum' ? 'active' : ''}`}
