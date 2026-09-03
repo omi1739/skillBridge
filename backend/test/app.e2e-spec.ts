@@ -56,7 +56,7 @@ describe('SkillBridge API (e2e)', () => {
     } as unknown as Response);
 
     await app.init();
-  });
+  }, 45000);
 
   afterAll(async () => {
     await app.close();

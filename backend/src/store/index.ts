@@ -438,7 +438,12 @@ export class AppDataStore {
       arr.push(sk.skill_id);
     }
 
-    const rows = await query<any>(`SELECT * FROM jobs ORDER BY id`);
+    const rows = await query<any>(
+      `SELECT j.*, s.name AS source_name, s.access_method AS source_access_method
+       FROM jobs j
+       LEFT JOIN job_sources s ON s.id = j.source_id
+       ORDER BY j.posted_at DESC NULLS LAST, j.id`
+    );
     return rows.map(j => ({
       id: j.id,
       title: j.title,
@@ -449,8 +454,110 @@ export class AppDataStore {
       description: j.description,
       requiredSkillIds: reqMap.get(j.id) || [],
       preferredSkillIds: prefMap.get(j.id) || [],
-      postedAt: j.posted_at
+      postedAt: j.posted_at,
+      sourceName: j.source_name || undefined,
+      sourceUrl: j.posting_url || undefined,
+      sourceAccessMethod: j.source_access_method || undefined,
+      externalId: j.external_id || undefined
     }));
+  }
+
+  async getJobSources(): Promise<any[]> {
+    const rows = await query<any>(`SELECT * FROM job_sources ORDER BY name`);
+    return rows.map(r => ({
+      id: r.id,
+      name: r.name,
+      accessMethod: r.access_method,
+      licenseNotes: r.license_notes || undefined,
+      isActive: r.is_active
+    }));
+  }
+
+  async ensureJobSource(name: string, accessMethod: string, licenseNotes?: string): Promise<string> {
+    const rows = await query<any>(
+      `INSERT INTO job_sources (name, access_method, license_notes, is_active)
+       VALUES ($1,$2,$3,true)
+       ON CONFLICT (name) DO UPDATE SET access_method=EXCLUDED.access_method
+       RETURNING id`,
+      [name, accessMethod, licenseNotes || null]
+    );
+    return rows[0].id;
+  }
+
+  async upsertJobs(jobs: Array<{
+    externalId: string;
+    sourceId: string;
+    title: string;
+    company: string;
+    location: string;
+    experienceLevel: string;
+    roleId: string;
+    description: string;
+    postingUrl: string;
+    postedAt?: string;
+    requiredSkillIds?: string[];
+    preferredSkillIds?: string[];
+  }>): Promise<{ inserted: number; updated: number }> {
+    let inserted = 0;
+    let updated = 0;
+    await withTransaction(async client => {
+      for (const j of jobs) {
+        const id = `job_src_${this.effectiveCompanyKey(j)}_${this.hashExternal(j.externalId)}`;
+        const upsert = await client.query(
+          `INSERT INTO jobs
+             (id, source_id, external_id, title, company, location, experience_level, role_id, description, posting_url, posted_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::timestamptz)
+           ON CONFLICT (source_id, external_id)
+           DO UPDATE SET title=EXCLUDED.title, company=EXCLUDED.company,
+             location=EXCLUDED.location, experience_level=EXCLUDED.experience_level,
+             role_id=EXCLUDED.role_id, description=EXCLUDED.description,
+             posting_url=EXCLUDED.posting_url, posted_at=EXCLUDED.posted_at
+           RETURNING (xmax = 0) AS freshly_inserted`,
+          [id, j.sourceId, j.externalId, j.title, j.company, j.location,
+           j.experienceLevel, j.roleId, j.description, j.postingUrl,
+           j.postedAt || new Date().toISOString()]
+        );
+        if (upsert.rows[0]?.freshly_inserted) inserted++;
+        else if (upsert.rows.length) updated++;
+        const existing = await client.query(
+          `SELECT id FROM jobs WHERE source_id=$1 AND external_id=$2`,
+          [j.sourceId, j.externalId]
+        );
+        const jobId = (existing.rows[0]?.id) || id;
+        await client.query(`DELETE FROM job_skills WHERE job_id=$1`, [jobId]);
+        for (const sId of j.requiredSkillIds || []) {
+          await client.query(
+            `INSERT INTO job_skills (job_id, skill_id, is_required) VALUES ($1,$2,true) ON CONFLICT (job_id, skill_id) DO NOTHING`,
+            [jobId, sId]
+          );
+        }
+        for (const sId of j.preferredSkillIds || []) {
+          await client.query(
+            `INSERT INTO job_skills (job_id, skill_id, is_required) VALUES ($1,$2,false) ON CONFLICT (job_id, skill_id) DO NOTHING`,
+            [jobId, sId]
+          );
+        }
+      }
+    });
+    return { inserted, updated };
+  }
+
+  async getJobsForRole(roleId: string): Promise<JobListing[]> {
+    const all = await this.getJobs();
+    return all.filter(j => j.roleId === roleId);
+  }
+
+  private effectiveCompanyKey(j: { company: string }): string {
+    // Deterministic short key so a real job keeps a stable, readable id.
+    return (j.company || 'unknown').toLowerCase().replace(/[^a-z0-9]+/g, '_').slice(0, 24);
+  }
+
+  private hashExternal(id: string): string {
+    let h = 0;
+    for (let i = 0; i < id.length; i++) {
+      h = ((h << 5) - h + id.charCodeAt(i)) | 0;
+    }
+    return Math.abs(h).toString(36);
   }
 
   // ---- Job matches (persisted analysis) ----
@@ -509,6 +616,44 @@ export class AppDataStore {
        q.options ? JSON.stringify(q.options) : null, q.correctAnswer,
        q.explanation, q.subSkill, q.difficulty, q.points]
     );
+  }
+
+  // ---- Market demand (recomputed from real job postings) ----
+  async recomputeMarketDemand(): Promise<{ updatedRoles: number; totalJobs: number }> {
+    const roleCounts = await query<{ role_id: string; total_jobs: string }>(
+      `SELECT role_id, COUNT(*)::text AS total_jobs
+       FROM jobs
+       WHERE role_id IS NOT NULL
+       GROUP BY role_id`
+    );
+    const totalJobs = roleCounts.reduce((sum, r) => sum + Number(r.total_jobs), 0);
+    let updatedRoles = 0;
+
+    for (const rc of roleCounts) {
+      const total = Number(rc.total_jobs);
+      if (total === 0) continue;
+      const skillCounts = await query<{ skill_id: string; cnt: string }>(
+        `SELECT js.skill_id, COUNT(*)::text AS cnt
+         FROM job_skills js
+         JOIN jobs j ON j.id = js.job_id
+         WHERE j.role_id = $1
+         GROUP BY js.skill_id`,
+        [rc.role_id]
+      );
+      await withTransaction(async client => {
+        for (const sc of skillCounts) {
+          const freq = Number(sc.cnt) / total;
+          await client.query(
+            `UPDATE role_skills SET market_demand_frequency = $3
+             WHERE role_id = $1 AND skill_id = $2`,
+            [rc.role_id, sc.skill_id, Number(freq.toFixed(2))]
+          );
+        }
+      });
+      updatedRoles++;
+    }
+
+    return { updatedRoles, totalJobs };
   }
 }
 

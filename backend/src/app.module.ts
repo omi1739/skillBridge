@@ -11,6 +11,7 @@ import { JobsModule } from './modules/jobs/jobs.module';
 import { CurriculumModule } from './modules/curriculum/curriculum.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { StatsModule } from './modules/stats/stats.module';
+import { IngestionModule } from './modules/ingestion/ingestion.module';
 import { RequestLoggingMiddleware } from './common/request-logging.middleware';
 
 @Module({
@@ -25,7 +26,8 @@ import { RequestLoggingMiddleware } from './common/request-logging.middleware';
     JobsModule,
     CurriculumModule,
     AdminModule,
-    StatsModule
+    StatsModule,
+    IngestionModule
   ],
   controllers: [AppController]
 })

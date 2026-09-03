@@ -210,6 +210,40 @@ export interface JobListing {
   requiredSkillIds: string[];
   preferredSkillIds: string[];
   postedAt: string;
+  sourceName?: string;
+  sourceUrl?: string;
+  sourceAccessMethod?: string;
+  externalId?: string;
+}
+
+export interface JobSource {
+  id: string;
+  name: string;
+  accessMethod: 'API' | 'PARTNER_FEED' | 'MANUAL_CURATED';
+  licenseNotes?: string;
+  isActive: boolean;
+}
+
+export interface MarketDemandStat {
+  skillId: string;
+  canonicalName: string;
+  required: boolean;
+  roleWeight: number;
+  marketDemandFrequency: number;
+  jobsRequiring: number;
+  totalJobs: number;
+  sourceName: string;
+  sources: string[];
+  lastIngestedAt: string | null;
+}
+
+export interface MarketDemandResponse {
+  roleId: string;
+  roleTitle: string;
+  totalJobs: number;
+  lastIngestedAt: string | null;
+  sources: string[];
+  skills: MarketDemandStat[];
 }
 
 export interface JobMatchResult {

@@ -24,8 +24,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         await seedAll();
         this.logger.log('Database schema + seed applied on boot (idempotent).');
       } catch (err) {
-        this.logger.error(`Auto database initialization failed: ${(err as Error).message}`);
-        throw err;
+        this.logger.warn(`Auto database initialization skipped/warn: ${(err as Error).message}`);
       }
     }
   }

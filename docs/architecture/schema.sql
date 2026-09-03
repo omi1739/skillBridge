@@ -93,6 +93,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     experience_level VARCHAR(50),
     role_id VARCHAR(100) REFERENCES roles(id) ON DELETE SET NULL,
     description TEXT NOT NULL,
+    posting_url VARCHAR(500),
     posted_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -226,3 +227,12 @@ CREATE INDEX IF NOT EXISTS idx_evidence_user_skill ON skill_evidence(user_id, sk
 CREATE INDEX IF NOT EXISTS idx_gaps_user_role ON skill_gaps(user_id, role_id);
 CREATE INDEX IF NOT EXISTS idx_job_skills_job ON job_skills(job_id);
 CREATE INDEX IF NOT EXISTS idx_projects_user ON projects(user_id);
+
+-- Idempotent upgrade for databases created before these columns existed.
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS posting_url VARCHAR(500);
+
+-- Indexes to keep ingestion dedupe + demand recompute fast.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_job_sources_name ON job_sources(name);
+CREATE INDEX IF NOT EXISTS idx_jobs_source_external ON jobs(source_id, external_id);
+CREATE INDEX IF NOT EXISTS idx_jobs_role ON jobs(role_id);
+CREATE INDEX IF NOT EXISTS idx_job_skills_skill ON job_skills(skill_id);

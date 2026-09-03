@@ -101,6 +101,15 @@ export default function SkillBridgeApp() {
   const [role, setRole] = useState<Role | null>(null);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [allJobs, setAllJobs] = useState<any[]>([]);
+  const [marketProvenance, setMarketProvenance] = useState<{
+    sources: string[];
+    lastIngestedAt: string | null;
+    totalJobs: number;
+  } | null>(null);
+  const [expandedSkillPostings, setExpandedSkillPostings] = useState<{
+    skillId: string;
+    postings: any[];
+  } | null>(null);
   const [assessment, setAssessment] = useState<Assessment | null>(null);
   const [challenges, setChallenges] = useState<any[]>([]);
   const [curricula, setCurricula] = useState<CurriculumProfile[]>([]);
@@ -264,6 +273,19 @@ export default function SkillBridgeApp() {
       .then(res => res.json())
       .then(data => setLandingStats(data))
       .catch((err) => console.error('[SkillBridge] Data load failed:', err));
+
+    fetch(`${API_BASE}/market/demand?roleId=role_junior_backend`)
+      .then(res => res.json())
+      .then(data => {
+        if (data && typeof data.totalJobs === 'number') {
+          setMarketProvenance({
+            sources: Array.isArray(data.sources) ? data.sources : [],
+            lastIngestedAt: data.lastIngestedAt || null,
+            totalJobs: data.totalJobs
+          });
+        }
+      })
+      .catch((err) => console.error('[SkillBridge] Market demand load failed:', err));
 
     // Restore saved session if available
     const savedToken = localStorage.getItem('skillbridge_token');
@@ -671,8 +693,14 @@ export default function SkillBridgeApp() {
     if (!role) return null;
     const totalJobsCount = landingStats?.jobPostings ?? allJobs.length;
     const employerCount = new Set(allJobs.map(j => j.company)).size;
+    const sourceList = marketProvenance?.sources?.length
+      ? marketProvenance.sources.join(' + ')
+      : 'Public job APIs';
+    const lastSync = marketProvenance?.lastIngestedAt
+      ? new Date(marketProvenance.lastIngestedAt).toLocaleDateString()
+      : 'pending';
     const sourcesText = employerCount > 0
-      ? `${employerCount} tech employers across the target region`
+      ? `${employerCount} tech employers ${sourceList ? `• Source: ${sourceList}` : ''} • Synced ${lastSync}`
       : 'Live data loading…';
 
     return (
@@ -723,6 +751,11 @@ export default function SkillBridgeApp() {
             {role?.roleSkills ? role.roleSkills.map(rs => {
               const pct = Math.round(rs.marketDemandFrequency * 100);
               const isRequired = rs.required;
+              const matchingPostings = allJobs.filter(j =>
+                (j.requiredSkillIds || []).includes(rs.skillId) ||
+                (j.preferredSkillIds || []).includes(rs.skillId)
+              );
+              const isExpanded = expandedSkillPostings?.skillId === rs.skillId;
 
               return (
                 <div key={rs.skillId}>
@@ -735,9 +768,23 @@ export default function SkillBridgeApp() {
                         {isRequired ? 'Required' : 'Preferred'}
                       </span>
                     </div>
-                    <div style={{ fontWeight: 700, fontFamily: 'var(--font-mono)', color: isRequired ? '#f87171' : '#60a5fa' }}>
+                    <button
+                      onClick={() => setExpandedSkillPostings(
+                        isExpanded ? null : { skillId: rs.skillId, postings: matchingPostings }
+                      )}
+                      style={{
+                        fontWeight: 700,
+                        fontFamily: 'var(--font-mono)',
+                        color: isRequired ? '#f87171' : '#60a5fa',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        textDecoration: 'underline dotted'
+                      }}
+                      title="Show the real postings used to compute this value"
+                    >
                       {pct}% of jobs
-                    </div>
+                    </button>
                   </div>
 
                   <div className="progress-container">
@@ -748,13 +795,47 @@ export default function SkillBridgeApp() {
                   </div>
 
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                    Target Level: <strong>{rs.proficiencyTarget}</strong> • Role Weight: <strong>{rs.roleWeight * 100}%</strong>
+                    Target Level: <strong>{rs.proficiencyTarget}</strong> • Role Weight: <strong>{rs.roleWeight * 100}%</strong> • {matchingPostings.length} of {totalJobsCount} postings
                   </div>
+
+                  {isExpanded && (
+                    <div style={{ marginTop: '0.6rem', border: '1px solid var(--border-faint)', borderRadius: '6px', padding: '0.7rem', background: 'var(--bg-row)' }}>
+                      <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+                        Verifiable source postings
+                      </div>
+                      {matchingPostings.length === 0 && (
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>No live postings matched yet — run ingestion.</div>
+                      )}
+                      {(matchingPostings.slice(0, 8)).map(j => (
+                        <div key={j.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', padding: '0.35rem 0', borderBottom: '1px solid var(--border-faint)', fontSize: '0.8rem' }}>
+                          <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <strong>{j.title}</strong>
+                            <span style={{ color: 'var(--text-muted)' }}> — {j.company}{j.location ? ` (${j.location})` : ''}</span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+                            <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>{j.sourceName || 'Manual'}</span>
+                            {j.sourceUrl ? (
+                              <a href={j.sourceUrl} target="_blank" rel="noopener noreferrer" className="btn btn-secondary" style={{ fontSize: '0.7rem', padding: '0.2rem 0.6rem' }}>
+                                Open ↗
+                              </a>
+                            ) : null}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             }) : (
               <div style={{ color: 'var(--text-muted)', padding: '1rem 0' }}>Loading market demand data...</div>
             )}
+          </div>
+
+          <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-faint)', fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', flexWrap: 'wrap', gap: '0.5rem 1.25rem' }}>
+            <span><strong style={{ color: 'var(--text-secondary)' }}>Computed from</strong> {totalJobsCount} live postings</span>
+            <span><strong style={{ color: 'var(--text-secondary)' }}>Source</strong> {sourceList}</span>
+            <span><strong style={{ color: 'var(--text-secondary)' }}>Last synced</strong> {lastSync}</span>
+            <span>Percentages are occurrence counts across real, verifiable postings — click a value to open them.</span>
           </div>
         </div>
       </div>
@@ -1558,6 +1639,13 @@ export default function SkillBridgeApp() {
             <div className="demand-panel">
               <div className="demand-panel-title">Live Market Data</div>
               <h2 className="demand-panel-heading">What employers ask for most</h2>
+              {marketProvenance && marketProvenance.sources.length > 0 && (
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+                  Source: <strong style={{ color: 'var(--text-secondary)' }}>{marketProvenance.sources.join(' + ')}</strong>
+                  {' · '}{marketProvenance.totalJobs} postings
+                  {marketProvenance.lastIngestedAt ? ` · synced ${new Date(marketProvenance.lastIngestedAt).toLocaleDateString()}` : ''}
+                </div>
+              )}
               <div className="demand-list">
                 {topSkills.map(rs => {
                   const pct = Math.round(rs.marketDemandFrequency * 100);

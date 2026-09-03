@@ -1,0 +1,40 @@
+name: Scheduled Job Ingestion
+
+# Refresh SkillBridge's labor-market dataset from the live public job API on a
+# schedule. Uses the ADMIN ingestion endpoint so data keeps flowing without
+# manual intervention. Requires these repository secrets:
+#   INGEST_API_BASE  e.g. https://skillbridge-cv3e.onrender.com/api
+#   INGEST_EMAIL     owner/ADMIN email
+#   INGEST_PASSWORD  owner/ADMIN password
+on:
+  schedule:
+    - cron: '23 3 * * *'   # UTC daily
+  workflow_dispatch:
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Trigger live job ingestion
+        env:
+          API_BASE: ${{ secrets.INGEST_API_BASE }}
+          EMAIL: ${{ secrets.INGEST_EMAIL }}
+          PASSWORD: ${{ secrets.INGEST_PASSWORD }}
+        run: |
+          set -euo pipefail
+          LOGIN="$(curl -s -X POST "$API_BASE/auth/login" \
+            -H 'Content-Type: application/json' \
+            -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}")"
+          TOKEN="$(printf '%s' "$LOGIN" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s).token)}catch{process.exit(1)}})')"
+          if [ -z "$TOKEN" ]; then
+            echo "Auth failed. Response: $LOGIN"
+            exit 1
+          fi
+          REPORT="$(curl -s -X POST "$API_BASE/ingest/run" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H 'Content-Type: application/json' \
+            -d '{}')"
+          echo "$REPORT"
+          printf '%s' "$REPORT" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const r=JSON.parse(s);if(!r || typeof r.inserted==="undefined"){console.error("Unexpected response",s);process.exit(1)}console.log("OK inserted="+r.inserted+" updated="+r.updated+" totalJobs="+r.totalJobs)})'
