@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Query, Body, UseGuards, InternalServerErrorException } from '@nestjs/common';
+import { Controller, Get, Post, Query, Body, UseGuards, InternalServerErrorException, Inject } from '@nestjs/common';
 import { IngestionService } from './ingestion.service';
 import { store } from '../../store';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -7,7 +7,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 
 @Controller()
 export class IngestionController {
-  constructor(private readonly ingestionService: IngestionService) {}
+  constructor(@Inject(IngestionService) private readonly ingestionService: IngestionService) {}
 
   @Get('market/demand')
   async getMarketDemand(@Query('roleId') roleId?: string) {
