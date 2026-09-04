@@ -79,7 +79,7 @@ export class IngestionService {
     inserted: number;
     updated: number;
     removed: number;
-    expired: number;
+    deleted: number;
     recomputedRoles: number;
     totalJobs: number;
     source: string;
@@ -168,7 +168,7 @@ export class IngestionService {
     await this.bustCaches();
 
     this.logger.log(
-      `Ingestion complete: fetched=${raw.length} classified=${built.length} inserted=${inserted} updated=${updated} removed=${removed} expired=${sweep.expired} totalJobs=${recomputed.totalJobs}`
+      `Ingestion complete: fetched=${raw.length} classified=${built.length} inserted=${inserted} updated=${updated} removed=${removed} deleted=${sweep.deleted} totalJobs=${recomputed.totalJobs}`
     );
     return {
       fetched: raw.length,
@@ -176,7 +176,7 @@ export class IngestionService {
       inserted,
       updated,
       removed,
-      expired: sweep.expired,
+      deleted: sweep.deleted,
       recomputedRoles: recomputed.updatedRoles,
       totalJobs: recomputed.totalJobs,
       source: sourceName

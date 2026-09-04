@@ -638,25 +638,31 @@ export class AppDataStore {
     );
   }
 
-  async runVerificationSweep(): Promise<{ expired: number; recentlyChecked: number; verified: number }> {
-    const EXPIRY_INTERVAL = "7 days";
+  async runVerificationSweep(): Promise<{ deleted: number; recentlyChecked: number; verified: number }> {
     const RECENT_INTERVAL = "48 hours";
 
-    // Expire jobs: source inactive OR last_verified_at older than 7 days
-    const expired = await query<{ c: string }>(
-      `WITH expired AS (
-         UPDATE jobs SET verification_status = 'EXPIRED'
+    // Retain ingested listings for this many days since last verification, then
+    // permanently remove them. Defaults to 4 (keeps job-plan growth bounded so
+    // the table never fills up). EMPLOYER_VERIFIED postings are always kept.
+    const retentionDays = Number(process.env.JOB_RETENTION_DAYS || 4) || 4;
+    const retentionInterval = `${retentionDays} days`;
+
+    // Purge stale listings: source became inactive OR not re-verified within
+    // the retention window. Never remove recruiter-hosted (EMPLOYER_VERIFIED) jobs.
+    const deleted = await query<{ c: string }>(
+      `WITH purged AS (
+         DELETE FROM jobs
          WHERE (
            source_id IS NOT NULL AND NOT EXISTS (
              SELECT 1 FROM job_sources s WHERE s.id = jobs.source_id AND s.is_active
            )
            OR
-           (last_verified_at IS NOT NULL AND last_verified_at < CURRENT_TIMESTAMP - INTERVAL '${EXPIRY_INTERVAL}')
+           (last_verified_at IS NOT NULL AND last_verified_at < CURRENT_TIMESTAMP - INTERVAL '${retentionInterval}')
          )
-         AND verification_status NOT IN ('EMPLOYER_VERIFIED', 'EXPIRED')
+         AND verification_status != 'EMPLOYER_VERIFIED'
          RETURNING id
        )
-       SELECT COUNT(*)::text AS c FROM expired`
+       SELECT COUNT(*)::text AS c FROM purged`
     );
 
     // RECENTLY_CHECKED: source is active AND last_verified_at within 48h
@@ -684,7 +690,7 @@ export class AppDataStore {
     );
 
     return {
-      expired: Number(expired[0]?.c || 0),
+      deleted: Number(deleted[0]?.c || 0),
       recentlyChecked: Number(recent[0]?.c || 0),
       verified: Number(verified[0]?.c || 0)
     };
