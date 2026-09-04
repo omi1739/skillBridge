@@ -98,6 +98,14 @@ export interface SubSkillResult {
   status: 'STRENGTH' | 'MODERATE' | 'NEEDS_WORK';
 }
 
+export interface QuestionResult {
+  question: Question;
+  userAnswer: string | null;
+  correct: boolean;
+  correctAnswer: string;
+  explanation: string;
+}
+
 export interface AssessmentAttempt {
   id: string;
   userId: string;
@@ -110,6 +118,7 @@ export interface AssessmentAttempt {
   passed: boolean;
   subSkillScores: SubSkillResult[];
   status: 'IN_PROGRESS' | 'COMPLETED' | 'ABANDONED';
+  detailedResults?: QuestionResult[];
 }
 
 export type EvidenceSourceType = 'SELF_REPORTED' | 'ASSESSMENT' | 'PROJECT' | 'GITHUB';
@@ -289,4 +298,163 @@ export interface JobMatchResult {
   matchedSkills: Array<{ skillId: string; canonicalName: string; proficiency: number }>;
   missingSkills: Array<{ skillId: string; canonicalName: string; isRequired: boolean }>;
   explanation: string;
+}
+
+// ============================================================
+// Skill-Centric Assessment System Types
+// ============================================================
+
+export type SkillLevel = 'Beginner' | 'Developing' | 'Intermediate' | 'Advanced';
+
+export type QuestionDifficulty = 'easy' | 'medium' | 'hard';
+
+export type AssessmentQuestionType = 'MCQ' | 'multiple_select' | 'true_false' | 'code_output';
+
+export type QuestionVerificationStatus = 'pending_review' | 'approved' | 'rejected';
+
+export interface SkillTopic {
+  id: string;
+  skillId: string;
+  name: string;
+  description?: string;
+}
+
+/**
+ * A question in the skill-centric bank. The correct answer and explanation are
+ * NEVER sent to the client before submission; they live server-side.
+ */
+export interface BankQuestion {
+  id: string;
+  skillId: string;
+  topic: string;
+  difficulty: QuestionDifficulty;
+  questionType: AssessmentQuestionType;
+  questionText: string;
+  codeSnippet?: string;
+  options: string[];
+  correctAnswer: string | string[]; // single string for MCQ/tf/code, array for multiple_select
+  explanation: string;
+  verificationStatus: QuestionVerificationStatus;
+  createdBy?: string; // 'seed' | 'admin' | 'ai'
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/** A question as served to the candidate (no correct answer/explanation). */
+export interface AssessmentQuestionView {
+  id: string;
+  topic: string;
+  difficulty: QuestionDifficulty;
+  questionType: AssessmentQuestionType;
+  questionText: string;
+  codeSnippet?: string;
+  options: string[];
+  points: number;
+}
+
+/** Distribution of difficulty for a configurable assessment (e.g. 2 easy / 5 medium / 3 hard). */
+export interface AssessmentConfig {
+  skillId: string;
+  title?: string;
+  totalQuestions: number;
+  easyCount: number;
+  mediumCount: number;
+  hardCount: number;
+}
+
+export interface AssessmentSession {
+  id: string;
+  userId: string;
+  skillId: string;
+  skillName?: string;
+  difficulty: string;
+  questionCount: number;
+  status: 'in_progress' | 'completed' | 'abandoned' | 'expired';
+  startedAt: string;
+  completedAt?: string;
+  score?: number;
+  skillLevel?: SkillLevel;
+  questions: AssessmentQuestionView[];
+}
+
+export interface TopicResult {
+  topic: string;
+  earnedPoints: number;
+  totalPoints: number;
+  percentage: number;
+  status: 'STRENGTH' | 'MODERATE' | 'NEEDS_WORK';
+}
+
+export interface AssessmentResult {
+  assessmentId: string;
+  sessionId: string;
+  skillId: string;
+  skillName: string;
+  score: number; // 0-100
+  skillLevel: SkillLevel;
+  topicResults: TopicResult[];
+  strengths: string[];
+  needsImprovement: string[];
+  correctCount: number;
+  incorrectCount: number;
+  totalQuestions: number;
+  startedAt: string;
+  completedAt: string;
+  durationSeconds?: number;
+  detailedResults?: QuestionResult[];
+}
+
+export interface AssessmentHistoryItem {
+  id: string;
+  skillId: string;
+  skillName: string;
+  difficulty: string;
+  score: number;
+  skillLevel: SkillLevel;
+  questionCount: number;
+  completedAt: string;
+  status: string;
+}
+
+export interface SkillProgress {
+  skillId: string;
+  skillName: string;
+  attemptCount: number;
+  averageScore: number;
+  bestScore: number;
+  latestScore: number;
+  latestSkillLevel: SkillLevel;
+  trend: Array<{ completedAt: string; score: number }>;
+}
+
+// ---- AI question generation ----
+export interface AiGeneratedQuestion {
+  questionText: string;
+  codeSnippet?: string;
+  questionType: AssessmentQuestionType;
+  difficulty: QuestionDifficulty;
+  topic: string;
+  options: string[];
+  correctAnswer: string | string[];
+  explanation: string;
+}
+
+export interface QuestionGenerationRequest {
+  skillId: string;
+  topic: string;
+  difficulty: QuestionDifficulty;
+  questionType: AssessmentQuestionType;
+  count: number;
+}
+
+export interface QuestionGenerationResult {
+  jobId: string;
+  created: number;
+  rejected: number;
+  errors: string[];
+}
+
+export interface ValidationFailure {
+  index: number;
+  reasons: string[];
 }

@@ -15,6 +15,10 @@ import {
   INITIAL_ASSESSMENT,
   INITIAL_RECOMMENDATIONS
 } from '../data/seed';
+import {
+  SKILL_BANK_TOPICS,
+  SKILL_BANK_QUESTIONS
+} from '../data/skill-bank.seed';
 import { query, withTransaction } from './client';
 import { authService } from '../services/auth.service';
 
@@ -79,6 +83,41 @@ export async function seedAll(): Promise<void> {
         [q.id, a.id, q.prompt, q.codeSnippet || null, q.questionType,
          q.options ? JSON.stringify(q.options) : null, q.correctAnswer,
          q.explanation, q.subSkill, q.difficulty, q.points]
+      );
+    }
+
+    // --- Skill assessment: topics + question bank ---
+    for (const t of SKILL_BANK_TOPICS) {
+      await client.query(
+        `INSERT INTO skill_topics (id, skill_id, name, description)
+         VALUES ($1,$2,$3,$4) ON CONFLICT (skill_id, name) DO NOTHING`,
+        [t.id, t.skillId, t.name, t.description || null]
+      );
+    }
+    for (const q of SKILL_BANK_QUESTIONS) {
+      await client.query(
+        `INSERT INTO questions
+           (id, assessment_id, prompt, code_snippet, question_type, options_json, correct_answer,
+            explanation, sub_skill, difficulty, points, skill_id, topic, verification_status,
+            question_text, is_multiple_select, created_by)
+         VALUES ($1, NULL, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11, $12, 'approved', $13, $14, 'seed')
+         ON CONFLICT (id) DO NOTHING`,
+        [
+          q.id,
+          q.questionText,
+          q.codeSnippet || null,
+          q.questionType,
+          q.options ? JSON.stringify(q.options) : null,
+          Array.isArray(q.correctAnswer) ? JSON.stringify(q.correctAnswer) : q.correctAnswer,
+          q.explanation,
+          q.topic,
+          q.difficulty,
+          q.difficulty === 'easy' ? 1 : q.difficulty === 'hard' ? 3 : 2,
+          q.skillId,
+          q.topic,
+          q.questionText,
+          q.questionType === 'multiple_select'
+        ]
       );
     }
 

@@ -162,11 +162,31 @@ export default function SkillBridgeApp() {
   const [attemptResult, setAttemptResult] = useState<AssessmentAttempt | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<number>(30 * 60);
 
+  // Skill-centric assessment state
+  const [skillAssessAvailableSkills, setSkillAssessAvailableSkills] = useState<any[]>([]);
+  const [skillAssessSelectedSkill, setSkillAssessSelectedSkill] = useState<string>('');
+  const [skillAssessCfg, setSkillAssessCfg] = useState({ easy: 2, medium: 5, hard: 3 });
+  const [skillSession, setSkillSession] = useState<any | null>(null);
+  const [skillQuestionIdx, setSkillQuestionIdx] = useState(0);
+  const [skillAnswers, setSkillAnswers] = useState<Record<string, string | string[]>>({});
+  const [skillSavedCorrect, setSkillSavedCorrect] = useState<Record<string, boolean>>({});
+  const [isStartingSkill, setIsStartingSkill] = useState(false);
+  const [isSubmittingSkill, setIsSubmittingSkill] = useState(false);
+  const [skillAssessError, setSkillAssessError] = useState('');
+  const [skillResult, setSkillResult] = useState<any | null>(null);
+  const [skillHistory, setSkillHistory] = useState<any[] | null>(null);
+  const [skillProgress, setSkillProgress] = useState<any | null>(null);
+  const [viewingResultId, setViewingResultId] = useState<string | null>(null);
+
   // Sandbox runner state
   const [selectedChallengeIdx, setSelectedChallengeIdx] = useState(0);
   const [sandboxCode, setSandboxCode] = useState('');
   const [isRunningSandbox, setIsRunningSandbox] = useState(false);
   const [sandboxResult, setSandboxResult] = useState<any | null>(null);
+  const [isGeneratingChallenge, setIsGeneratingChallenge] = useState(false);
+  const [generateError, setGenerateError] = useState('');
+  const [referenceSolution, setReferenceSolution] = useState<string | null>(null);
+  const [isLoadingSolution, setIsLoadingSolution] = useState(false);
 
   // Candidate personalized data
   const [gaps, setGaps] = useState<SkillGap[]>([]);
@@ -209,6 +229,13 @@ export default function SkillBridgeApp() {
   const [weightSaveSuccess, setWeightSaveSuccess] = useState(false);
   const [aliasSaveSuccess, setAliasSaveSuccess] = useState(false);
 
+  // Admin skill question bank state
+  const [adminSkillQuestions, setAdminSkillQuestions] = useState<any[] | null>(null);
+  const [adminQStatusFilter, setAdminQStatusFilter] = useState('pending_review');
+  const [adminQMsg, setAdminQMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [adminGenForm, setAdminGenForm] = useState({ topic: '', difficulty: 'medium', questionType: 'MCQ', count: 3 });
+  const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false);
+
   // Landing page market stats (dynamic counts)
   const [landingStats, setLandingStats] = useState<{
     jobPostings: number;
@@ -218,6 +245,20 @@ export default function SkillBridgeApp() {
     activeCompanies?: number;
   } | null>(null);
 
+  const loadDiagnostic = (count = 12) => {
+    fetch(`${API_BASE}/assessments/diagnostic?count=${count}`)
+      .then(res => res.json())
+      .then(data => {
+        setAssessment(data);
+        setCurrentQuestionIdx(0);
+        setUserAnswers({});
+        setAttemptResult(null);
+        if (data && data.timeLimitMinutes) {
+          setTimeRemaining(data.timeLimitMinutes * 60);
+        }
+      })
+      .catch((err) => console.error('[SkillBridge] Data load failed:', err));
+  };
   const activeUserId = currentUser ? currentUser.id : 'demo_user_01';
 
   const authHeaders = () => {
@@ -232,6 +273,144 @@ export default function SkillBridgeApp() {
     if (token) headers['Authorization'] = `Bearer ${token}`;
     return headers;
   };
+
+  // ---- Skill-centric assessment API helpers ----
+  const loadSkillAssessSkills = () => {
+    fetch(`${API_BASE}/assessments/skills`)
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          setSkillAssessAvailableSkills(data);
+          setSkillAssessSelectedSkill(prev => prev || data[0].id);
+        }
+      })
+      .catch((err) => console.error('[SkillBridge] Skill assessment skills load failed:', err));
+  };
+
+  const startSkillAssessment = async () => {
+    if (!skillAssessSelectedSkill) return;
+    setIsStartingSkill(true);
+    setSkillAssessError('');
+    setSkillResult(null);
+    setViewingResultId(null);
+    setSkillAnswers({});
+    setSkillQuestionIdx(0);
+    try {
+      const res = await fetch(`${API_BASE}/assessments`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          skillId: skillAssessSelectedSkill,
+          easyCount: skillAssessCfg.easy,
+          mediumCount: skillAssessCfg.medium,
+          hardCount: skillAssessCfg.hard
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || data.error || 'Could not start assessment.');
+      setSkillSession(data);
+      setSkillSavedCorrect({});
+    } catch (err: any) {
+      setSkillAssessError(err.message || 'Could not start assessment.');
+    } finally {
+      setIsStartingSkill(false);
+    }
+  };
+
+  const submitSkillAnswer = async (questionId: string, answer: string | string[]) => {
+    if (!skillSession) return;
+    if (skillSavedCorrect[questionId]) return;
+    try {
+      const res = await fetch(`${API_BASE}/assessments/session/${skillSession.id}/answers`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ questionId, answer })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Answer could not be saved.');
+      setSkillSavedCorrect(prev => ({ ...prev, [questionId]: data.correct }));
+      setSkillAnswers(prev => ({ ...prev, [questionId]: answer }));
+    } catch (err: any) {
+      setSkillAssessError(err.message || 'Answer could not be saved.');
+    }
+  };
+
+  const goSkillQuestion = (idx: number) => {
+    setSkillQuestionIdx(idx);
+    setSkillAssessError('');
+  };
+
+  const submitSkillAssessment = async () => {
+    if (!skillSession) return;
+    setIsSubmittingSkill(true);
+    setSkillAssessError('');
+    try {
+      const res = await fetch(`${API_BASE}/assessments/session/${skillSession.id}/submit`, {
+        method: 'POST',
+        headers: authHeaders()
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Could not submit assessment.');
+      setSkillResult(data);
+      setSkillSession(null);
+      loadSkillAssessHistory();
+      if (skillAssessSelectedSkill) loadSkillAssessProgress(skillAssessSelectedSkill);
+    } catch (err: any) {
+      setSkillAssessError(err.message || 'Could not submit assessment.');
+    } finally {
+      setIsSubmittingSkill(false);
+    }
+  };
+
+  const loadSkillAssessResult = async (sessionId: string) => {
+    try {
+      const res = await fetch(`${API_BASE}/assessments/session/${sessionId}/result`, { headers: authHeaders() });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Could not load result.');
+      setSkillResult(data);
+      setViewingResultId(sessionId);
+      setSkillSession(null);
+    } catch (err: any) {
+      setSkillAssessError(err.message || 'Could not load result.');
+    }
+  };
+
+  const loadSkillAssessHistory = () => {
+    fetch(`${API_BASE}/assessments/history`, { headers: authHeaders() })
+      .then(res => res.json())
+      .then(data => setSkillHistory(Array.isArray(data) ? data : null))
+      .catch(() => setSkillHistory(null));
+  };
+
+  const loadSkillAssessProgress = (skillId: string) => {
+    fetch(`${API_BASE}/assessments/skills/${skillId}/progress`, { headers: authHeaders() })
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => setSkillProgress(data || null))
+      .catch(() => setSkillProgress(null));
+  };
+
+  const resetSkillAssessment = () => {
+    setSkillSession(null);
+    setSkillResult(null);
+    setViewingResultId(null);
+    setSkillAnswers({});
+    setSkillSavedCorrect({});
+    setSkillQuestionIdx(0);
+    setSkillAssessError('');
+  };
+
+  const cancelSkillAssessment = () => {
+    setSkillAssessError('');
+    setSkillSession(null);
+    setSkillQuestionIdx(0);
+    setSkillAnswers({});
+    setSkillSavedCorrect({});
+  };
+
+  useEffect(() => {
+    loadSkillAssessSkills();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Raw job postings are only served to authenticated members. This also
   // powers the public market view's posting drilldown once a user signs in.
@@ -402,15 +581,7 @@ export default function SkillBridgeApp() {
   useEffect(() => {
     fetchRoleAndSkills();
 
-    fetch(`${API_BASE}/assessments/assessment_backend_diagnostic`)
-      .then(res => res.json())
-      .then(data => {
-        setAssessment(data);
-        if (data && data.timeLimitMinutes) {
-          setTimeRemaining(data.timeLimitMinutes * 60);
-        }
-      })
-      .catch((err) => console.error('[SkillBridge] Data load failed:', err));
+    loadDiagnostic(12);
 
     fetch(`${API_BASE}/sandbox/challenges`)
       .then(res => res.json())
@@ -747,6 +918,50 @@ export default function SkillBridgeApp() {
     setSelectedChallengeIdx(idx);
     setSandboxCode(challenges[idx].starterCode);
     setSandboxResult(null);
+    setReferenceSolution(null);
+  };
+
+  const handleGenerateChallenge = async () => {
+    setIsGeneratingChallenge(true);
+    setGenerateError('');
+    setSandboxResult(null);
+    setReferenceSolution(null);
+    try {
+      const res = await fetch(`${API_BASE}/sandbox/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'SQL', skillId: 'skill_sql', difficulty: 'Intermediate' })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || data.error || 'Generation failed.');
+      }
+      setChallenges(prev => [...prev, data]);
+      const newIdx = challenges.length;
+      setSelectedChallengeIdx(newIdx);
+      setSandboxCode(data.starterCode || '');
+    } catch (err: any) {
+      setGenerateError(err.message || 'Generation failed.');
+    } finally {
+      setIsGeneratingChallenge(false);
+    }
+  };
+
+  const handleShowSolution = async () => {
+    const challenge = activeChallenge;
+    if (!challenge) return;
+    setIsLoadingSolution(true);
+    setReferenceSolution(null);
+    try {
+      const res = await fetch(`${API_BASE}/sandbox/reference-solution/${challenge.id}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || data.error || 'No solution available.');
+      setReferenceSolution(data.referenceSolution || '');
+    } catch (err: any) {
+      setReferenceSolution(`Could not load solution: ${err.message}`);
+    } finally {
+      setIsLoadingSolution(false);
+    }
   };
 
   const handleRunSandbox = async () => {
@@ -868,6 +1083,66 @@ export default function SkillBridgeApp() {
       }
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  // ---- Admin skill question bank helpers ----
+  const loadAdminSkillQuestions = (status = adminQStatusFilter || 'pending_review') => {
+    if (!authToken) return;
+    const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+    fetch(`${API_BASE}/assessments/admin/questions${qs}`, { headers: authHeaders() })
+      .then(res => (res.ok ? res.json() : Promise.reject(res)))
+      .then((data: any) => setAdminSkillQuestions(Array.isArray(data) ? data : []))
+      .catch(() => setAdminSkillQuestions([]));
+  };
+
+  useEffect(() => {
+    if (activeTab === 'admin' && currentUser?.role === 'ADMIN' && authToken) {
+      loadAdminSkillQuestions();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, currentUser?.role, authToken]);
+
+  const setAdminQuestionStatus = async (id: string, status: string) => {
+    setAdminQMsg(null);
+    try {
+      const res = await fetch(`${API_BASE}/assessments/admin/questions/${id}/status`, {
+        method: 'PATCH',
+        headers: authHeaders(),
+        body: JSON.stringify({ status })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Update failed.');
+      setAdminQMsg({ ok: true, text: `Question ${status}.` });
+      loadAdminSkillQuestions();
+    } catch (err: any) {
+      setAdminQMsg({ ok: false, text: err.message });
+    }
+  };
+
+  const generateAdminQuestions = async () => {
+    setAdminQMsg(null);
+    setIsGeneratingQuestions(true);
+    try {
+      const res = await fetch(`${API_BASE}/assessments/admin/generate`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          skillId: skillAssessSelectedSkill,
+          topic: adminGenForm.topic,
+          difficulty: adminGenForm.difficulty,
+          questionType: adminGenForm.questionType,
+          count: adminGenForm.count
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || data.error || 'Generation failed.');
+      setAdminQMsg({ ok: true, text: `Generated ${data.created} question(s); ${data.rejected} rejected.` });
+      loadAdminSkillQuestions();
+    } catch (err: any) {
+      setAdminQMsg({ ok: false, text: err.message });
+    } finally {
+      setIsGeneratingQuestions(false);
     }
   };
 
@@ -1155,6 +1430,342 @@ export default function SkillBridgeApp() {
     );
   };
 
+  const renderSkillAssessmentView = () => {
+    const skillName =
+      skillAssessAvailableSkills.find((s: any) => s.id === skillAssessSelectedSkill)?.canonicalName ||
+      skillAssessSelectedSkill;
+
+    const renderConfig = () => (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">Skill Assessment</h1>
+            <p className="page-subtitle">
+              Self-assess skills with difficulty-weighted questions. Your answers are evaluated securely on the
+              server and feed your verified skill profile.
+            </p>
+          </div>
+        </div>
+
+        <div className="card">
+          <h3 className="card-title" style={{ marginBottom: '1rem' }}>Configure Assessment</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div>
+              <label className="auth-label" style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '0.35rem' }}>
+                Skill
+              </label>
+              <select
+                value={skillAssessSelectedSkill}
+                onChange={(e) => { setSkillAssessSelectedSkill(e.target.value); setSkillProgress(null); loadSkillAssessProgress(e.target.value); }}
+                style={{ width: '100%', padding: '0.6rem 0.8rem', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '7px', color: 'var(--text-primary)', fontSize: '0.85rem' }}
+              >
+                {(skillAssessAvailableSkills as any[]).map((s: any) => (
+                  <option key={s.id} value={s.id}>{s.canonicalName || s.id}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
+              {(['easy', 'medium', 'hard'] as const).map((level) => (
+                <div key={level}>
+                  <label className="auth-label" style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'capitalize', marginBottom: '0.3rem' }}>
+                    {level}
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={30}
+                    value={skillAssessCfg[level]}
+                    onChange={(e) => setSkillAssessCfg(prev => ({ ...prev, [level]: Math.max(0, Number(e.target.value)) }))}
+                    style={{ width: '100%', padding: '0.6rem 0.8rem', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '7px', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: '0.9rem' }}
+                  />
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              Total questions: <strong>{skillAssessCfg.easy + skillAssessCfg.medium + skillAssessCfg.hard}</strong>
+            </div>
+
+            {skillAssessError && <div className="error-banner" style={{ color: '#f87171', fontSize: '0.82rem' }}>{skillAssessError}</div>}
+
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button className="btn btn-primary" onClick={startSkillAssessment} disabled={isStartingSkill || !skillAssessSelectedSkill}>
+                <BrainCircuit size={15} /> {isStartingSkill ? 'Starting…' : 'Start Skill Assessment'}
+              </button>
+              <button className="btn btn-secondary" onClick={loadSkillAssessHistory}>Refresh History</button>
+            </div>
+          </div>
+        </div>
+
+        {skillProgress && (
+          <div className="card">
+            <h3 className="card-title" style={{ marginBottom: '0.75rem' }}>Progress · {skillProgress.skillName}</h3>
+            <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', fontSize: '0.85rem' }}>
+              <div><span style={{ color: 'var(--text-muted)' }}>Attempts</span> <strong>{skillProgress.attemptCount}</strong></div>
+              <div><span style={{ color: 'var(--text-muted)' }}>Average</span> <strong>{skillProgress.averageScore}%</strong></div>
+              <div><span style={{ color: 'var(--text-muted)' }}>Best</span> <strong>{skillProgress.bestScore}%</strong></div>
+              <div><span style={{ color: 'var(--text-muted)' }}>Latest Level</span> <strong>{skillProgress.latestSkillLevel}</strong></div>
+            </div>
+          </div>
+        )}
+
+        {skillHistory && skillHistory.length > 0 && (
+          <div className="card">
+            <h3 className="card-title" style={{ marginBottom: '0.75rem' }}>Assessment History</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {skillHistory.map((h: any) => (
+                <div key={h.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.6rem 0.7rem', background: 'var(--bg-row)', border: '1px solid var(--border-faint)', borderRadius: '6px', fontSize: '0.82rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div>
+                    <strong>{h.skillName}</strong>
+                    <span style={{ color: 'var(--text-muted)' }}> · {new Date(h.completedAt).toLocaleDateString()}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <span className="badge" style={{ background: 'rgba(16,185,129,0.1)', color: '#34d399', border: '1px solid rgba(16,185,129,0.2)' }}>{h.skillLevel}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{h.score}%</span>
+                    <button className="btn btn-secondary" style={{ fontSize: '0.72rem', padding: '0.3rem 0.7rem' }} onClick={() => loadSkillAssessResult(h.id)}>
+                      View Result
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+
+    const renderQuiz = () => {
+      const questions = skillSession?.questions || [];
+      const idx = Math.min(skillQuestionIdx, questions.length - 1);
+      const q = questions[idx];
+      if (!q) return null;
+      const answered = !!skillSavedCorrect[q.id];
+      const selected = skillAnswers[q.id];
+
+      const pick = (opt: string) => {
+        if (q.questionType === 'multiple_select') {
+          const current = Array.isArray(selected) ? selected : [];
+          const next = current.includes(opt) ? current.filter(x => x !== opt) : [...current, opt];
+          setSkillAnswers(prev => ({ ...prev, [q.id]: next }));
+        } else {
+          setSkillAnswers(prev => ({ ...prev, [q.id]: opt }));
+        }
+      };
+
+      const confirmAnswer = () => {
+        if (!selected || (Array.isArray(selected) && selected.length === 0)) return;
+        submitSkillAnswer(q.id, selected);
+      };
+
+      const isSelected = (opt: string) =>
+        q.questionType === 'multiple_select'
+          ? Array.isArray(selected) && selected.includes(opt)
+          : selected === opt;
+
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div className="card-header" style={{ alignItems: 'center' }}>
+            <div>
+              <h2 className="card-title">Skill Assessment · {skillName}</h2>
+              <p className="card-subtitle">Question {idx + 1} of {questions.length} · {q.difficulty} · {q.topic}</p>
+            </div>
+            <button className="btn btn-secondary" onClick={cancelSkillAssessment} style={{ fontSize: '0.78rem' }}>Exit</button>
+          </div>
+
+          <div className="progress-container">
+            <div className="progress-bar progress-cyan" style={{ width: `${((idx + 1) / questions.length) * 100}%` }} />
+          </div>
+
+          <div className="card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+              <span className={`badge ${q.difficulty === 'hard' ? 'badge-critical' : q.difficulty === 'medium' ? 'badge-required' : 'badge-preferred'}`}>
+                <strong>{q.points}</strong> pt{q.points > 1 ? 's' : ''}
+              </span>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'capitalize' }}>{q.questionType?.replace('_', ' ')}</span>
+            </div>
+            <p style={{ fontSize: '0.95rem', color: 'var(--text-primary)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{q.questionText}</p>
+            {q.codeSnippet && (
+              <pre className="code-block" style={{ marginTop: '0.75rem' }}>{q.codeSnippet}</pre>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
+              {(q.options || []).map((opt: string) => {
+                const isSel = isSelected(opt);
+                return (
+                  <button
+                    key={opt}
+                    className={`option-btn ${isSel ? 'option-btn-selected' : ''}`}
+                    onClick={() => pick(opt)}
+                  >
+                    <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', marginRight: '0.5rem' }}>{(q.options || []).indexOf(opt) + 1}</span>
+                    <span style={{ whiteSpace: 'pre-wrap', textAlign: 'left' }}>{opt}</span>
+                    {answered && isSel && <CheckCircle2 size={16} style={{ marginLeft: 'auto', color: '#34d399' }} />}
+                  </button>
+                );
+              })}
+            </div>
+
+            {q.questionType === 'code_output' && (
+              <div style={{ marginTop: '0.75rem' }}>
+                <input
+                  className="terminal-input"
+                  value={typeof selected === 'string' ? selected || '' : ''}
+                  onChange={(e) => setSkillAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
+                  placeholder="Enter the expected output…"
+                  style={{ width: '100%', padding: '0.6rem 0.8rem', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '7px', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}
+                />
+              </div>
+            )}
+
+            {q.questionType === 'true_false' && (
+              <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem' }}>
+                {['True', 'False'].map(tf => (
+                  <button key={tf} className={`option-btn ${selected === tf ? 'option-btn-selected' : ''}`} onClick={() => pick(tf)}>
+                    {tf}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {answered ? (
+              <div className="confirmed-banner" style={{ marginTop: '1rem', padding: '0.6rem 0.8rem', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', color: '#34d399' }}>
+                <ShieldCheck size={14} /> Answer recorded and evaluated securely. You can change it before submitting the assessment.
+              </div>
+            ) : (
+              <div style={{ marginTop: '1rem', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                Select an answer, then confirm it. You can revise before submitting.
+              </div>
+            )}
+
+            <div style={{ marginTop: '1rem', display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+              <button className="btn btn-primary" onClick={confirmAnswer} disabled={!selected || (Array.isArray(selected) && selected.length === 0) || isSubmittingSkill}>
+                {answered ? 'Update Answer' : 'Confirm Answer'}
+              </button>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <button className="btn btn-secondary" onClick={() => goSkillQuestion(idx - 1)} disabled={idx === 0}>← Previous</button>
+            <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+              {questions.map((_q: any, i: number) => (
+                <button
+                  key={i}
+                  className={`btn ${i === idx ? 'btn-primary' : skillSavedCorrect[_q.id] ? 'btn-success' : 'btn-secondary'}`}
+                  style={{ width: '2rem', height: '2rem', padding: '0', fontSize: '0.78rem' }}
+                  onClick={() => goSkillQuestion(i)}
+                >
+                  {i + 1}
+                </button>
+              ))}
+            </div>
+            {idx === questions.length - 1 ? (
+              <button className="btn btn-primary" onClick={submitSkillAssessment} disabled={isSubmittingSkill}>
+                <Check size={15} /> {isSubmittingSkill ? 'Submitting…' : 'Submit Assessment'}
+              </button>
+            ) : (
+              <button className="btn btn-secondary" onClick={() => goSkillQuestion(idx + 1)}>Next →</button>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    const renderResult = () => {
+      const r = skillResult;
+      if (!r) return null;
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <div className="page-header">
+            <div>
+              <h1 className="page-title">Assessment Results · {r.skillName}</h1>
+              <p className="page-subtitle">Weighted score across difficulty levels and per-topic performance.</p>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '0.9fr 2fr', gap: '1.5rem' }}>
+            <div className="card" style={{ textAlign: 'center', padding: '1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.75rem' }}>
+              <div style={{ width: '84px', height: '84px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `3px solid ${r.score >= 70 ? '#10b981' : r.score >= 40 ? '#f59e0b' : '#f43f5e'}`, background: 'rgba(255,255,255,0.03)' }}>
+                <span style={{ fontSize: '1.5rem', fontWeight: 800, fontFamily: 'var(--font-mono)' }}>{r.score}%</span>
+              </div>
+              <span className="badge" style={{ background: 'rgba(16,185,129,0.1)', color: '#34d399', border: '1px solid rgba(16,185,129,0.2)', fontSize: '0.85rem' }}>
+                {r.skillLevel}
+              </span>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                {r.correctCount} correct · {r.incorrectCount} incorrect · {r.totalQuestions} total
+              </div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                {r.durationSeconds != null ? `${Math.floor(r.durationSeconds / 60)}m ${r.durationSeconds % 60}s` : ''}
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <button className="btn btn-secondary" onClick={resetSkillAssessment}>New Assessment</button>
+                <button className="btn btn-secondary" onClick={() => { setViewingResultId(null); setSkillResult(null); loadSkillAssessHistory(); }}>Back to Dashboard</button>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div className="card">
+                <h3 className="card-title" style={{ marginBottom: '0.75rem' }}>Topic Performance</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
+                  {(r.topicResults || []).map((t: any) => {
+                    const color = t.status === 'STRENGTH' ? '#10b981' : t.status === 'MODERATE' ? '#f59e0b' : '#f43f5e';
+                    return (
+                      <div key={t.topic}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '0.3rem' }}>
+                          <span><strong>{t.topic}</strong></span>
+                          <span style={{ color: 'var(--text-muted)' }}>{t.earnedPoints}/{t.totalPoints} pts · {t.percentage}%</span>
+                        </div>
+                        <div className="progress-container">
+                          <div className="progress-bar" style={{ width: `${t.percentage}%`, background: color }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="card">
+                  <h3 className="card-title" style={{ color: '#34d399', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Strengths</h3>
+                  {r.strengths?.length ? r.strengths.map((s: string) => <div key={s} style={{ fontSize: '0.82rem', padding: '0.2rem 0' }}>• {s}</div>) : <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>None yet.</div>}
+                </div>
+                <div className="card">
+                  <h3 className="card-title" style={{ color: '#fb7185', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Needs Work</h3>
+                  {r.needsImprovement?.length ? r.needsImprovement.map((s: string) => <div key={s} style={{ fontSize: '0.82rem', padding: '0.2rem 0' }}>• {s}</div>) : <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Nothing critical — great job.</div>}
+                </div>
+              </div>
+
+              {r.detailedResults && r.detailedResults.length > 0 && (
+                <div className="card">
+                  <h3 className="card-title" style={{ marginBottom: '0.75rem' }}>Question Review</h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                    {r.detailedResults.map((d: any, i: number) => (
+                      <div key={i} style={{ padding: '0.65rem 0.7rem', background: 'var(--bg-row)', border: '1px solid var(--border-faint)', borderRadius: '6px', fontSize: '0.82rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                          {d.correct ? <CheckCircle2 size={15} style={{ color: '#10b981', flexShrink: 0, marginTop: '2px' }} /> : <X size={15} style={{ color: '#f43f5e', flexShrink: 0, marginTop: '2px' }} />}
+                          <div>
+                            <div style={{ whiteSpace: 'pre-wrap' }}><strong>Q{i + 1}.</strong> {d.question?.prompt}</div>
+                            {d.question?.codeSnippet && <pre className="code-block" style={{ marginTop: '0.4rem' }}>{d.question.codeSnippet}</pre>}
+                            <div style={{ marginTop: '0.4rem', color: 'var(--text-secondary)' }}>Your answer: <span style={{ color: d.correct ? '#34d399' : '#fb7185' }}>{d.userAnswer || '(no answer)'}</span></div>
+                            <div style={{ color: 'var(--text-secondary)' }}>Correct: <span style={{ color: '#34d399' }}>{d.correctAnswer}</span></div>
+                            <div style={{ color: 'var(--text-muted)', marginTop: '0.2rem' }}>{d.explanation}</div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    if (skillSession) return renderQuiz();
+    if (skillResult) return renderResult();
+    return renderConfig();
+  };
+
   const renderAssessmentView = () => {
     if (!assessment) return null;
 
@@ -1196,8 +1807,8 @@ export default function SkillBridgeApp() {
               <button className="btn btn-primary" onClick={() => setActiveTab('gaps')}>
                 View My Skill Gaps <BarChart3 size={15} />
               </button>
-              <button className="btn btn-secondary" onClick={() => { setAttemptResult(null); setCurrentQuestionIdx(0); setUserAnswers({}); }}>
-                <RotateCcw size={14} /> Retake Test
+              <button className="btn btn-secondary" onClick={() => loadDiagnostic(12)}>
+                <RotateCcw size={14} /> Retake Test (New Questions)
               </button>
             </div>
           </div>
@@ -1226,6 +1837,80 @@ export default function SkillBridgeApp() {
               ))}
             </div>
           </div>
+
+          {attemptResult.detailedResults && attemptResult.detailedResults.length > 0 && (
+            <div className="card">
+              <h3 className="card-title" style={{ marginBottom: '0.25rem' }}>Question-by-Question Review</h3>
+              <p className="card-subtitle" style={{ marginBottom: '1rem' }}>
+                Compare your answers against the correct solutions with explanations.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {attemptResult.detailedResults.map((r, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      border: '1px solid var(--border-faint)',
+                      borderRadius: '6px',
+                      padding: '1rem',
+                      background: 'var(--bg-row)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                      <span style={{ fontSize: '0.72rem', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>
+                        Q{idx + 1} · {r.question.subSkill}
+                      </span>
+                      <span
+                        className={`badge ${r.correct ? 'badge-strength' : 'badge-critical'}`}
+                        style={{ fontSize: '0.675rem' }}
+                      >
+                        {r.correct ? 'Correct' : 'Incorrect'}
+                      </span>
+                    </div>
+
+                    <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.5rem' }}>
+                      {r.question.prompt}
+                    </div>
+                    {r.question.codeSnippet && (
+                      <pre className="code-block" style={{ fontSize: '0.75rem' }}>
+                        <code>{r.question.codeSnippet}</code>
+                      </pre>
+                    )}
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.8rem', marginTop: '0.5rem' }}>
+                      <div>
+                        <span style={{ color: 'var(--text-muted)' }}>Your answer: </span>
+                        <span style={{ color: r.correct ? '#6ee7b7' : '#fda4af', fontWeight: 600 }}>
+                          {r.userAnswer || '(not answered)'}
+                        </span>
+                      </div>
+                      <div>
+                        <span style={{ color: 'var(--text-muted)' }}>Correct answer: </span>
+                        <span style={{ color: '#6ee7b7', fontWeight: 600 }}>{r.correctAnswer}</span>
+                      </div>
+                    </div>
+
+                    {r.explanation && (
+                      <div
+                        style={{
+                          marginTop: '0.6rem',
+                          padding: '0.6rem 0.75rem',
+                          borderRadius: '5px',
+                          background: 'var(--bg-inset-panel)',
+                          border: '1px solid var(--border-faint)',
+                          fontSize: '0.8rem',
+                          color: 'var(--text-secondary)',
+                          lineHeight: 1.5
+                        }}
+                      >
+                        <strong style={{ color: '#93c5fd' }}>Explanation: </strong>
+                        {r.explanation}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       );
     }
@@ -1335,7 +2020,20 @@ export default function SkillBridgeApp() {
               Solve real engineering queries and algorithmic problems against test datasets. Passing hands-on challenges elevates your skill evidence to Verified.
             </p>
           </div>
+          <button
+            className="btn btn-primary"
+            disabled={isGeneratingChallenge}
+            onClick={handleGenerateChallenge}
+          >
+            <BrainCircuit size={15} /> {isGeneratingChallenge ? 'Generating...' : 'Generate New Challenge'}
+          </button>
         </div>
+
+        {generateError && (
+          <div style={{ fontSize: '0.8rem', color: '#fda4af', background: 'rgba(244, 63, 94, 0.08)', border: '1px solid rgba(244, 63, 94, 0.2)', padding: '0.7rem 0.9rem', borderRadius: '6px' }}>
+            {generateError}
+          </div>
+        )}
 
         <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.25rem' }}>
           {challenges.map((ch, idx) => (
@@ -1378,6 +2076,30 @@ export default function SkillBridgeApp() {
                     </pre>
                   </div>
                 )}
+
+                <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--border-faint)' }}>
+                  <button
+                    className="btn btn-secondary"
+                    disabled={isLoadingSolution}
+                    onClick={handleShowSolution}
+                    style={{ fontSize: '0.8rem', padding: '0.4rem 0.85rem' }}
+                  >
+                    {isLoadingSolution ? 'Loading...' : 'Show Reference Solution'}
+                  </button>
+                  {referenceSolution && (
+                    <div style={{ marginTop: '0.75rem' }}>
+                      <div style={{ fontSize: '0.725rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
+                        Reference Solution
+                      </div>
+                      <pre
+                        className="code-block"
+                        style={{ fontSize: '0.75rem', whiteSpace: 'pre-wrap', color: '#6ee7b7' }}
+                      >
+                        <code>{referenceSolution}</code>
+                      </pre>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -1771,6 +2493,109 @@ export default function SkillBridgeApp() {
               )}
             </div>
           ))}
+        </div>
+      </div>
+    );
+  };
+
+  const renderSkillAdminView = () => {
+    const questions = adminSkillQuestions || [];
+    return (
+      <div className="card" style={{ marginBottom: '1.5rem', overflow: 'hidden', padding: '0' }}>
+        <div className="card-header" style={{ alignItems: 'center', background: 'rgba(167,139,250,0.06)' }}>
+          <div>
+            <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Database size={18} style={{ color: '#a78bfa' }} /> Skill Question Bank
+            </h2>
+            <p className="card-subtitle">Review AI-generated questions and manage the skill question bank.</p>
+          </div>
+        </div>
+
+        <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <div className="card" style={{ padding: '1rem' }}>
+            <h3 style={{ fontSize: '0.9rem', fontWeight: 600, marginBottom: '0.75rem' }}>Generate Questions with AI</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 0.7fr auto', gap: '0.6rem', alignItems: 'end', flexWrap: 'wrap' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Skill</label>
+                <select value={skillAssessSelectedSkill} onChange={(e) => setSkillAssessSelectedSkill(e.target.value)} style={{ width: '100%', padding: '0.5rem 0.6rem', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '0.8rem' }}>
+                  {(skillAssessAvailableSkills as any[]).map((s: any) => <option key={s.id} value={s.id}>{s.canonicalName || s.id}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Topic</label>
+                <input value={adminGenForm.topic} onChange={(e) => setAdminGenForm(prev => ({ ...prev, topic: e.target.value }))} placeholder="e.g. Promises & Async" style={{ width: '100%', padding: '0.5rem 0.6rem', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '0.8rem' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Difficulty</label>
+                <select value={adminGenForm.difficulty} onChange={(e) => setAdminGenForm(prev => ({ ...prev, difficulty: e.target.value }))} style={{ width: '100%', padding: '0.5rem 0.6rem', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '0.8rem' }}>
+                  <option value="easy">easy</option><option value="medium">medium</option><option value="hard">hard</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Type</label>
+                <select value={adminGenForm.questionType} onChange={(e) => setAdminGenForm(prev => ({ ...prev, questionType: e.target.value }))} style={{ width: '100%', padding: '0.5rem 0.6rem', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '0.8rem' }}>
+                  <option value="MCQ">MCQ</option><option value="code_output">Code Output</option><option value="true_false">True/False</option><option value="multiple_select">Multi-Select</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Count</label>
+                <input type="number" min={1} max={20} value={adminGenForm.count} onChange={(e) => setAdminGenForm(prev => ({ ...prev, count: Number(e.target.value) }))} style={{ width: '100%', padding: '0.5rem 0.6rem', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '0.8rem' }} />
+              </div>
+              <div>
+                <button className="btn btn-primary" style={{ width: '100%' }} onClick={generateAdminQuestions} disabled={isGeneratingQuestions || !adminGenForm.topic}>
+                  {isGeneratingQuestions ? 'Generating…' : 'Generate'}
+                </button>
+              </div>
+            </div>
+            {adminQMsg && (
+              <div style={{ marginTop: '0.6rem', fontSize: '0.82rem', color: adminQMsg.ok ? '#34d399' : '#fb7185' }}>{adminQMsg.text}</div>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>View:</span>
+            <div className="badge-group" style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+              {['pending_review', 'approved', 'rejected', ''].map(st => (
+                <button key={st} className={`btn ${adminQStatusFilter === st ? 'btn-primary' : 'btn-secondary'}`} style={{ fontSize: '0.75rem', padding: '0.3rem 0.7rem' }}
+                  onClick={() => { setAdminQStatusFilter(st); loadAdminSkillQuestions(st); }}>
+                  {st ? st.replace('_', ' ') : 'all'}
+                </button>
+              ))}
+            </div>
+            <button className="btn btn-secondary" style={{ marginLeft: 'auto', fontSize: '0.75rem' }} onClick={() => loadAdminSkillQuestions()}>Refresh</button>
+          </div>
+
+          {questions.length === 0 ? (
+            <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', padding: '1rem 0' }}>No questions in this view.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+              {questions.map((q: any) => (
+                <div key={q.id} style={{ padding: '0.7rem 0.8rem', background: 'var(--bg-row)', border: '1px solid var(--border-faint)', borderRadius: '6px', fontSize: '0.82rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.6rem', flexWrap: 'wrap' }}>
+                    <div style={{ whiteSpace: 'pre-wrap' }}><strong>{q.questionText}</strong></div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <span className="badge" style={{ background: 'rgba(167,139,250,0.1)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.2)' }}>{q.difficulty}</span>
+                      <span className="badge badge-preferred" style={{ fontSize: '0.65rem' }}>{q.questionType}</span>
+                      <span className="badge" style={{ background: q.verificationStatus === 'pending_review' ? 'rgba(245,158,11,0.1)' : 'rgba(148,163,184,0.1)', color: '#94a3b8', border: '1px solid rgba(148,163,184,0.2)', fontSize: '0.65rem', textTransform: 'capitalize' }}>{String(q.verificationStatus).replace('_', ' ')}</span>
+                    </div>
+                  </div>
+                  <div style={{ marginTop: '0.4rem', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>{q.skillName || q.skillId}</span> · Topic: {q.topic}
+                    {q.codeSnippet && <pre className="code-block" style={{ marginTop: '0.35rem' }}>{q.codeSnippet}</pre>}
+                  </div>
+                  <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                    {q.verificationStatus !== 'approved' && (
+                      <button className="btn btn-success" style={{ fontSize: '0.72rem', padding: '0.3rem 0.7rem' }} onClick={() => setAdminQuestionStatus(q.id, 'approved')}>Approve</button>
+                    )}
+                    {q.verificationStatus !== 'rejected' && (
+                      <button className="btn btn-secondary" style={{ fontSize: '0.72rem', padding: '0.3rem 0.7rem' }} onClick={() => setAdminQuestionStatus(q.id, 'rejected')}>Reject</button>
+                    )}
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginLeft: 'auto', alignSelf: 'center' }}>by {q.createdBy || 'seed'}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -2497,12 +3322,34 @@ export default function SkillBridgeApp() {
           <main className="app-main">
             {activeTab === 'market' && renderMarketView()}
             {activeTab === 'curriculum' && renderCurriculumView()}
-            {activeTab === 'assessment' && renderAssessmentView()}
+            {activeTab === 'assessment' && (
+              <>
+                <div className="card" style={{ marginBottom: '1.5rem', padding: '0', overflow: 'hidden' }}>
+                  <div className="card-header" style={{ alignItems: 'center', background: 'rgba(56,189,248,0.05)' }}>
+                    <div>
+                      <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <BrainCircuit size={18} style={{ color: '#38bdf8' }} /> Skill Assessment (New)
+                      </h2>
+                      <p className="card-subtitle">Difficulty-weighted, server-evaluated skill exams with per-topic results.</p>
+                    </div>
+                  </div>
+                  <div style={{ padding: '1.25rem' }}>
+                    {renderSkillAssessmentView()}
+                  </div>
+                </div>
+                {renderAssessmentView()}
+              </>
+            )}
             {activeTab === 'sandbox' && renderSandboxView()}
             {activeTab === 'gaps' && renderGapsView()}
             {activeTab === 'actions' && renderActionsView()}
             {activeTab === 'jobs' && renderJobsView()}
-            {activeTab === 'admin' && currentUser?.role === 'ADMIN' && renderAdminView()}
+            {activeTab === 'admin' && currentUser?.role === 'ADMIN' && (
+              <>
+                {renderSkillAdminView()}
+                {renderAdminView()}
+              </>
+            )}
           </main>
         </div>
       ) : (

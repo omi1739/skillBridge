@@ -3,6 +3,12 @@ import * as vm from 'vm';
 import initSqlJs, { Database, SqlJsStatic } from 'sql.js';
 import { store } from '../store';
 import { gapService } from './gap.service';
+import {
+  GeneratedChallenge,
+  challengeGenerator,
+  getDynamicChallenges,
+  getDynamicChallenge
+} from './challenge-generator.service';
 
 export interface SandboxChallenge {
   id: string;
@@ -140,7 +146,8 @@ ORDER BY c.name ASC;`,
   ];
 
   public getChallenges(): SandboxChallenge[] {
-    return this.challenges;
+    const dynamic: SandboxChallenge[] = getDynamicChallenges().map(toSandboxChallenge);
+    return [...dynamic, ...this.challenges];
   }
 
   /**
@@ -150,7 +157,21 @@ ORDER BY c.name ASC;`,
    */
   public async executeSQL(challengeId: string, query: string, userId: string = 'demo_user_01'): Promise<ExecutionResult> {
     const startTime = Date.now();
-    const fixture = SQL_FIXTURES[challengeId];
+    let fixture = SQL_FIXTURES[challengeId];
+    let dynSql: GeneratedChallenge | undefined;
+
+    if (!fixture) {
+      dynSql = getDynamicChallenge(challengeId);
+      if (dynSql && dynSql.schemaSql && dynSql.seedSql && dynSql.referenceQuery) {
+        fixture = {
+          skillId: dynSql.skillId || 'skill_sql',
+          proficiency: 0.9,
+          schemaSql: dynSql.schemaSql,
+          seedSql: dynSql.seedSql,
+          referenceQuery: dynSql.referenceQuery
+        };
+      }
+    }
 
     if (!fixture) {
       return {
@@ -218,6 +239,11 @@ ORDER BY c.name ASC;`,
     const timeoutMs = 5000;
 
     try {
+      const dyn = getDynamicChallenge(challengeId) || challengeGenerator.getOfflineChallenge(challengeId);
+      if (dyn && dyn.type === 'JAVASCRIPT' && dyn.testCases && dyn.testCases.length > 0) {
+        return await this.runDynamicJs(dyn, userCode, userId, startTime, timeoutMs);
+      }
+
       if (challengeId === 'challenge_js_01') {
         const userFunction = this.runUserFunction(userCode, timeoutMs);
         if (typeof userFunction !== 'function') {
@@ -282,6 +308,96 @@ ORDER BY c.name ASC;`,
       message: 'Unknown challenge ID.',
       executionTimeMs: Date.now() - startTime
     };
+  }
+
+  /** Evaluate a model/curated JS challenge against its generic test cases. */
+  private async runDynamicJs(
+    chall: GeneratedChallenge,
+    userCode: string,
+    userId: string,
+    startTime: number,
+    timeoutMs: number
+  ): Promise<ExecutionResult> {
+    const fn = this.getDynamicFunction(userCode, timeoutMs);
+    if (!fn) {
+      return {
+        passed: false,
+        message:
+          'Could not find a function to test. Ensure your code defines the requested function.',
+        executionTimeMs: Date.now() - startTime
+      };
+    }
+
+    const testCases = chall.testCases || [];
+    const testResults: Array<{ testName: string; passed: boolean; expected: any; actual: any }> = [];
+    let allPassed = true;
+
+    for (const tc of testCases) {
+      try {
+        const args = safeParse(tc.input);
+        const expected = safeParse(tc.expected);
+        const actual = await withTimeout(fn(...(Array.isArray(args) ? args : [args])), timeoutMs);
+        const pass = deepEqual(actual, expected);
+        testResults.push({ testName: tc.name || 'Test', passed: pass, expected, actual });
+        if (!pass) allPassed = false;
+      } catch (err: any) {
+        testResults.push({
+          testName: tc.name || 'Test',
+          passed: false,
+          expected: safeParse(tc.expected),
+          actual: `Error: ${err?.message || 'runtime error'}`
+        });
+        allPassed = false;
+      }
+    }
+
+    let verifiedEvidence;
+    if (allPassed && testResults.length > 0) {
+      verifiedEvidence = await this.recordVerifiedEvidence(userId, chall.skillId, 0.9);
+    }
+
+    return {
+      passed: allPassed,
+      message: allPassed
+        ? 'All test cases passed!'
+        : `${testResults.filter(t => !t.passed).length} of ${testResults.length} test cases failed.`,
+      executionTimeMs: Date.now() - startTime,
+      testResults,
+      verifiedEvidence
+    };
+  }
+
+  /**
+   * Evaluate generic user code inside a VM, returning the first function it
+   * defines (by name) so it can be invoked against test cases.
+   */
+  private getDynamicFunction(code: string, timeoutMs: number): ((...args: any[]) => any) | undefined {
+    const sandboxGlobals = {
+      Promise,
+      setTimeout,
+      clearTimeout,
+      console,
+      Math,
+      Number,
+      String,
+      Array,
+      Object,
+      Boolean,
+      JSON,
+      Symbol,
+      Error,
+      Date,
+      RegExp
+    };
+    const context = vm.createContext(Object.assign(Object.create(null), sandboxGlobals));
+    const script = new vm.Script(code);
+    script.runInContext(context, { timeout: timeoutMs });
+
+    const name = detectFunctionName(code);
+    if (!name) return undefined;
+    const probe = new vm.Script(`${code}\n;${name};`);
+    const candidate = probe.runInContext(context, { timeout: timeoutMs });
+    return typeof candidate === 'function' ? candidate : undefined;
   }
 
   /**
@@ -446,3 +562,55 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 }
 
 export const sandboxService = new SandboxService();
+
+function safeParse(raw: string | undefined): any {
+  if (raw === undefined || raw === null || raw === '') return undefined;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return raw;
+  }
+}
+
+function deepEqual(a: any, b: any): boolean {
+  if (a === b) return true;
+  if (typeof a !== typeof b) return false;
+  if (a === null || b === null) return a === b;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a)) {
+    if (a.length !== b.length) return false;
+    return a.every((_, i) => deepEqual(a[i], b[i]));
+  }
+  if (typeof a === 'object') {
+    const aKeys = Object.keys(a).sort();
+    const bKeys = Object.keys(b).sort();
+    if (JSON.stringify(aKeys) !== JSON.stringify(bKeys)) return false;
+    return aKeys.every(k => deepEqual(a[k], b[k]));
+  }
+  return a === b;
+}
+
+function detectFunctionName(code: string): string | null {
+  const decl = code.match(/(?:function|async function)\s+([A-Za-z_$][\w$]*)\s*\(/);
+  if (decl) return decl[1];
+  const arrow = code.match(/(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?\(/);
+  if (arrow) return arrow[1];
+  const arrowNamed = code.match(/(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?([A-Za-z_$][\w$]*)\s*=>/);
+  if (arrowNamed) return arrowNamed[1];
+  return null;
+}
+
+function toSandboxChallenge(c: GeneratedChallenge): SandboxChallenge {
+  return {
+    id: c.id,
+    title: c.title,
+    type: c.type,
+    skillId: c.skillId,
+    difficulty: c.difficulty,
+    description: c.description,
+    starterCode: c.starterCode,
+    schemaPreview: c.schemaPreview,
+    sampleDataDescription: c.sampleDataDescription,
+    testCasesCount: c.testCases ? c.testCases.length : 0
+  };
+}

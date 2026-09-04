@@ -274,3 +274,100 @@ CREATE INDEX IF NOT EXISTS idx_jobs_role ON jobs(role_id);
 CREATE INDEX IF NOT EXISTS idx_job_skills_skill ON job_skills(skill_id);
 CREATE INDEX IF NOT EXISTS idx_jobs_verification ON jobs(verification_status);
 CREATE INDEX IF NOT EXISTS idx_jobs_remote ON jobs(is_remote);
+
+-- ============================================================
+-- Skill-Centric Assessment System (skill assessment banks)
+-- Reuses existing `skills`, `assessments`, `questions`,
+-- `assessment_attempts` and `skill_evidence` tables where possible.
+-- ============================================================
+
+-- Topics that make up a skill (e.g. JavaScript -> Functions, Arrays,
+-- Promises, Async/Await, Closures). Used for question tagging and per-topic
+-- performance reporting.
+CREATE TABLE IF NOT EXISTS skill_topics (
+    id VARCHAR(100) PRIMARY KEY,
+    skill_id VARCHAR(100) NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+    name VARCHAR(150) NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_skill_topic UNIQUE (skill_id, name)
+);
+
+-- The existing `questions` table is evolved into a skill-centric question
+-- bank. `assessment_id` is relaxed (nullable) so bank questions are not tied
+-- to a single assessment. Options live in `options_json` (the equivalent of a
+-- separate question_options table). `difficulty` uses easy/medium/hard.
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS skill_id VARCHAR(100);
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS topic VARCHAR(150);
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS verification_status VARCHAR(50) DEFAULT 'approved';
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS question_text TEXT;
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE questions ALTER COLUMN assessment_id DROP NOT NULL;
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS is_multiple_select BOOLEAN DEFAULT FALSE;
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS created_by VARCHAR(100);
+
+-- Fixed selection of questions for a given assessment attempt/session. This
+-- guarantees the set of questions (and their order) is stable across refreshes.
+CREATE TABLE IF NOT EXISTS assessment_questions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    attempt_id VARCHAR(100) NOT NULL REFERENCES assessment_attempts(id) ON DELETE CASCADE,
+    question_id VARCHAR(100) NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+    position INT NOT NULL,
+    CONSTRAINT uq_assessment_question UNIQUE (attempt_id, question_id)
+);
+
+-- Per-question answers submitted during an assessment session. Whether an
+-- answer is correct is computed ONLY on the backend using the trusted answer.
+CREATE TABLE IF NOT EXISTS user_answers (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    attempt_id VARCHAR(100) NOT NULL REFERENCES assessment_attempts(id) ON DELETE CASCADE,
+    question_id VARCHAR(100) NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+    user_answer JSONB,           -- single option string, or array for multiple_select
+    is_correct BOOLEAN,
+    time_taken_ms INT,
+    answered_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_attempt_question_answer UNIQUE (attempt_id, question_id)
+);
+
+-- Per-topic performance for a completed assessment (e.g. Promises 60%).
+CREATE TABLE IF NOT EXISTS assessment_topic_results (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    attempt_id VARCHAR(100) NOT NULL REFERENCES assessment_attempts(id) ON DELETE CASCADE,
+    topic VARCHAR(150) NOT NULL,
+    earned_points NUMERIC(8, 2) NOT NULL DEFAULT 0,
+    total_points NUMERIC(8, 2) NOT NULL DEFAULT 0,
+    percentage NUMERIC(5, 2) NOT NULL DEFAULT 0,
+    CONSTRAINT uq_assessment_topic UNIQUE (attempt_id, topic)
+);
+
+-- Tracks batch AI question-generation requests (admin -> AI -> validated bank).
+CREATE TABLE IF NOT EXISTS question_generation_jobs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    skill_id VARCHAR(100) REFERENCES skills(id) ON DELETE SET NULL,
+    topic VARCHAR(150),
+    difficulty VARCHAR(50),
+    question_type VARCHAR(50),
+    requested_count INT,
+    status VARCHAR(50) DEFAULT 'pending',   -- pending, completed, failed, partial
+    payload JSONB,                          -- { created, rejected, errors[] }
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMP WITH TIME ZONE
+);
+
+-- Rating for any optional number of easy/medium/hard across skill questions.
+ALTER TABLE assessment_attempts ADD COLUMN IF NOT EXISTS skill_id VARCHAR(100);
+ALTER TABLE assessment_attempts ALTER COLUMN assessment_id DROP NOT NULL;
+ALTER TABLE assessment_attempts ADD COLUMN IF NOT EXISTS difficulty VARCHAR(50);
+ALTER TABLE assessment_attempts ADD COLUMN IF NOT EXISTS skill_level VARCHAR(50);
+ALTER TABLE assessment_attempts ADD COLUMN IF NOT EXISTS topic_results_json JSONB DEFAULT '[]';
+ALTER TABLE assessment_attempts ADD COLUMN IF NOT EXISTS question_count INT DEFAULT 0;
+
+-- Indexes for the skill assessment system.
+CREATE INDEX IF NOT EXISTS idx_questions_skill ON questions(skill_id);
+CREATE INDEX IF NOT EXISTS idx_questions_skill_status ON questions(skill_id, verification_status);
+CREATE INDEX IF NOT EXISTS idx_questions_topic ON questions(topic);
+CREATE INDEX IF NOT EXISTS idx_attempts_user_skill ON assessment_attempts(user_id, skill_id);
+CREATE INDEX IF NOT EXISTS idx_assessment_questions_attempt ON assessment_questions(attempt_id);
+CREATE INDEX IF NOT EXISTS idx_user_answers_attempt ON user_answers(attempt_id);
+CREATE INDEX IF NOT EXISTS idx_topic_results_attempt ON assessment_topic_results(attempt_id);

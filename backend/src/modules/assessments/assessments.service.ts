@@ -1,7 +1,17 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { AssessmentAttempt, SkillEvidence, SubSkillResult } from '@skillbridge/types';
+import { AssessmentAttempt, SkillEvidence, SubSkillResult, Question, AssessmentConfig } from '@skillbridge/types';
 import { store } from '../../store';
 import { gapService } from '../../services/gap.service';
+import { getAllBankQuestions, drawDiagnosticQuestions } from '../../data/question-bank';
+import { assessmentEngine } from '../../services/assessment/assessment-engine.service';
+
+export interface QuestionResult {
+  question: Question;
+  userAnswer: string | null;
+  correct: boolean;
+  correctAnswer: string;
+  explanation: string;
+}
 
 @Injectable()
 export class AssessmentsService {
@@ -9,6 +19,40 @@ export class AssessmentsService {
     return store.getAssessments();
   }
 
+  // ---- Skill-centric assessment system ----
+  async getSkillAssessmentSkills() {
+    return assessmentEngine.availableSkills();
+  }
+
+  async createSkillAssessment(userId: string, cfg: AssessmentConfig) {
+    return assessmentEngine.createAssessment(userId, cfg);
+  }
+
+  async getSkillAssessmentSession(userId: string, sessionId: string) {
+    return assessmentEngine.getSession(userId, sessionId);
+  }
+
+  async submitSkillAnswer(userId: string, sessionId: string, questionId: string, answer: unknown) {
+    return assessmentEngine.submitAnswer(userId, sessionId, questionId, answer);
+  }
+
+  async submitSkillAssessment(userId: string, sessionId: string) {
+    return assessmentEngine.submitAssessment(userId, sessionId);
+  }
+
+  async getSkillAssessmentResult(userId: string, sessionId: string) {
+    return assessmentEngine.getResult(userId, sessionId);
+  }
+
+  async getSkillAssessmentHistory(userId: string) {
+    return assessmentEngine.getHistory(userId);
+  }
+
+  async getSkillProgress(userId: string, skillId: string) {
+    return assessmentEngine.getProgress(userId, skillId);
+  }
+
+  // ---- Legacy diagnostic ----
   async getAssessmentById(id: string) {
     const assessment = await store.getAssessment(id);
     if (!assessment) {
@@ -17,29 +61,85 @@ export class AssessmentsService {
     return assessment;
   }
 
+  /**
+   * Return a random, sub-skill-balanced diagnostic attempt. The bank replaces
+   * the single static question set stored in the DB, so every retake gets a
+   * fresh subset. Correct answers/explanations are NOT returned to the client.
+   */
+  getDiagnosticAssessment(count?: number) {
+    const picked = drawDiagnosticQuestions({ count });
+    return {
+      id: 'assessment_backend_diagnostic',
+      title: 'Backend Engineering Core Diagnostic',
+      description:
+        'A randomized, adaptive diagnostic across asynchronous JavaScript, Node.js, SQL, REST design, security, and containerization.',
+      timeLimitMinutes: 15,
+      passingScore: 70,
+      version: '1.1.0',
+      questionCount: picked.length,
+      questions: picked.map(q => ({
+        id: q.id,
+        assessmentId: q.assessmentId,
+        prompt: q.prompt,
+        codeSnippet: q.codeSnippet,
+        questionType: q.questionType,
+        options: q.options,
+        subSkill: q.subSkill,
+        difficulty: q.difficulty,
+        points: q.points
+      }))
+    };
+  }
+
   async submitAssessment(
     assessmentId: string,
     userId: string = 'demo_user_01',
     answers: Array<{ questionId: string; selectedAnswer: string }>
   ) {
-    const assessment = await store.getAssessment(assessmentId);
-    if (!assessment) {
-      throw new NotFoundException(`Assessment ${assessmentId} not found`);
+    const bank = getAllBankQuestions();
+    const bankMap = new Map(bank.map(q => [q.id, q]));
+
+    // Primary diagnostic is served from the question bank for randomized
+    // retakes; the DB-stored assessment is kept as a legacy fallback for any
+    // non-diagnostic assessment id.
+    if (assessmentId === 'assessment_backend_diagnostic') {
+      return this.grade(assessmentId, bankMap, answers, userId, 70, 'skill_javascript');
     }
 
+    const dbAssessment = await store.getAssessment(assessmentId);
+    if (!dbAssessment) {
+      throw new NotFoundException(`Assessment ${assessmentId} not found`);
+    }
+    const qs = dbAssessment.questions || [];
+    if (qs.length === 0) {
+      throw new NotFoundException(`Assessment ${assessmentId} has no questions`);
+    }
+    const map = new Map(qs.map(q => [q.id, q]));
+    return this.grade(assessmentId, map, answers, userId, dbAssessment.passingScore, dbAssessment.skillId);
+  }
+
+  private async grade(
+    assessmentId: string,
+    questionMap: Map<string, Question>,
+    answers: Array<{ questionId: string; selectedAnswer: string }>,
+    userId: string,
+    passingScore: number,
+    skillId?: string
+  ) {
     if (!answers || !Array.isArray(answers)) {
       throw new BadRequestException('Answers array is required');
     }
 
-    const questionMap = new Map(assessment.questions?.map(q => [q.id, q]));
     let totalPointsEarned = 0;
     let maxPoints = 0;
 
     const subSkillPoints: Record<string, { earned: number; total: number }> = {};
+    const questionResults: QuestionResult[] = [];
 
-    for (const ans of answers) {
-      const q = questionMap.get(ans.questionId);
-      if (!q) continue;
+    for (const [id, q] of questionMap.entries()) {
+      const ans = answers.find(a => a.questionId === id);
+      const selected = ans ? ans.selectedAnswer : null;
+      const correct = selected != null && selected === q.correctAnswer;
 
       maxPoints += q.points;
       if (!subSkillPoints[q.subSkill]) {
@@ -47,14 +147,34 @@ export class AssessmentsService {
       }
       subSkillPoints[q.subSkill].total += q.points;
 
-      if (ans.selectedAnswer === q.correctAnswer) {
+      if (correct) {
         totalPointsEarned += q.points;
         subSkillPoints[q.subSkill].earned += q.points;
       }
+
+      questionResults.push({
+        question: {
+          id: q.id,
+          assessmentId: q.assessmentId,
+          prompt: q.prompt,
+          codeSnippet: q.codeSnippet,
+          questionType: q.questionType,
+          options: q.options ? [...q.options] : undefined,
+          subSkill: q.subSkill,
+          difficulty: q.difficulty,
+          points: q.points,
+          correctAnswer: q.correctAnswer,
+          explanation: q.explanation
+        },
+        userAnswer: selected,
+        correct,
+        correctAnswer: q.correctAnswer,
+        explanation: q.explanation
+      });
     }
 
     const scorePercentage = maxPoints > 0 ? Math.round((totalPointsEarned / maxPoints) * 100) : 0;
-    const passed = scorePercentage >= assessment.passingScore;
+    const passed = scorePercentage >= passingScore;
 
     const subSkillScores: SubSkillResult[] = Object.entries(subSkillPoints).map(([subSkill, data]) => {
       const pct = data.total > 0 ? Math.round((data.earned / data.total) * 100) : 0;
@@ -92,7 +212,7 @@ export class AssessmentsService {
     const newEvidence: SkillEvidence = {
       id: `ev_${Date.now()}`,
       userId,
-      skillId: assessment.skillId || 'skill_javascript',
+      skillId: skillId || 'skill_javascript',
       sourceType: 'ASSESSMENT',
       sourceId: attempt.id,
       proficiencyScore: proficiencyRatio,
@@ -107,7 +227,7 @@ export class AssessmentsService {
     return {
       attempt,
       gaps: updatedGaps,
-      detailedQuestions: assessment.questions
+      detailedResults: questionResults
     };
   }
 }

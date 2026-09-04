@@ -38,6 +38,10 @@ services:
         sync: false
       - key: JOB_BD_PAGES
         sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        sync: false
 
   # Scheduled job-board ingestion, separate from the always-on web service so
   # it runs a fixed number of times per day instead of in the background.

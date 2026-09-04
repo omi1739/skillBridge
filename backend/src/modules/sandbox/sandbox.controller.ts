@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Body,
+  Param,
   Inject,
   HttpCode,
   HttpStatus,
@@ -21,6 +22,25 @@ export class SandboxController {
   @Get('challenges')
   getChallenges() {
     return this.sandboxService.getChallenges();
+  }
+
+  @Get('generator/status')
+  getGeneratorStatus() {
+    return this.sandboxService.getGeneratorStatus();
+  }
+
+  @Post('generate')
+  async generateChallenge(@Body() body: { type?: string; skillId?: string; difficulty?: string }) {
+    return this.sandboxService.generateChallenge(
+      (body.type || 'SQL') as 'SQL' | 'JAVASCRIPT',
+      body.skillId,
+      body.difficulty
+    );
+  }
+
+  @Get('reference-solution/:challengeId')
+  async referenceSolution(@Param('challengeId') challengeId: string) {
+    return this.sandboxService.getReferenceSolution(challengeId);
   }
 
   @Post('run-sql')

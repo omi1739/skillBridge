@@ -14,4 +14,9 @@ export class SkillsController {
   async getSkillById(@Param('id') id: string) {
     return this.skillsService.getSkillById(id);
   }
+
+  @Get(':skillId/topics')
+  async getSkillTopics(@Param('skillId') skillId: string) {
+    return this.skillsService.getSkillTopics(skillId);
+  }
 }
