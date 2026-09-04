@@ -42,6 +42,12 @@ services:
         sync: false
       - key: OPENAI_MODEL
         sync: false
+      # Google Gemini (free tier) for AI skill-question generation. Declared with
+      # sync:false so the secret value is set in the Render dashboard, not the file.
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        sync: false
 
   # Scheduled job-board ingestion, separate from the always-on web service so
   # it runs a fixed number of times per day instead of in the background.
