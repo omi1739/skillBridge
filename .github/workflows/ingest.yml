@@ -17,6 +17,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
       - name: Trigger live job ingestion
         env:
           API_BASE: ${{ secrets.INGEST_API_BASE }}
@@ -24,17 +29,60 @@ jobs:
           PASSWORD: ${{ secrets.INGEST_PASSWORD }}
         run: |
           set -euo pipefail
-          LOGIN="$(curl -s -X POST "$API_BASE/auth/login" \
-            -H 'Content-Type: application/json' \
-            -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}")"
-          TOKEN="$(printf '%s' "$LOGIN" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s).token)}catch{process.exit(1)}})')"
-          if [ -z "$TOKEN" ]; then
-            echo "Auth failed. Response: $LOGIN"
+
+          if [ -z "$API_BASE" ] || [ -z "$EMAIL" ] || [ -z "$PASSWORD" ]; then
+            echo "::error::Missing required secrets. Ensure INGEST_API_BASE, INGEST_EMAIL, and INGEST_PASSWORD are set in repository settings."
             exit 1
           fi
-          REPORT="$(curl -s -X POST "$API_BASE/ingest/run" \
+
+          echo "Logging in as $EMAIL ..."
+          HTTP_CODE=$(curl -s -o LOGIN_BODY -w '%{http_code}' --max-time 30 -X POST "$API_BASE/auth/login" \
+            -H 'Content-Type: application/json' \
+            -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}")
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "::error::Login failed (HTTP $HTTP_CODE). Response: $(cat LOGIN_BODY)"
+            exit 1
+          fi
+
+          TOKEN=$(printf '%s' "$LOGIN_BODY" | node -e '
+            let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
+              try {
+                const r = JSON.parse(s);
+                if (r && typeof r.token === "string" && r.token.length > 0) {
+                  console.log(r.token);
+                } else {
+                  console.error("Login response missing token field:", s);
+                  process.exit(1);
+                }
+              } catch(e) {
+                console.error("Failed to parse login response:", e.message, s);
+                process.exit(1);
+              }
+            })')
+          echo "Login successful."
+
+          echo "Triggering job ingestion ..."
+          REPORT=$(curl -s -o INGEST_BODY -w '%{http_code}' --max-time 120 -X POST "$API_BASE/ingest/run" \
             -H "Authorization: Bearer $TOKEN" \
             -H 'Content-Type: application/json' \
-            -d '{}')"
-          echo "$REPORT"
-          printf '%s' "$REPORT" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const r=JSON.parse(s);if(!r || typeof r.inserted==="undefined"){console.error("Unexpected response",s);process.exit(1)}console.log("OK inserted="+r.inserted+" updated="+r.updated+" totalJobs="+r.totalJobs)})'
+            -d '{}')
+          if [ "$REPORT" -lt 200 ] || [ "$REPORT" -ge 300 ]; then
+            echo "::error::Ingestion request failed (HTTP $REPORT). Response: $(cat INGEST_BODY)"
+            exit 1
+          fi
+
+          cat INGEST_BODY
+          printf '%s' "$INGEST_BODY" | node -e '
+            let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
+              try {
+                const r = JSON.parse(s);
+                if (!r || typeof r.inserted === "undefined") {
+                  console.error("Unexpected ingestion response:", s);
+                  process.exit(1);
+                }
+                console.log("OK inserted=" + r.inserted + " updated=" + r.updated + " totalJobs=" + r.totalJobs);
+              } catch(e) {
+                console.error("Failed to parse ingestion response:", e.message, s);
+                process.exit(1);
+              }
+            })'
