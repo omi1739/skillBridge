@@ -25,8 +25,7 @@ export const RATE_WINDOW_KEY = 'rate_window';
 @Injectable()
 export class RateLimitGuard implements CanActivate {
   private buckets = new Map<string, number[]>();
-
-  constructor(private readonly reflector: Reflector) {}
+  private readonly reflector = new Reflector();
 
   canActivate(context: ExecutionContext): boolean {
     const limit = this.reflector.getAllAndOverride<number | undefined>(RATE_LIMIT_KEY, [
