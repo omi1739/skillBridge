@@ -81,9 +81,9 @@ export class MatchService {
     return result;
   }
 
-  public async matchAllJobs(userId: string): Promise<JobMatchResult[]> {
+  public async matchAllJobs(userId: string, roleId?: string): Promise<JobMatchResult[]> {
     const [jobs, allSkills, userEvidenceList] = await Promise.all([
-      store.getJobs(),
+      roleId ? store.getJobsForRole(roleId) : store.getJobs(),
       store.getSkills(),
       store.getEvidence(userId)
     ]);

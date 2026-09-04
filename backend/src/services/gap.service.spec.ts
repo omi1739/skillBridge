@@ -63,20 +63,24 @@ describe('GapService', () => {
     await expect(service.calculateGaps('user_1', 'missing')).rejects.toThrow('not found');
   });
 
-  it('reports MAJOR_GAP when there is no evidence at all', async () => {
+  it('returns no gaps when there is no evidence at all', async () => {
     mockedStore.getEvidence.mockResolvedValue([]);
     const gaps = await service.calculateGaps('user_1', 'role_junior_backend');
+    expect(gaps).toHaveLength(0);
+  });
+
+  it('prioritizes the higher-weighted gap first', async () => {
+    mockedStore.getEvidence.mockResolvedValue([
+      evidence('skill_nodejs', 'SELF_REPORTED', 0),
+      evidence('skill_docker', 'SELF_REPORTED', 0)
+    ]);
+    const gaps = await service.calculateGaps('user_1', 'role_junior_backend');
+    // both are MAJOR_GAP at 0 demonstrated proficiency; nodejs priority = 0.9*0.95*1 = 0.855, docker = 0.6*0.7 = 0.42
     expect(gaps).toHaveLength(2);
     for (const g of gaps) {
       expect(g.status).toBe('MAJOR_GAP');
       expect(g.demonstratedProficiency).toBe(0);
     }
-  });
-
-  it('prioritizes the higher-weighted gap first', async () => {
-    mockedStore.getEvidence.mockResolvedValue([]);
-    const gaps = await service.calculateGaps('user_1', 'role_junior_backend');
-    // nodejs priority = 0.9*0.95*1 = 0.855, docker = 0.6*0.7 = 0.42
     expect(gaps[0].skillId).toBe('skill_nodejs');
   });
 
@@ -96,7 +100,10 @@ describe('GapService', () => {
   });
 
   it('persists the calculated gaps to the store', async () => {
-    mockedStore.getEvidence.mockResolvedValue([]);
+    mockedStore.getEvidence.mockResolvedValue([
+      evidence('skill_nodejs', 'SELF_REPORTED', 0),
+      evidence('skill_docker', 'SELF_REPORTED', 0)
+    ]);
     await service.calculateGaps('user_1', 'role_junior_backend');
     expect(mockedStore.saveGaps).toHaveBeenCalledTimes(1);
     const saved = mockedStore.saveGaps.mock.calls[0][1] as any[];

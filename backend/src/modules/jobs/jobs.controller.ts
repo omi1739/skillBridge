@@ -13,9 +13,9 @@ export class JobsController {
   }
 
   @Get('matches')
-  async getMatches(@Query('userId') queryUserId?: string) {
+  async getMatches(@Query('userId') queryUserId?: string, @Query('roleId') roleId?: string) {
     const userId = queryUserId || 'demo_user_01';
-    return this.jobsService.getMatches(userId);
+    return this.jobsService.getMatches(userId, roleId);
   }
 
   @Get(':id/match')

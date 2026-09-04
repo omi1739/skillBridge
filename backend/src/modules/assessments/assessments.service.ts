@@ -222,7 +222,8 @@ export class AssessmentsService {
     };
 
     await store.saveEvidence(userId, [newEvidence]);
-    const updatedGaps = await gapService.calculateGaps(userId, 'role_junior_backend');
+    const roleId = await store.getTargetRoleId(userId);
+    const updatedGaps = await gapService.calculateGaps(userId, roleId);
 
     return {
       attempt,

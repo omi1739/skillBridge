@@ -414,7 +414,8 @@ export class AssessmentEngine {
       createdAt: new Date().toISOString()
     };
     await store.saveEvidence(userId, [evidence]);
-    await gapService.calculateGaps(userId, 'role_junior_backend').catch(() => undefined);
+    const roleId = await store.getTargetRoleId(userId);
+    await gapService.calculateGaps(userId, roleId).catch(() => undefined);
   }
 
   private buildResult(

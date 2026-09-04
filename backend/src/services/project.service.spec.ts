@@ -9,7 +9,8 @@ jest.mock('../store', () => ({
     getEvidence: jest.fn(),
     saveEvidence: jest.fn(),
     getRecommendations: jest.fn(),
-    updateRecommendationStatus: jest.fn()
+    updateRecommendationStatus: jest.fn(),
+    getTargetRoleId: jest.fn().mockResolvedValue('role_junior_backend')
   }
 }));
 

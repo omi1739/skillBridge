@@ -67,7 +67,7 @@ export class AuthService {
     email: string,
     password: string,
     fullName: string,
-    targetRoleId: string = 'role_junior_backend',
+    targetRoleId?: string,
     currentStatus?: string
   ): Promise<{ token: string; user: User; profile: Profile }> {
     const cleanEmail = email.trim().toLowerCase();
@@ -121,7 +121,7 @@ export class AuthService {
       await client.query(
         `INSERT INTO profiles (id, user_id, full_name, target_role_id, created_at, updated_at)
          VALUES ($1, $2, $3, $4, $5::timestamptz, $6::timestamptz)`,
-        [profileId, userId, profile.fullName, targetRoleId, now, now]
+        [profileId, userId, profile.fullName, targetRoleId || null, now, now]
       );
     });
 
@@ -174,7 +174,7 @@ export class AuthService {
       id: profileId,
       userId,
       fullName: profileInfo.fullName.trim() || 'Google User',
-      targetRoleId: 'role_junior_backend',
+      targetRoleId: undefined,
       createdAt: now,
       updatedAt: now
     };
@@ -187,8 +187,8 @@ export class AuthService {
       );
       await client.query(
         `INSERT INTO profiles (id, user_id, full_name, target_role_id, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5::timestamptz, $6::timestamptz)`,
-        [profileId, userId, profile.fullName, profile.targetRoleId, now, now]
+         VALUES ($1, $2, $3, NULL, $5::timestamptz, $6::timestamptz)`,
+        [profileId, userId, profile.fullName, now, now]
       );
     });
 

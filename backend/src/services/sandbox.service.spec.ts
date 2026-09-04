@@ -4,7 +4,8 @@ import { store } from '../store';
 jest.mock('../store', () => ({
   store: {
     getEvidence: jest.fn(),
-    saveEvidence: jest.fn()
+    saveEvidence: jest.fn(),
+    getTargetRoleId: jest.fn().mockResolvedValue('role_junior_backend')
   }
 }));
 

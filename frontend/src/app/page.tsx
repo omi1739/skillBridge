@@ -48,7 +48,8 @@ import {
   Lock,
   MapPin,
   Mail,
-  Users
+  Users,
+  Target
 } from 'lucide-react';
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000/api').replace(/\/$/, '');
@@ -131,10 +132,14 @@ export default function SkillBridgeApp() {
     confirmPassword: '',
     fullName: '',
     currentStatus: '',
-    targetRoleId: 'role_junior_backend'
+    targetRoleId: ''
   });
   const [authError, setAuthError] = useState('');
   const [isAuthLoading, setIsAuthLoading] = useState(false);
+
+  // Role catalog + target role selection (progressive prompt flow)
+  const [allRoles, setAllRoles] = useState<Role[]>([]);
+  const [roleDraft, setRoleDraft] = useState('');
 
   // Core domain data
   const [role, setRole] = useState<Role | null>(null);
@@ -260,6 +265,10 @@ export default function SkillBridgeApp() {
       .catch((err) => console.error('[SkillBridge] Data load failed:', err));
   };
   const activeUserId = currentUser ? currentUser.id : 'demo_user_01';
+
+  // Target-role resolution: null when the user has not picked a role yet.
+  const activeTargetRoleId = currentProfile?.targetRoleId || null;
+  const effectiveRoleId = activeTargetRoleId || 'role_junior_backend';
 
   const authHeaders = () => {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -430,7 +439,7 @@ export default function SkillBridgeApp() {
       .catch(() => setAllJobs([]));
   };
 
-  const refreshUserData = (userId = activeUserId, role?: string, t?: string | null) => {
+  const refreshUserData = (userId = activeUserId, role?: string, t?: string | null, roleId?: string | null) => {
     if (!(t || authToken)) {
       setGaps([]);
       setRecommendations([]);
@@ -440,21 +449,31 @@ export default function SkillBridgeApp() {
       return;
     }
     const token = t || authToken;
+    const targetRole = roleId || currentProfile?.targetRoleId || null;
 
-    fetch(`${API_BASE}/me/gaps?userId=${userId}&roleId=role_junior_backend`, { headers: headersFor(token) })
-      .then(res => res.json())
-      .then(data => { if (Array.isArray(data)) setGaps(data); })
-      .catch((err) => console.error('[SkillBridge] Data load failed:', err));
+    if (targetRole) {
+      fetch(`${API_BASE}/me/gaps?userId=${userId}&roleId=${targetRole}`, { headers: headersFor(token) })
+        .then(res => res.json())
+        .then(data => { if (Array.isArray(data)) setGaps(data); })
+        .catch((err) => console.error('[SkillBridge] Data load failed:', err));
 
-    fetch(`${API_BASE}/me/recommendations?userId=${userId}&roleId=role_junior_backend`, { headers: headersFor(token) })
-      .then(res => res.json())
-      .then(data => { if (Array.isArray(data)) setRecommendations(data); })
-      .catch((err) => console.error('[SkillBridge] Data load failed:', err));
+      fetch(`${API_BASE}/me/recommendations?userId=${userId}&roleId=${targetRole}`, { headers: headersFor(token) })
+        .then(res => res.json())
+        .then(data => { if (Array.isArray(data)) setRecommendations(data); })
+        .catch((err) => console.error('[SkillBridge] Data load failed:', err));
 
-    fetch(`${API_BASE}/jobs/matches?userId=${userId}&roleId=role_junior_backend`, { headers: headersFor(token) })
-      .then(res => res.json())
-      .then(data => { if (Array.isArray(data)) setJobMatches(data); })
-      .catch((err) => console.error('[SkillBridge] Data load failed:', err));
+      fetch(`${API_BASE}/jobs/matches?userId=${userId}&roleId=${targetRole}`, { headers: headersFor(token) })
+        .then(res => res.json())
+        .then(data => { if (Array.isArray(data)) setJobMatches(data); })
+        .catch((err) => console.error('[SkillBridge] Data load failed:', err));
+
+      fetchJobs(token);
+    } else {
+      setGaps([]);
+      setRecommendations([]);
+      setJobMatches([]);
+      setAllJobs([]);
+    }
 
     fetch(`${API_BASE}/me/projects?userId=${userId}`, { headers: headersFor(token) })
       .then(res => res.json())
@@ -482,8 +501,6 @@ export default function SkillBridgeApp() {
       setAdminDashboard(null);
       setAdminUsers([]);
     }
-
-    fetchJobs(token);
   };
 
   const loadUsers = (opts?: { page?: number; pageSize?: number; search?: string }) => {
@@ -557,8 +574,15 @@ export default function SkillBridgeApp() {
       .catch(() => setAdminUserMsg({ ok: false, text: 'Delete failed.' }));
   };
 
-  const fetchRoleAndSkills = () => {
-    fetch(`${API_BASE}/roles/role_junior_backend`)
+  const fetchAllRoles = () => {
+    fetch(`${API_BASE}/roles`)
+      .then(res => res.json())
+      .then(data => setAllRoles(Array.isArray(data) ? data : []))
+      .catch((err) => console.error('[SkillBridge] Roles load failed:', err));
+  };
+
+  const fetchRoleAndSkills = (roleId = 'role_junior_backend') => {
+    fetch(`${API_BASE}/roles/${roleId}`)
       .then(res => res.json())
       .then(data => {
         setRole(data);
@@ -578,8 +602,47 @@ export default function SkillBridgeApp() {
       .catch((err) => console.error('[SkillBridge] Data load failed:', err));
   };
 
+  const handleRoleSelect = (roleId: string) => {
+    if (!currentUser || !authToken || !roleId) return;
+    setRoleDraft('');
+    fetch(`${API_BASE}/me/profile`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify({ targetRoleId: roleId })
+    })
+      .then(res => res.json().then((data: any) => ({ ok: res.ok, data })))
+      .then(({ ok, data }) => {
+        if (ok && data && data.userId) {
+          const updatedProfile: Profile = data;
+          setCurrentProfile(updatedProfile);
+          localStorage.setItem('skillbridge_profile', JSON.stringify(updatedProfile));
+          fetchRoleAndSkills(roleId);
+          refreshUserData(currentUser.id, currentUser.role, authToken, roleId);
+        }
+      })
+      .catch((err) => console.error('[SkillBridge] Role update failed:', err));
+  };
+
   useEffect(() => {
-    fetchRoleAndSkills();
+    // Restore saved session first so the target role is known before data loads.
+    const savedToken = localStorage.getItem('skillbridge_token');
+    const savedUser = localStorage.getItem('skillbridge_user');
+    const savedProfile = localStorage.getItem('skillbridge_profile');
+    let restoredUser: User | null = null;
+    let restoredProfile: Profile | null = null;
+    if (savedToken && savedUser && savedProfile) {
+      try {
+        restoredUser = JSON.parse(savedUser);
+        restoredProfile = JSON.parse(savedProfile);
+      } catch {
+        restoredUser = null;
+        restoredProfile = null;
+      }
+    }
+
+    const initialRoleId = restoredProfile?.targetRoleId || 'role_junior_backend';
+    fetchRoleAndSkills(initialRoleId);
+    fetchAllRoles();
 
     loadDiagnostic(12);
 
@@ -598,7 +661,7 @@ export default function SkillBridgeApp() {
       .then(data => setCurricula(data))
       .catch((err) => console.error('[SkillBridge] Data load failed:', err));
 
-    fetch(`${API_BASE}/curriculum/analyze?institutionId=curr_bsc_cse&roleId=role_junior_backend`)
+    fetch(`${API_BASE}/curriculum/analyze?institutionId=curr_bsc_cse&roleId=${initialRoleId}`)
       .then(res => res.json())
       .then(data => setCurriculumAnalysis(data))
       .catch((err) => console.error('[SkillBridge] Data load failed:', err));
@@ -608,7 +671,7 @@ export default function SkillBridgeApp() {
       .then(data => setLandingStats(data))
       .catch((err) => console.error('[SkillBridge] Data load failed:', err));
 
-    fetch(`${API_BASE}/market/demand?roleId=role_junior_backend`)
+    fetch(`${API_BASE}/market/demand?roleId=${initialRoleId}`)
       .then(res => res.json())
       .then(data => {
         if (data && typeof data.totalJobs === 'number') {
@@ -621,23 +684,11 @@ export default function SkillBridgeApp() {
       })
       .catch((err) => console.error('[SkillBridge] Market demand load failed:', err));
 
-    // Restore saved session if available
-    const savedToken = localStorage.getItem('skillbridge_token');
-    const savedUser = localStorage.getItem('skillbridge_user');
-    const savedProfile = localStorage.getItem('skillbridge_profile');
-    if (savedToken && savedUser && savedProfile) {
-      try {
-        const restoredUser = JSON.parse(savedUser);
-        const restoredProfile = JSON.parse(savedProfile);
-        setCurrentUser(restoredUser);
-        setCurrentProfile(restoredProfile);
-        setAuthToken(savedToken);
-        refreshUserData(restoredUser.id, restoredUser.role, savedToken);
-      } catch {
-        localStorage.removeItem('skillbridge_token');
-        localStorage.removeItem('skillbridge_user');
-        localStorage.removeItem('skillbridge_profile');
-      }
+    if (restoredUser && restoredProfile && savedToken) {
+      setCurrentUser(restoredUser);
+      setCurrentProfile(restoredProfile);
+      setAuthToken(savedToken);
+      refreshUserData(restoredUser.id, restoredUser.role, savedToken, restoredProfile.targetRoleId);
     } else {
       setAllJobs([]);
       setJobMatches([]);
@@ -695,7 +746,7 @@ export default function SkillBridgeApp() {
           confirmPassword: authForm.confirmPassword,
           fullName: authForm.fullName,
           currentStatus: authForm.currentStatus || undefined,
-          targetRoleId: authForm.targetRoleId
+          targetRoleId: authForm.targetRoleId || undefined
         }
       : {
           email: authForm.email,
@@ -735,7 +786,7 @@ export default function SkillBridgeApp() {
     localStorage.setItem('skillbridge_user', JSON.stringify(data.user));
     localStorage.setItem('skillbridge_profile', JSON.stringify(data.profile));
     setShowAuthModal(false);
-    setAuthForm({ email: '', password: '', confirmPassword: '', fullName: '', currentStatus: '', targetRoleId: 'role_junior_backend' });
+    setAuthForm({ email: '', password: '', confirmPassword: '', fullName: '', currentStatus: '', targetRoleId: '' });
     setActiveTab('market');
     refreshUserData(data.user.id, data.user.role, data.token);
   };
@@ -798,7 +849,7 @@ export default function SkillBridgeApp() {
 
   const handleCurriculumChange = (currId: string) => {
     setSelectedCurriculumId(currId);
-    fetch(`${API_BASE}/curriculum/analyze?institutionId=${currId}&roleId=role_junior_backend`)
+    fetch(`${API_BASE}/curriculum/analyze?institutionId=${currId}&roleId=${effectiveRoleId}`)
       .then(res => res.json())
       .then(data => setCurriculumAnalysis(data))
       .catch((err) => console.error('[SkillBridge] Data load failed:', err));
@@ -811,7 +862,7 @@ export default function SkillBridgeApp() {
       return;
     }
     try {
-      const res = await fetch(`${API_BASE}/me/report?userId=${activeUserId}`, { headers: authHeaders() });
+      const res = await fetch(`${API_BASE}/me/report?userId=${activeUserId}&roleId=${effectiveRoleId}`, { headers: authHeaders() });
       const data = await res.json();
       setPassportData(data);
       setShowPassportModal(true);
@@ -828,7 +879,7 @@ export default function SkillBridgeApp() {
       `# SkillBridge Evidence Passport`,
       ``,
       `**Candidate:** ${candidate.name || candidate.fullName || 'Candidate'}`,
-      `**Target Role:** ${candidate.targetRole || 'Junior Backend Engineer'}`,
+      `**Target Role:** ${candidate.targetRole || 'Not selected'}`,
       `**Passport ID:** ${passportData.passportId || 'SKILLBRIDGE-VERIFIED'}`,
       `**Target Alignment:** ${alignment}%`,
       ``,
@@ -1152,7 +1203,94 @@ export default function SkillBridgeApp() {
   // VIEW RENDERERS
   // ==========================================
 
+  // Progressive role-selection prompt (user is logged in but has not chosen a target role).
+  const renderRolePromptView = () => {
+    const roleOptions = allRoles.length > 0 ? allRoles : (role ? [role] : []);
+    return (
+      <div className="card" style={{ textAlign: 'center', padding: '2.5rem', maxWidth: '560px', margin: '2rem auto' }}>
+        <div style={{
+          width: '52px', height: '52px', borderRadius: '50%', margin: '0 auto 1rem',
+          background: 'rgba(56,189,248,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }}>
+          <Sliders size={22} style={{ color: '#38bdf8' }} />
+        </div>
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 0.6rem' }}>Choose Your Target Role</h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: '0 auto 1.5rem', maxWidth: '420px' }}>
+          Pick the role you're preparing for to unlock personalized skill gaps, market demand insights, and job matches.
+        </p>
+        <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+          <select
+            value={roleDraft}
+            onChange={e => setRoleDraft(e.target.value)}
+            style={{ maxWidth: '280px' }}
+          >
+            <option value="">Select a role…</option>
+            {roleOptions.map(r => (
+              <option key={r.id} value={r.id}>{r.title}</option>
+            ))}
+          </select>
+          <button
+            className="btn btn-primary"
+            disabled={!roleDraft}
+            onClick={() => handleRoleSelect(roleDraft)}
+          >
+            Save Target Role
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  // Signed-out prompt for personalized tabs.
+  const renderSignInPromptView = (title: string, subtitle: string) => (
+    <div className="card" style={{ textAlign: 'center', padding: '2.5rem', maxWidth: '560px', margin: '2rem auto' }}>
+      <div style={{
+        width: '52px', height: '52px', borderRadius: '50%', margin: '0 auto 1rem',
+        background: 'rgba(251,191,36,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center'
+      }}>
+        <LogIn size={22} style={{ color: '#fbbf24' }} />
+      </div>
+      <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 0.6rem' }}>{title}</h2>
+      <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: '0 auto 1.5rem', maxWidth: '420px' }}>
+        {subtitle}
+      </p>
+      <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+        <button className="btn btn-primary" onClick={handleDemoLogin}>
+          Try Demo (1-Click)
+        </button>
+        <button className="btn btn-secondary" onClick={() => { setAuthMode('LOGIN'); setShowAuthModal(true); }}>
+          Sign In
+        </button>
+      </div>
+    </div>
+  );
+
+  // Empty state shown when the user has a target role but no skill evidence yet.
+  const renderNoEvidenceView = () => (
+    <div className="card" style={{ textAlign: 'center', padding: '2.5rem', maxWidth: '560px', margin: '2rem auto' }}>
+      <div style={{
+        width: '52px', height: '52px', borderRadius: '50%', margin: '0 auto 1rem',
+        background: 'rgba(16,185,129,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center'
+      }}>
+        <ShieldCheck size={22} style={{ color: '#34d399' }} />
+      </div>
+      <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 0.6rem' }}>You haven't verified any skills yet</h2>
+      <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: '0 auto 1.5rem', maxWidth: '440px' }}>
+        Take the skill assessment or solve a sandbox challenge to build your skill evidence. Your personalized skill gaps, project recommendations, and job matches will unlock here once you have verified results.
+      </p>
+      <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+        <button className="btn btn-primary" onClick={() => setActiveTab('assessment')}>
+          <BrainCircuit size={14} /> Take the Skill Assessment
+        </button>
+        <button className="btn btn-secondary" onClick={() => setActiveTab('sandbox')}>
+          <Terminal size={14} /> Try the SQL & Code Sandbox
+        </button>
+      </div>
+    </div>
+  );
+
   const renderMarketView = () => {
+    if (currentUser && !activeTargetRoleId) return renderRolePromptView();
     if (!role) return null;
     const totalJobsCount = landingStats?.jobPostings ?? allJobs.length;
     const employerCount = new Set(allJobs.map(j => j.company)).size;
@@ -2174,6 +2312,15 @@ export default function SkillBridgeApp() {
   };
 
   const renderGapsView = () => {
+    if (!currentUser) {
+      return renderSignInPromptView(
+        'Sign in to see your personalized skill gaps',
+        'Your skill gaps are computed against real evidence from the diagnostic, skill assessments, and sandbox challenges.'
+      );
+    }
+    if (!activeTargetRoleId) return renderRolePromptView();
+    if (gaps.length === 0) return renderNoEvidenceView();
+
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         <div className="page-header">
@@ -2183,6 +2330,19 @@ export default function SkillBridgeApp() {
               Gaps prioritized mathematically using role weight, market demand frequency, and demonstrated proficiency:
               Priority = Role Weight × Market Demand × (1 - Demonstrated Proficiency).
             </p>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span className="badge" style={{ fontSize: '0.7rem', whiteSpace: 'nowrap' }}>Target role</span>
+            <select
+              value={activeTargetRoleId}
+              onChange={e => handleRoleSelect(e.target.value)}
+              title="Change your target role"
+              style={{ width: 'auto' }}
+            >
+              {allRoles.map(r => (
+                <option key={r.id} value={r.id}>{r.title}</option>
+              ))}
+            </select>
           </div>
         </div>
 
@@ -2228,6 +2388,15 @@ export default function SkillBridgeApp() {
   };
 
   const renderActionsView = () => {
+    if (!currentUser) {
+      return renderSignInPromptView(
+        'Sign in to see recommended projects',
+        'Project recommendations are built from your verified skill gaps to help you bridge multiple high-priority skills at once.'
+      );
+    }
+    if (!activeTargetRoleId) return renderRolePromptView();
+    if (recommendations.length === 0) return renderNoEvidenceView();
+
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
         <div className="page-header">
@@ -2313,6 +2482,14 @@ export default function SkillBridgeApp() {
   };
 
   const renderJobsView = () => {
+    if (!currentUser) {
+      return renderSignInPromptView(
+        'Sign in to see matching jobs',
+        'Job matches are computed against your demonstrated skill evidence and ranked by compatibility for your target role.'
+      );
+    }
+    if (!activeTargetRoleId) return renderRolePromptView();
+
     const bdCount = jobMatches.filter(m => m.job.isBangladesh).length;
     const internationalCount = jobMatches.length - bdCount;
     const bdOnsite = jobMatches.filter(m => m.job.isBangladesh && !m.job.isRemote).length;
@@ -3197,7 +3374,7 @@ export default function SkillBridgeApp() {
               <div className="sidebar-track-card">
                 <div className="sidebar-track-label">Active Track</div>
                 <div className="sidebar-track-title">
-                  <span>{role?.title || 'Junior Backend Engineer'}</span>
+                  <span>{activeTargetRoleId ? (role?.title || 'Select your track') : 'Select your track'}</span>
                 </div>
               </div>
             </div>
@@ -3499,7 +3676,7 @@ export default function SkillBridgeApp() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>{passportData.candidate?.name || passportData.candidate?.fullName || 'Candidate'}</h3>
-                  <div style={{ fontSize: '0.85rem', color: '#60a5fa' }}>{passportData.candidate?.targetRole || 'Junior Backend Engineer'}</div>
+                  <div style={{ fontSize: '0.85rem', color: '#60a5fa' }}>{passportData.candidate?.targetRole || 'Not selected'}</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Target Alignment</div>
@@ -3708,6 +3885,24 @@ export default function SkillBridgeApp() {
                         <option value="">Select your current status</option>
                         {CURRENT_STATUS_OPTIONS.map(opt => (
                           <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="auth-field">
+                    <label className="auth-label" htmlFor="auth-target-role">What role are you preparing for? <span style={{ fontWeight: 400 }}>(optional)</span></label>
+                    <div className="auth-input-wrap">
+                      <Target size={15} className="auth-input-icon" />
+                      <select
+                        id="auth-target-role"
+                        value={authForm.targetRoleId}
+                        onChange={e => setAuthForm({ ...authForm, targetRoleId: e.target.value })}
+                        className="auth-input auth-select"
+                      >
+                        <option value="">Choose now or later</option>
+                        {allRoles.map(r => (
+                          <option key={r.id} value={r.id}>{r.title}</option>
                         ))}
                       </select>
                     </div>

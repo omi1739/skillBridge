@@ -74,9 +74,9 @@ export class AuthController {
   }
 
   @Get('me/recommendations')
-  async getRecommendations(@Query('userId') queryUserId?: string) {
+  async getRecommendations(@Query('userId') queryUserId?: string, @Query('roleId') roleId?: string) {
     const userId = queryUserId || 'demo_user_01';
-    return this.authService.getRecommendations(userId);
+    return this.authService.getRecommendations(userId, roleId);
   }
 
   @Get('me/report')

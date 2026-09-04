@@ -57,6 +57,9 @@ function setupFetch() {
     if (url.includes('/me?userId') || url.includes('/me?user')) {
       return response({ user: USER, profile: PROFILE });
     }
+    if (url.includes('/assessments/diagnostic')) {
+      return response(ASSESSMENT);
+    }
     if (url.includes('/assessments/assessment_backend_diagnostic')) {
       return response(ASSESSMENT);
     }

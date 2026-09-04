@@ -14,6 +14,13 @@ export class GapService {
 
     const userEvidenceList: SkillEvidence[] = await store.getEvidence(userId);
 
+    // A user who has never demonstrated any skill (no assessment, sandbox pass,
+    // verified project, or self-declared skill) has no gaps to report yet.
+    // Personalization only makes sense once there is real evidence to compare.
+    if (userEvidenceList.length === 0) {
+      return [];
+    }
+
     const gaps: SkillGap[] = role.roleSkills.map(rs => {
       const skillName = rs.skill ? rs.skill.canonicalName : rs.skillId;
 

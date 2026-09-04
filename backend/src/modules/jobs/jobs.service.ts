@@ -8,8 +8,8 @@ export class JobsService {
     return store.getJobs(sort);
   }
 
-  async getMatches(userId: string = 'demo_user_01') {
-    return matchService.matchAllJobs(userId);
+  async getMatches(userId: string = 'demo_user_01', roleId?: string) {
+    return matchService.matchAllJobs(userId, roleId);
   }
 
   async matchJob(userId: string, jobId: string) {

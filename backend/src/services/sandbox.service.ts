@@ -457,7 +457,8 @@ ORDER BY c.name ASC;`,
     await store.saveEvidence(userId, userEvidence);
 
     // Recompute gaps with newly elevated practical score
-    await gapService.calculateGaps(userId, 'role_junior_backend');
+    const roleId = await store.getTargetRoleId(userId);
+    await gapService.calculateGaps(userId, roleId);
 
     return newEv;
   }
