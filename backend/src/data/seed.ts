@@ -1,4 +1,4 @@
-import { Skill, Role, Assessment, ActionRecommendation } from '@skillbridge/types';
+import { Skill, Role, Assessment } from '@skillbridge/types';
 
 export const INITIAL_SKILLS: Skill[] = [
   {
@@ -269,30 +269,3 @@ CMD ["node", "dist/server.js"]`,
     }
   ]
 };
-
-export const INITIAL_RECOMMENDATIONS: ActionRecommendation[] = [
-  {
-    id: 'rec_capstone_api',
-    userId: '',
-    type: 'CAPSTONE_PROJECT',
-    title: 'Production REST API with PostgreSQL & Docker',
-    description: 'Build an authenticated Task & Organization Management API with Node.js/Express, raw PostgreSQL queries with indexes & transactions, input validation with Zod, and containerized deployment with multi-stage Dockerfile and Docker Compose.',
-    targetSkillIds: ['skill_nodejs', 'skill_postgresql', 'skill_sql', 'skill_rest_api', 'skill_docker'],
-    targetSkillNames: ['Node.js', 'PostgreSQL', 'SQL', 'REST APIs', 'Docker'],
-    estimatedHours: 12,
-    priorityLevel: 'CRITICAL',
-    status: 'PENDING'
-  },
-  {
-    id: 'rec_sql_deep_dive',
-    userId: '',
-    type: 'PRACTICAL_TASK',
-    title: 'Relational Database Modeling & Index Optimization Lab',
-    description: 'Design a normalized e-commerce database schema, write queries using multi-table JOINs and window functions, and optimize slow queries using EXPLAIN ANALYZE.',
-    targetSkillIds: ['skill_sql', 'skill_postgresql'],
-    targetSkillNames: ['SQL', 'PostgreSQL'],
-    estimatedHours: 6,
-    priorityLevel: 'HIGH',
-    status: 'PENDING'
-  }
-];

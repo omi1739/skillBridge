@@ -3,6 +3,7 @@ import { User, Profile, SkillEvidence, ActionRecommendation } from '@skillbridge
 import { authService, AuthPayload } from '../../services/auth.service';
 import { store } from '../../store';
 import { gapService } from '../../services/gap.service';
+import { recommendationService } from '../../services/recommendation.service';
 import { googleVerifier } from '../../services/google-verifier.service';
 
 @Injectable()
@@ -80,18 +81,17 @@ export class NestAuthService {
     return gapService.calculateGaps(userId, roleId);
   }
 
-  async getRecommendations(userId: string) {
-    return store.getRecommendations(userId);
+  async getRecommendations(userId: string, roleId: string = 'role_junior_backend') {
+    return recommendationService.refreshRecommendations(userId, roleId);
   }
 
   async getCareerReport(userId: string, roleId: string = 'role_junior_backend') {
-    const [user, profile, role, evidence, gaps, recs, projects] = await Promise.all([
+    const [user, profile, role, evidence, gaps, projects] = await Promise.all([
       store.getUser(userId),
       store.getProfile(userId),
       store.getRole(roleId),
       store.getEvidence(userId),
       gapService.calculateGaps(userId, roleId),
-      store.getRecommendations(userId),
       store.getProjects(userId)
     ]);
 
@@ -102,6 +102,8 @@ export class NestAuthService {
     if (!role) {
       throw new NotFoundException('Target role not found');
     }
+
+    const recs = await recommendationService.buildFromGapsAndPersist(userId, gaps);
 
     let totalWeightedScore = 0;
     let totalMaxPossible = 0;

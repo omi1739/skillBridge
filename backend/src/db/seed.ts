@@ -4,7 +4,6 @@ import {
   Skill,
   Role,
   Assessment,
-  ActionRecommendation,
   User,
   Profile,
   SkillEvidence
@@ -12,8 +11,7 @@ import {
 import {
   INITIAL_SKILLS,
   INITIAL_ROLES,
-  INITIAL_ASSESSMENT,
-  INITIAL_RECOMMENDATIONS
+  INITIAL_ASSESSMENT
 } from '../data/seed';
 import {
   SKILL_BANK_TOPICS,
@@ -243,33 +241,25 @@ export async function seedAll(): Promise<void> {
       );
     }
 
-    // --- Recommendations (assigned to demo user) ---
-    for (const rec of INITIAL_RECOMMENDATIONS as ActionRecommendation[]) {
-      await client.query(
-        `INSERT INTO recommendations
-           (id, user_id, type, title, description, target_skill_ids, target_skill_names, estimated_hours, priority_level, status)
-         VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb,$8,$9,$10)
-         ON CONFLICT (id) DO NOTHING`,
-        [rec.id, 'demo_user_01', rec.type, rec.title, rec.description,
-         JSON.stringify(rec.targetSkillIds), JSON.stringify(rec.targetSkillNames),
-         rec.estimatedHours, rec.priorityLevel, rec.status]
-      );
-    }
-
-    // --- Demo portfolio project ---
+    // --- Recommendations: no static seeds. Recommendations are derived
+    // dynamically from assessed skill gaps via RecommendationService, so we
+    // purge any legacy hardcoded demo rows (and any transient test rows)
+    // rather than re-inserting them on every boot.
     await client.query(
-      `INSERT INTO projects
-         (id, user_id, title, repo_url, description, primary_skills, detected_stack,
-          has_tests, has_docker, has_readme, commit_count_estimate, verification_status, submitted_at)
-       VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb,$8,$9,$10,$11,$12,$13::timestamptz)
-       ON CONFLICT (id) DO NOTHING`,
-      ['proj_demo_01', 'demo_user_01',
-       'E-Commerce Backend REST API with PostgreSQL',
-       'https://github.com/ayman-rahman/ecommerce-backend-api',
-       'Production-ready Node.js REST API with authentication (JWT), raw PostgreSQL queries with indexes, multi-stage Dockerfile, and integration tests.',
-       JSON.stringify(['Node.js', 'PostgreSQL', 'REST APIs', 'Docker']),
-       JSON.stringify(['TypeScript', 'Express', 'PostgreSQL', 'Docker', 'Jest']),
-       true, true, true, 42, 'VERIFIED', new Date(Date.now() - 86400000 * 2).toISOString()]
+      `DELETE FROM recommendations WHERE user_id = $1`,
+      ['demo_user_01']
+    );
+
+    // --- No demo portfolio project. The portfolio only shows real GitHub
+    // submissions from the current user, so drop the legacy demo project.
+    await client.query(
+      `DELETE FROM projects WHERE id = 'proj_demo_01' OR user_id = 'demo_user_01'`
+    );
+
+    // Skill-evidence contributed by the demo project (source_type PROJECT) is
+    // also stale now that the demo portfolio is gone.
+    await client.query(
+      `DELETE FROM skill_evidence WHERE user_id = 'demo_user_01' AND source_type = 'PROJECT'`
     );
   });
 

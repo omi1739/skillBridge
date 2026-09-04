@@ -356,6 +356,24 @@ export class AppDataStore {
     );
   }
 
+  /**
+   * Replaces all recommendations for a user with the given list (used by the
+   * dynamic recommendation engine that derives them from live skill gaps).
+   */
+  async saveRecommendations(userId: string, recs: ActionRecommendation[]): Promise<void> {
+    await query(`DELETE FROM recommendations WHERE user_id = $1`, [userId]);
+    for (const rec of recs) {
+      await query(
+        `INSERT INTO recommendations
+           (id, user_id, type, title, description, target_skill_ids, target_skill_names, estimated_hours, priority_level, status)
+         VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb,$8,$9,$10)`,
+        [rec.id, userId, rec.type, rec.title, rec.description,
+         JSON.stringify(rec.targetSkillIds), JSON.stringify(rec.targetSkillNames),
+         rec.estimatedHours, rec.priorityLevel, rec.status]
+      );
+    }
+  }
+
   // ---- Projects (portfolio evidence) ----
   async getProjects(userId: string): Promise<ProjectEvidence[]> {
     const rows = await query<ProjectRow>(
