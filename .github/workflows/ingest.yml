@@ -44,7 +44,7 @@ jobs:
             exit 1
           fi
 
-          TOKEN=$(printf '%s' "$LOGIN_BODY" | node -e '
+          TOKEN=$(printf '%s' "$(cat LOGIN_BODY)" | node -e '
             let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
               try {
                 const r = JSON.parse(s);
@@ -72,7 +72,7 @@ jobs:
           fi
 
           cat INGEST_BODY
-          printf '%s' "$INGEST_BODY" | node -e '
+          printf '%s' "$(cat INGEST_BODY)" | node -e '
             let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
               try {
                 const r = JSON.parse(s);
