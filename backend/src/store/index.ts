@@ -638,28 +638,46 @@ export class AppDataStore {
     );
   }
 
-  async runVerificationSweep(): Promise<{ deleted: number; recentlyChecked: number; verified: number }> {
+  async runVerificationSweep(): Promise<{ expired: number; deleted: number; recentlyChecked: number; verified: number }> {
     const RECENT_INTERVAL = "48 hours";
 
-    // Retain ingested listings for this many days since last verification, then
-    // permanently remove them. Defaults to 4 (keeps job-plan growth bounded so
-    // the table never fills up). EMPLOYER_VERIFIED postings are always kept.
-    const retentionDays = Number(process.env.JOB_RETENTION_DAYS || 4) || 4;
+    // How long a listing can go without re-verification before it is flagged
+    // EXPIRED (shown to users as a visible "Expired" badge). Defaults to 4 days.
+    const expireDays = Number(process.env.JOB_EXPIRE_DAYS || 4) || 4;
+    const expireInterval = `${expireDays} days`;
+
+    // How long an EXPIRED listing is kept for audit before being permanently
+    // removed to keep the job-plan bounded. Defaults to 7 days.
+    const retentionDays = Number(process.env.JOB_RETENTION_DAYS || 7) || 7;
     const retentionInterval = `${retentionDays} days`;
 
-    // Purge stale listings: source became inactive OR not re-verified within
-    // the retention window. Never remove recruiter-hosted (EMPLOYER_VERIFIED) jobs.
-    const deleted = await query<{ c: string }>(
-      `WITH purged AS (
-         DELETE FROM jobs
+    // Soft-expire: a listing whose source became inactive OR wasn't re-verified
+    // within the expire window. Never flag recruiter-hosted (EMPLOYER_VERIFIED)
+    // jobs or ones already EXPIRED. This is what users see as the badge.
+    const expired = await query<{ c: string }>(
+      `WITH expiring AS (
+         UPDATE jobs SET verification_status = 'EXPIRED'
          WHERE (
            source_id IS NOT NULL AND NOT EXISTS (
              SELECT 1 FROM job_sources s WHERE s.id = jobs.source_id AND s.is_active
            )
            OR
-           (last_verified_at IS NOT NULL AND last_verified_at < CURRENT_TIMESTAMP - INTERVAL '${retentionInterval}')
+           (last_verified_at IS NOT NULL AND last_verified_at < CURRENT_TIMESTAMP - INTERVAL '${expireInterval}')
          )
-         AND verification_status != 'EMPLOYER_VERIFIED'
+         AND verification_status NOT IN ('EMPLOYER_VERIFIED', 'EXPIRED')
+         RETURNING id
+       )
+       SELECT COUNT(*)::text AS c FROM expiring`
+    );
+
+    // Physical purge: permanently remove listings that are EXPIRED and have been
+    // stale beyond the retention window. Keeps the table bounded. Employment-
+    // verified (recruiter-hosted) postings are already excluded by the status.
+    const deleted = await query<{ c: string }>(
+      `WITH purged AS (
+         DELETE FROM jobs
+         WHERE verification_status = 'EXPIRED'
+           AND last_verified_at < CURRENT_TIMESTAMP - INTERVAL '${retentionInterval}'
          RETURNING id
        )
        SELECT COUNT(*)::text AS c FROM purged`
@@ -690,6 +708,7 @@ export class AppDataStore {
     );
 
     return {
+      expired: Number(expired[0]?.c || 0),
       deleted: Number(deleted[0]?.c || 0),
       recentlyChecked: Number(recent[0]?.c || 0),
       verified: Number(verified[0]?.c || 0)

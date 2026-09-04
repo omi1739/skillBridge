@@ -74,5 +74,7 @@ services:
         sync: false
       - key: JOB_MIN_MATCHES
         sync: false
-      - key: JOB_RETENTION_DAYS
+      - key: JOB_EXPIRE_DAYS
         value: 4
+      - key: JOB_RETENTION_DAYS
+        value: 7
