@@ -1,5 +1,7 @@
 import './globals.css';
 import type { Metadata } from 'next';
+import { SkillBridgeProvider } from '@/lib/skillbridge-context';
+import GlobalModals from '@/components/GlobalModals';
 
 export const metadata: Metadata = {
   title: 'SkillBridge | Evidence-Based Talent Intelligence',
@@ -14,7 +16,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <main>{children}</main>
+        <SkillBridgeProvider>
+          {children}
+          <GlobalModals />
+        </SkillBridgeProvider>
       </body>
     </html>
   );

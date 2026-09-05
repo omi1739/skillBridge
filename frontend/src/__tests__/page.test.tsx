@@ -1,7 +1,21 @@
+import React, { useState, useCallback, useMemo } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import Page from '../app/page';
+
+import { SkillBridgeProvider } from '../lib/skillbridge-context';
+import GlobalModals from '../components/GlobalModals';
+import AppShell from '../components/AppShell';
+import { usePathname } from 'next/navigation';
+import LandingPage from '../app/page';
+import MarketPage from '../app/(app)/market/page';
+import CurriculumPage from '../app/(app)/curriculum/page';
+import AssessmentPage from '../app/(app)/assessment/page';
+import SandboxPage from '../app/(app)/sandbox/page';
+import GapsPage from '../app/(app)/gaps/page';
+import ActionsPage from '../app/(app)/actions/page';
+import JobsPage from '../app/(app)/jobs/page';
+import AdminPage from '../app/(app)/admin/page';
 
 const USER = { id: 'demo_user_01', fullName: 'Demo Candidate', email: 'demo@skillbridge.dev' };
 const PROFILE = { userId: 'demo_user_01', targetRoleId: 'role_junior_backend' };
@@ -91,12 +105,86 @@ function setupFetch() {
   });
 }
 
+const navMock = vi.hoisted(() => ({ ctx: undefined as any }));
+
+vi.mock('next/navigation', async () => {
+  const ReactMod = await import('react');
+  const NavCtx = ReactMod.createContext<{ path: string; router: any }>({ path: '/', router: undefined });
+  navMock.ctx = NavCtx;
+  return {
+    useRouter: () => ReactMod.useContext(NavCtx).router,
+    usePathname: () => ReactMod.useContext(NavCtx).path,
+    useSearchParams: () => new URLSearchParams(),
+    useParams: () => ({})
+  };
+});
+
+vi.mock('next/link', async () => {
+  const ReactMod = await import('react');
+  return {
+    __esModule: true,
+    default: ({ href, children, className, style }: any) => {
+      const ctx = ReactMod.useContext(navMock.ctx) as any;
+      return ReactMod.createElement('a', {
+        href: String(href),
+        className,
+        style,
+        onClick: (e: any) => { e.preventDefault(); ctx?.router.push(String(href)); }
+      }, children);
+    }
+  };
+});
+
+function NavProvider({ children, initialPath = '/' }: { children: React.ReactNode; initialPath?: string }) {
+  const [path, setPath] = useState(initialPath);
+  const navigate = useCallback((p: string) => { setPath(p); }, []);
+  const router = useMemo(() => ({ push: navigate, replace: navigate, back: () => navigate('/'), prefetch: () => {} }), [navigate]);
+  const NavCtx = navMock.ctx;
+  return (
+    <NavCtx.Provider value={{ path, router }}>
+      {children}
+    </NavCtx.Provider>
+  );
+}
+
+function Main() {
+  const pathname = usePathname();
+  if (pathname === '/') return <LandingPage />;
+
+  let content: React.ReactNode;
+  switch (pathname) {
+    case '/market': content = <MarketPage />; break;
+    case '/curriculum': content = <CurriculumPage />; break;
+    case '/assessment': content = <AssessmentPage />; break;
+    case '/sandbox': content = <SandboxPage />; break;
+    case '/gaps': content = <GapsPage />; break;
+    case '/actions': content = <ActionsPage />; break;
+    case '/jobs': content = <JobsPage />; break;
+    case '/admin': content = <AdminPage />; break;
+    default: content = <LandingPage />;
+  }
+  return <AppShell>{content}</AppShell>;
+}
+
+function renderApp(initialPath = '/') {
+  return render(
+    <NavProvider initialPath={initialPath}>
+      <SkillBridgeProvider>
+        <Main />
+        <GlobalModals />
+      </SkillBridgeProvider>
+    </NavProvider>
+  );
+}
+
 async function loginAsDemo(user: ReturnType<typeof userEvent.setup>) {
   const demo = await screen.findByRole('button', { name: /try demo/i });
   await user.click(demo);
+  await screen.findByRole('heading', { name: /Junior Backend Job Market Demand/i });
+  await screen.findByText(/matching jobs/i);
 }
 
-describe('SkillBridge page API contract', () => {
+describe('SkillBridge app API contract (multi-route)', () => {
   beforeEach(() => {
     localStorage.clear();
     setupFetch();
@@ -104,10 +192,10 @@ describe('SkillBridge page API contract', () => {
 
   it('submits an assessment with the selectedAnswer payload shape', async () => {
     const user = userEvent.setup();
-    render(<Page />);
+    renderApp('/');
     await loginAsDemo(user);
 
-    await user.click(await screen.findByRole('button', { name: /^Diagnostic Test/ }));
+    await user.click(await screen.findByRole('button', { name: /^Diagnostic Test$/ }));
     await screen.findByRole('heading', { name: /Backend Engineering Diagnostic/i });
 
     for (let i = 0; i < ASSESSMENT.questions.length; i++) {
@@ -140,7 +228,7 @@ describe('SkillBridge page API contract', () => {
 
   it('runs an SQL sandbox challenge with the query payload shape', async () => {
     const user = userEvent.setup();
-    render(<Page />);
+    renderApp('/');
     await loginAsDemo(user);
 
     await user.click(await screen.findByRole('button', { name: /SQL & Code Sandbox/i }));
@@ -167,7 +255,7 @@ describe('SkillBridge page API contract', () => {
 
   it('hides the Admin console tab for a non-admin (USER) user', async () => {
     const user = userEvent.setup();
-    render(<Page />);
+    renderApp('/');
     await loginAsDemo(user);
 
     await screen.findByText(/matching jobs/i);
@@ -175,7 +263,7 @@ describe('SkillBridge page API contract', () => {
   }, 20000);
 
   it('shows the real job posting count from /stats on the public landing page', async () => {
-    render(<Page />);
+    renderApp('/');
     await screen.findByText(/Real job requirements, measured against real skills/i);
     const matches = await screen.findAllByText('27');
     expect(matches).not.toHaveLength(0);
