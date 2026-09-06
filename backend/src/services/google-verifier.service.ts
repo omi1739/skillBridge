@@ -24,6 +24,9 @@ export async function verifyGoogleIdToken(idToken: string): Promise<GoogleProfil
   if (!idToken || typeof idToken !== 'string') {
     throw new Error('Google credential is missing.');
   }
+  if (typeof fetch !== 'function') {
+    throw new Error('Google verification requires global fetch (Node 18+).');
+  }
 
   const res = await fetch(`${TOKENINFO_BASE}?id_token=${encodeURIComponent(idToken)}`);
   if (!res.ok) {

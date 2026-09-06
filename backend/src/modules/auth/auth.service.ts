@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, UnauthorizedException, InternalServerErrorException } from '@nestjs/common';
 import { User, Profile, SkillEvidence, ActionRecommendation } from '@skillbridge/types';
 import { authService, AuthPayload } from '../../services/auth.service';
 import { store } from '../../store';
@@ -23,7 +23,13 @@ export class NestAuthService {
     } catch (err: any) {
       throw new UnauthorizedException(err?.message || 'Google login failed.');
     }
-    return authService.registerOrLoginWithGoogle(profileInfo, currentStatus);
+    try {
+      return await authService.registerOrLoginWithGoogle(profileInfo, currentStatus);
+    } catch (err: any) {
+      const msg = err?.message || 'Could not provision the Google account.';
+      console.error('[SkillBridge] Google account provisioning failed:', msg);
+      throw new InternalServerErrorException(`Google account provisioning failed: ${msg}`);
+    }
   }
 
   async getCurrentUser(userId: string) {
