@@ -3,7 +3,10 @@
 import { useSkillBridge } from '@/lib/skillbridge-context';
 import { RolePromptView } from './prompts';
 import { VerificationBadge } from '@/components/ui/badges';
-import { ArrowRight } from 'lucide-react';
+import {
+  ArrowRight, MapPin, TrendingUp, Database, Lock, ExternalLink,
+  BarChart3, Clock, CheckCircle2
+} from 'lucide-react';
 
 export default function MarketView() {
   const {
@@ -21,205 +24,246 @@ export default function MarketView() {
     navigate
   } = useSkillBridge();
 
-    if (currentUser && !activeTargetRoleId) return <RolePromptView />;
-    if (!role) {
-      return (
-        <div className="card" style={{ textAlign: 'center', padding: '2.5rem', maxWidth: '560px', margin: '2rem auto' }}>
-          <div style={{
-            width: '52px', height: '52px', borderRadius: '50%', margin: '0 auto 1rem',
-            background: 'var(--info-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }}>
-            <ArrowRight size={22} style={{ color: 'var(--info)' }} />
-          </div>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 0.6rem' }}>Loading Job Market Demand…</h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: '0 auto', maxWidth: '420px' }}>
-            Fetching live market requirement data for the junior backend track.
-          </p>
-        </div>
-      );
-    }
-    const totalJobsCount = landingStats?.jobPostings ?? allJobs.length;
-    const employerCount = new Set(allJobs.map(j => j.company)).size;
-    const sourceList = marketProvenance?.sources?.length
-      ? marketProvenance.sources.join(' + ')
-      : 'Public job APIs';
-    const lastSync = marketProvenance?.lastIngestedAt
-      ? new Date(marketProvenance.lastIngestedAt).toLocaleDateString()
-      : 'pending';
-    const sourcesText = employerCount > 0
-      ? `${employerCount} tech employers ${sourceList ? `• Source: ${sourceList}` : ''} • Synced ${lastSync}`
-      : 'Live data loading…';
-
-    const remoteCount = allJobs.filter(j => j.isRemote).length;
-    const remoteSplit = currentUser
-      ? `• ${remoteCount} remote/WFH • ${allJobs.length - remoteCount} onsite`
-      : '• Login to see remote/WFH vs onsite breakout';
-
+  if (currentUser && !activeTargetRoleId) return <RolePromptView />;
+  if (!role) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-        <div className="page-header">
-          <div>
-            <h1 className="page-title">Junior Backend Job Market Demand</h1>
-            <p className="page-subtitle">
-              Empirical market requirements derived dynamically from {totalJobsCount} verified junior backend job postings — remote / work-from-home and onsite — in {role.marketContext.region}.
-            </p>
-          </div>
+      <div className="card" style={{ textAlign: 'center', padding: '2.5rem', maxWidth: '560px', margin: '2rem auto' }}>
+        <div style={{
+          width: '52px', height: '52px', borderRadius: '50%', margin: '0 auto 1rem',
+          background: 'var(--info-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }}>
+          <TrendingUp size={22} style={{ color: 'var(--info)' }} />
         </div>
-
-        <div className="stat-grid-3">
-          <div className="stat-card">
-            <div className="stat-label">Focus Region</div>
-            <div className="stat-value" style={{ fontSize: '1.25rem' }}>{role.marketContext.region}</div>
-            <div className="stat-sub">Dhaka, Chittagong & Remote Hubs</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-label">Experience Tier</div>
-            <div className="stat-value" style={{ fontSize: '1.25rem' }}>{role.marketContext.experienceLevel}</div>
-            <div className="stat-sub">Primary hiring tier for this track</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-label">Live Postings Catalog</div>
-            <div className="stat-value" style={{ fontSize: '1.25rem', color: 'var(--text-link)' }}>N = {totalJobsCount} Postings</div>
-            <div className="stat-sub">{sourcesText}</div>
-            <div className="stat-sub">{remoteSplit}</div>
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="card-header">
-            <div>
-              <h2 className="card-title">Required Backend Technologies by Frequency</h2>
-              <p className="card-subtitle">
-                How frequently each technology appears in actual job requirements for junior backend roles.
-              </p>
-            </div>
-            {currentUser && (
-              <button className="btn btn-primary" onClick={() => navigate('assessment')}>
-                Take Diagnostic Test <ArrowRight size={15} />
-              </button>
-            )}
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.15rem' }}>
-            {role?.roleSkills ? role.roleSkills.map(rs => {
-              const pct = Math.round(rs.marketDemandFrequency * 100);
-              const isRequired = rs.required;
-              const matchingPostings = allJobs.filter(j =>
-                (j.requiredSkillIds || []).includes(rs.skillId) ||
-                (j.preferredSkillIds || []).includes(rs.skillId)
-              );
-              const isExpanded = expandedSkillPostings?.skillId === rs.skillId;
-
-              return (
-                <div key={rs.skillId}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <span style={{ fontWeight: 600, fontSize: '0.925rem' }}>
-                        {rs.skill?.canonicalName || rs.skillId}
-                      </span>
-                      <span className={`badge ${isRequired ? 'badge-required' : 'badge-preferred'}`}>
-                        {isRequired ? 'Required' : 'Preferred'}
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => {
-                        if (!currentUser) {
-                          setAuthMode('LOGIN');
-                          setShowAuthModal(true);
-                          return;
-                        }
-                        setExpandedSkillPostings(
-                          isExpanded ? null : { skillId: rs.skillId, postings: matchingPostings }
-                        );
-                      }}
-                      style={{
-                        fontWeight: 700,
-                        fontFamily: 'var(--font-mono)',
-                        color: isRequired ? 'var(--danger)' : 'var(--info)',
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        textDecoration: 'underline dotted'
-                      }}
-                      title={currentUser ? "Show the real postings used to compute this value" : "Sign in to see the real postings behind this percentage"}
-                    >
-                      {pct}% of jobs
-                    </button>
-                  </div>
-
-                  <div className="progress-container">
-                    <div
-                      className={`progress-bar ${isRequired ? 'progress-indigo' : 'progress-cyan'}`}
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                    Target Level: <strong>{rs.proficiencyTarget}</strong> • Role Weight: <strong>{rs.roleWeight * 100}%</strong>
-                    {currentUser ? <> • {matchingPostings.length} of {totalJobsCount} postings</> : null}
-                  </div>
-
-                  {isExpanded && !currentUser && (
-                    <div style={{ marginTop: '0.6rem', border: '1px solid var(--border-faint)', borderRadius: '6px', padding: '1rem', background: 'var(--bg-row)', textAlign: 'center' }}>
-                      <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
-                        See the individual job postings
-                      </div>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
-                        Create a free account or log in to view the real, verified postings behind each percentage.
-                      </div>
-                      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-                        <button className="btn btn-primary" style={{ fontSize: '0.8rem', padding: '0.4rem 0.9rem' }} onClick={handleDemoLogin}>
-                          Explore Demo <ArrowRight size={13} />
-                        </button>
-                        <button className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '0.4rem 0.9rem' }} onClick={() => { setAuthMode('REGISTER'); setShowAuthModal(true); }}>
-                          Register Free
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {isExpanded && currentUser && (
-                    <div style={{ marginTop: '0.6rem', border: '1px solid var(--border-faint)', borderRadius: '6px', padding: '0.7rem', background: 'var(--bg-row)' }}>
-                      <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
-                        Verifiable source postings
-                      </div>
-                      {matchingPostings.length === 0 && (
-                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>No live postings matched yet — run ingestion.</div>
-                      )}
-                      {(matchingPostings.slice(0, 8)).map(j => (
-                        <div key={j.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', padding: '0.35rem 0', borderBottom: '1px solid var(--border-faint)', fontSize: '0.8rem' }}>
-                          <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            <strong>{j.title}</strong>
-                            <span style={{ color: 'var(--text-muted)' }}> — {j.company}{j.location ? ` (${j.location})` : ''}</span>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
-                            <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>{j.sourceName || 'Manual'}</span>
-                            <VerificationBadge status={j.verificationStatus} />
-                            {j.sourceUrl ? (
-                              <a href={j.sourceUrl} target="_blank" rel="noopener noreferrer" className="btn btn-secondary" style={{ fontSize: '0.7rem', padding: '0.2rem 0.6rem' }}>
-                                Open ↗
-                              </a>
-                            ) : null}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            }) : (
-              <div style={{ color: 'var(--text-muted)', padding: '1rem 0' }}>Loading market demand data...</div>
-            )}
-          </div>
-
-          <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-faint)', fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', flexWrap: 'wrap', gap: '0.5rem 1.25rem', alignItems: 'center' }}>
-            <span><strong style={{ color: 'var(--text-secondary)' }}>Computed from</strong> {totalJobsCount} live postings</span>
-            <span><strong style={{ color: 'var(--text-secondary)' }}>Source</strong> {sourceList}</span>
-            <span><strong style={{ color: 'var(--text-secondary)' }}>Last synced</strong> {lastSync}</span>
-            <span><VerificationBadge status="SOURCE_VERIFIED" /></span>
-            <span>Percentages are occurrence counts across real, verifiable postings — click a value to open them.</span>
-          </div>
-        </div>
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 0.6rem' }}>Loading Job Market Demand…</h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: '0 auto', maxWidth: '420px' }}>
+          Fetching live market requirement data for the junior backend track.
+        </p>
       </div>
     );
+  }
+
+  const totalJobsCount = landingStats?.jobPostings ?? allJobs.length;
+  const employerCount = new Set(allJobs.map(j => j.company)).size;
+  const sourceList = marketProvenance?.sources?.length
+    ? marketProvenance.sources.join(' + ')
+    : 'Public job APIs';
+  const lastSync = marketProvenance?.lastIngestedAt
+    ? new Date(marketProvenance.lastIngestedAt).toLocaleDateString()
+    : 'Pending';
+  const remoteCount = allJobs.filter(j => j.isRemote).length;
+
+  const statusTiles = [
+    {
+      icon: MapPin,
+      accent: 'info',
+      label: 'Focus Region',
+      value: role.marketContext.region,
+      sub: 'Dhaka, Chittagong & remote hubs',
+      valueClass: 'tile-value'
+    },
+    {
+      icon: BarChart3,
+      accent: 'success',
+      label: 'Experience Tier',
+      value: role.marketContext.experienceLevel,
+      sub: 'Primary hiring tier for this track'
+    },
+    {
+      icon: Database,
+      accent: 'accent',
+      label: 'Live Postings Catalog',
+      value: `N = ${totalJobsCount}`,
+      sub: `${employerCount} employers • ${remoteCount} remote / WFH`,
+      mono: true
+    }
+  ];
+
+  return (
+    <div className="market-page">
+      <div className="page-header">
+        <div>
+          <div className="market-kicker">Live Market Intelligence</div>
+          <h1 className="page-title">Junior Backend Job Market Demand</h1>
+          <p className="page-subtitle">
+            Empirical requirements derived from {totalJobsCount} verified junior backend postings — remote and onsite — across the {role.marketContext.region} market.
+          </p>
+        </div>
+      </div>
+
+      <div className="market-meta-strip">
+        <span className="market-meta-item">
+          <VerificationBadge status="SOURCE_VERIFIED" />
+        </span>
+        <span className="market-meta-item">
+          <span className="market-meta-dot market-meta-dot-teal" /> Source — {sourceList}
+        </span>
+        <span className="market-meta-item">
+          <span className="market-meta-dot market-meta-dot-success" /> Synced {lastSync}
+        </span>
+        <span className="market-meta-item">
+          {currentUser
+            ? <><span className="market-meta-dot market-meta-dot-amber" /> {remoteCount} remote/WFH, {allJobs.length - remoteCount} onsite</>
+            : <><Lock size={12} /> Sign in for the remote/onsite breakout</>}
+        </span>
+      </div>
+
+      <div className="stat-grid-3 market-status-grid">
+        {statusTiles.map((tile, idx) => (
+          <div key={idx} className="stat-card market-status-card">
+            <div className="market-status-head">
+              <span className={`market-status-icon market-status-icon-${tile.accent}`}>
+                <tile.icon size={16} />
+              </span>
+              <span className="stat-label">{tile.label}</span>
+            </div>
+            <div
+              className={`stat-value ${tile.mono ? '' : ''}`}
+              style={{ fontSize: '1.3rem', color: tile.accent !== 'accent' ? undefined : 'var(--text-link)' }}
+            >
+              {tile.value}
+            </div>
+            <div className="stat-sub">{tile.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      <section className="card market-section">
+        <div className="card-header market-section-header">
+          <div>
+            <div className="market-section-eyebrow">Demand by Technology</div>
+            <h2 className="card-title">Required Backend Technologies by Frequency</h2>
+            <p className="card-subtitle">
+              How often each technology appears in actual job requirements for junior backend roles.
+            </p>
+          </div>
+          {currentUser && (
+            <button className="btn btn-primary" onClick={() => navigate('assessment')}>
+              Take Diagnostic Test <ArrowRight size={15} />
+            </button>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {role?.roleSkills ? role.roleSkills.map(rs => {
+            const pct = Math.round(rs.marketDemandFrequency * 100);
+            const isRequired = rs.required;
+            const matchingPostings = allJobs.filter(j =>
+              (j.requiredSkillIds || []).includes(rs.skillId) ||
+              (j.preferredSkillIds || []).includes(rs.skillId)
+            );
+            const isExpanded = expandedSkillPostings?.skillId === rs.skillId;
+
+            return (
+              <div key={rs.skillId} className="market-skill-row">
+                <div className="market-skill-top">
+                  <div className="market-skill-name-wrap">
+                    <span className="market-skill-name">
+                      {rs.skill?.canonicalName || rs.skillId}
+                    </span>
+                    <span className={`badge ${isRequired ? 'badge-required' : 'badge-preferred'}`}>
+                      {isRequired ? 'Required' : 'Preferred'}
+                    </span>
+                    {currentUser && (
+                      <span className="market-skill-count">
+                        {matchingPostings.length} of {totalJobsCount} postings
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    className="market-skill-pct"
+                    onClick={() => {
+                      if (!currentUser) {
+                        setAuthMode('LOGIN');
+                        setShowAuthModal(true);
+                        return;
+                      }
+                      setExpandedSkillPostings(
+                        isExpanded ? null : { skillId: rs.skillId, postings: matchingPostings }
+                      );
+                    }}
+                    title={currentUser ? "Show the real postings used to compute this value" : "Sign in to see the real postings behind this percentage"}
+                  >
+                    <span className="market-skill-pct-num">{pct}%</span>
+                    <span className="market-skill-pct-label">of jobs</span>
+                    <ArrowRight size={12} className={isExpanded ? 'rotate-90' : ''} />
+                  </button>
+                </div>
+
+                <div className="progress-container market-skill-bar">
+                  <div
+                    className={`progress-bar ${isRequired ? 'progress-indigo' : 'progress-cyan'}`}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+
+                <div className="market-skill-meta">
+                  <span><Clock size={12} /> Target Level: <strong>{rs.proficiencyTarget}</strong></span>
+                  <span><CheckCircle2 size={12} /> Role Weight: <strong>{Math.round(rs.roleWeight * 100)}%</strong></span>
+                </div>
+
+                {isExpanded && !currentUser && (
+                  <div className="market-lock-row">
+                    <Lock size={16} />
+                    <div>
+                      <div className="market-lock-title">See the individual job postings</div>
+                      <div className="market-lock-sub">
+                        Create a free account or log in to view the real, verified postings behind each percentage.
+                      </div>
+                    </div>
+                    <button className="btn btn-primary" style={{ fontSize: '0.8rem', padding: '0.4rem 0.9rem' }} onClick={handleDemoLogin}>
+                      Explore Demo <ArrowRight size={13} />
+                    </button>
+                    <button className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '0.4rem 0.9rem' }} onClick={() => { setAuthMode('REGISTER'); setShowAuthModal(true); }}>
+                      Register Free
+                    </button>
+                  </div>
+                )}
+
+                {isExpanded && currentUser && (
+                  <div className="market-postings">
+                    <div className="market-postings-title">Verifiable source postings</div>
+                    {matchingPostings.length === 0 && (
+                      <div className="market-postings-empty">No live postings matched yet — run ingestion.</div>
+                    )}
+                    {matchingPostings.slice(0, 8).map(j => (
+                      <div key={j.id} className="market-posting-row">
+                        <div className="market-posting-main">
+                          <strong>{j.title}</strong>
+                          <span className="market-posting-meta">
+                            {j.company}{j.location ? ` (${j.location})` : ''}
+                          </span>
+                        </div>
+                        <div className="market-posting-actions">
+                          <span className="market-posting-source">{j.sourceName || 'Manual'}</span>
+                          <VerificationBadge status={j.verificationStatus} />
+                          {j.sourceUrl ? (
+                            <a href={j.sourceUrl} target="_blank" rel="noopener noreferrer" className="btn btn-secondary market-posting-open">
+                              Open <ExternalLink size={11} />
+                            </a>
+                          ) : null}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          }) : (
+            <div className="market-loading">Loading market demand data…</div>
+          )}
+        </div>
+
+        <div className="market-footnote">
+          <span><strong>Computed from</strong> {totalJobsCount} live postings</span>
+          <span className="market-footnote-sep" />
+          <span><strong>Source</strong> {sourceList}</span>
+          <span className="market-footnote-sep" />
+          <span><strong>Last synced</strong> {lastSync}</span>
+          <span className="market-footnote-sep" />
+          <VerificationBadge status="SOURCE_VERIFIED" />
+          <span className="market-footnote-note">Percentages are occurrence counts across real postings — click a value to open them.</span>
+        </div>
+      </section>
+    </div>
+  );
 }

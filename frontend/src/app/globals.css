@@ -1304,6 +1304,352 @@ body {
   margin-bottom: 1.25rem;
 }
 
+/* =============================================================
+   Job Market Demand
+   ============================================================= */
+.market-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.market-kicker {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent-text);
+  margin-bottom: 0.4rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.market-kicker::before {
+  content: '';
+  width: 20px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent-primary);
+}
+
+.market-meta-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 1.25rem;
+  padding: 0.55rem 0.9rem;
+  background: var(--bg-row);
+  border: 1px solid var(--border-faint);
+  border-radius: var(--radius-sm);
+  font-size: 0.76rem;
+  color: var(--text-secondary);
+}
+
+.market-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+}
+
+.market-meta-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.market-meta-dot-teal { background: var(--teal); }
+.market-meta-dot-success { background: var(--success); }
+.market-meta-dot-amber { background: var(--warning); }
+
+.market-status-grid {
+  gap: 0.85rem;
+}
+
+.market-status-card {
+  padding: 1.1rem 1.2rem;
+}
+
+.market-status-head {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-bottom: 0.6rem;
+}
+
+.market-status-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.market-status-icon-info { background: var(--info-bg); color: var(--info); }
+.market-status-icon-success { background: var(--success-bg); color: var(--success-text); }
+.market-status-icon-accent { background: var(--accent-primary-soft); color: var(--accent-text); }
+
+.market-section {
+  padding: 1.5rem 1.5rem 1.1rem;
+}
+
+.market-section-header {
+  margin-bottom: 1.25rem;
+}
+
+.market-section-eyebrow {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+  margin-bottom: 0.3rem;
+}
+
+.market-skill-row {
+  padding: 0.4rem 0;
+}
+
+.market-skill-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.market-skill-name-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.market-skill-name {
+  font-weight: 650;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.market-skill-count {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  background: var(--bg-row);
+  border: 1px solid var(--border-faint);
+  border-radius: var(--radius-pill);
+  padding: 0.12rem 0.5rem;
+  white-space: nowrap;
+}
+
+.market-skill-pct {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0.2rem 0.4rem;
+  border-radius: var(--radius-sm);
+  transition: background 0.14s ease;
+}
+
+.market-skill-pct:hover {
+  background: var(--bg-hover);
+}
+
+.market-skill-pct-num {
+  font-family: var(--font-mono);
+  font-weight: 800;
+  font-size: 1.05rem;
+  color: var(--accent-text);
+}
+
+.market-skill-pct-label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.market-skill-bar {
+  margin: 0;
+  height: 8px;
+}
+
+.market-skill-bar .progress-bar {
+  height: 8px;
+  border-radius: 4px;
+}
+
+.market-skill-meta {
+  display: flex;
+  gap: 1rem 1.75rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  align-items: center;
+}
+
+.market-skill-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.market-skill-meta strong {
+  color: var(--text-secondary);
+  font-weight: 650;
+}
+
+.market-lock-row {
+  margin-top: 0.6rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 1rem;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-row);
+}
+
+.market-lock-row > svg {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.market-lock-row > div {
+  flex: 1;
+  min-width: 200px;
+}
+
+.market-lock-title {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.market-lock-sub {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  margin-top: 0.15rem;
+}
+
+.market-postings {
+  margin-top: 0.6rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-row);
+  overflow: hidden;
+}
+
+.market-postings-title {
+  padding: 0.6rem 1rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-faint);
+}
+
+.market-postings-empty {
+  padding: 1rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.market-posting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.45rem 1rem;
+  border-bottom: 1px solid var(--border-faint);
+  font-size: 0.8rem;
+}
+
+.market-posting-row:last-child {
+  border-bottom: none;
+}
+
+.market-posting-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.market-posting-meta {
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.market-posting-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.market-posting-source {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+}
+
+.market-posting-open {
+  font-size: 0.7rem;
+  padding: 0.2rem 0.6rem;
+}
+
+.market-footnote {
+  margin-top: 1.25rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--border-faint);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.9rem;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.market-footnote strong {
+  color: var(--text-secondary);
+}
+
+.market-footnote-sep {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--border-color);
+}
+
+.market-footnote-note {
+  width: 100%;
+  margin-top: 0.2rem;
+}
+
+.market-loading {
+  color: var(--text-muted);
+  padding: 1rem 0;
+}
+
+.rotate-90 {
+  transform: rotate(90deg);
+  transition: transform 0.14s ease;
+}
+
 .admin-donut {
   width: 150px;
   height: 150px;
