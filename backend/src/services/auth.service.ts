@@ -115,12 +115,12 @@ export class AuthService {
     await withTransaction(async client => {
       await client.query(
         `INSERT INTO users (id, email, password_hash, role, current_status, provider, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7::timestamptz, $8::timestamptz)`,
+         VALUES ($1, $2, $3, $4, $5::varchar, $6, $7::timestamptz, $8::timestamptz)`,
         [userId, cleanEmail, passwordHash, 'USER', status || null, 'EMAIL', now, now]
       );
       await client.query(
         `INSERT INTO profiles (id, user_id, full_name, target_role_id, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5::timestamptz, $6::timestamptz)`,
+         VALUES ($1, $2, $3, $4::varchar, $5::timestamptz, $6::timestamptz)`,
         [profileId, userId, profile.fullName, targetRoleId || null, now, now]
       );
     });
@@ -189,9 +189,13 @@ export class AuthService {
     };
 
     await withTransaction(async client => {
+      // Cast nullable params explicitly so Postgres can infer their type even
+      // when the value is NULL (e.g. no currentStatus / no avatar picture).
+      // Without this, an untyped NULL in a multi-column VALUES insert raises
+      // "42P18: could not determine data type of parameter" and aborts sign-in.
       await client.query(
         `INSERT INTO users (id, email, role, current_status, google_id, provider, avatar_url, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::timestamptz, $9::timestamptz)`,
+         VALUES ($1, $2, $3, $4::varchar, $5, $6, $7::varchar, $8::timestamptz, $9::timestamptz)`,
         [userId, cleanEmail, 'USER', status || null, profileInfo.googleId, 'GOOGLE', user.avatarUrl || null, now, now]
       );
       await client.query(
