@@ -1,5 +1,10 @@
+import { Suspense } from 'react';
 import LearnView from '@/components/views/LearnView';
 
 export default function LearnPage() {
-  return <LearnView />;
+  return (
+    <Suspense>
+      <LearnView />
+    </Suspense>
+  );
 }
