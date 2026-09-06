@@ -9,6 +9,7 @@ import PublicNavbar from './PublicNavbar';
 import ThemeToggle from './ThemeToggle';
 import Avatar from '@/components/ui/Avatar';
 import { SignInPromptView } from '@/components/views/prompts';
+import PublicHomeView from '@/components/views/PublicHomeView';
 import SiteFooter from './SiteFooter';
 
 const PROTECTED_LABELS: Record<string, { title: string }> = {
@@ -42,7 +43,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   } = useSkillBridge();
   const pathname = usePathname() || '/';
   const router = useRouter();
-  const isPublicPage = pathname === '/market' || pathname === '/curriculum' || pathname === '/learn';
+  const isPublicPage = pathname === '/' || pathname === '/market' || pathname === '/curriculum' || pathname === '/learn';
 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -87,12 +88,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   if (!currentUser) {
     const protectedLabel = PROTECTED_LABELS[pathname];
+    const showLanding = pathname === '/';
     return (
       <div>
         <PublicNavbar />
         {errorBanner}
         <div className="public-container">
-          {!isPublicPage && protectedLabel ? (
+          {showLanding ? (
+            <PublicHomeView />
+          ) : !isPublicPage && protectedLabel ? (
             <SignInPromptView
               title={protectedLabel.title}
               subtitle="Your assessments, skill evidence, and recommendations are linked to a verified account."

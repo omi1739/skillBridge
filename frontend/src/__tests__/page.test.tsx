@@ -7,7 +7,7 @@ import { SkillBridgeProvider } from '../lib/skillbridge-context';
 import GlobalModals from '../components/GlobalModals';
 import AppShell from '../components/AppShell';
 import { usePathname } from 'next/navigation';
-import LandingPage from '../app/page';
+import HomePage from '../app/(app)/page';
 import MarketPage from '../app/(app)/market/page';
 import CurriculumPage from '../app/(app)/curriculum/page';
 import AssessmentPage from '../app/(app)/assessment/page';
@@ -153,10 +153,10 @@ function NavProvider({ children, initialPath = '/' }: { children: React.ReactNod
 
 function Main() {
   const pathname = usePathname();
-  if (pathname === '/') return <LandingPage />;
 
   let content: React.ReactNode;
   switch (pathname) {
+    case '/': content = <HomePage />; break;
     case '/market': content = <MarketPage />; break;
     case '/curriculum': content = <CurriculumPage />; break;
     case '/assessment': content = <AssessmentPage />; break;
@@ -165,7 +165,7 @@ function Main() {
     case '/actions': content = <ActionsPage />; break;
     case '/jobs': content = <JobsPage />; break;
     case '/admin': content = <AdminPage />; break;
-    default: content = <LandingPage />;
+    default: content = <HomePage />;
   }
   return <AppShell>{content}</AppShell>;
 }
