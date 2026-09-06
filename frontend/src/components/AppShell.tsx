@@ -1,13 +1,13 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
-import { FileText } from 'lucide-react';
+import { ChevronDown, X } from 'lucide-react';
 import { useSkillBridge } from '@/lib/skillbridge-context';
 import AppSidebar from './AppSidebar';
 import PublicNavbar from './PublicNavbar';
+import ThemeToggle from './ThemeToggle';
 import { SignInPromptView } from '@/components/views/prompts';
-import { X } from 'lucide-react';
 
 const PROTECTED_LABELS: Record<string, { title: string }> = {
   '/assessment': { title: 'Sign in to take assessments' },
@@ -30,9 +30,39 @@ const PAGE_TITLES: Record<string, string> = {
 };
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
-  const { currentUser, currentProfile, role, activeTargetRoleId, globalError, dismissGlobalError, handleOpenPassport } = useSkillBridge();
+  const {
+    currentUser, currentProfile, role, activeTargetRoleId,
+    globalError, dismissGlobalError, handleLogout,
+    setShowProfileModal, setProfileForm
+  } = useSkillBridge();
   const pathname = usePathname() || '/';
   const isPublicPage = pathname === '/market' || pathname === '/curriculum';
+
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!userMenuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [userMenuOpen]);
+
+  const openProfile = () => {
+    setProfileForm({
+      fullName: currentProfile?.fullName || currentUser!.email.split('@')[0],
+      githubUrl: currentProfile?.githubUrl || '',
+      portfolioUrl: currentProfile?.portfolioUrl || '',
+      bio: currentProfile?.bio || '',
+      targetRoleId: currentProfile?.targetRoleId || activeTargetRoleId || ''
+    });
+    setShowProfileModal(true);
+    setUserMenuOpen(false);
+  };
 
   const errorBanner = globalError ? (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 1000, display: 'flex', justifyContent: 'center', padding: '0.75rem 1rem' }}>
@@ -85,22 +115,53 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               {trackLabel && <span className="topbar-track">{trackLabel}</span>}
             </div>
             <div className="topbar-actions">
-              <button className="btn btn-secondary" onClick={handleOpenPassport} style={{ gap: '0.4rem' }}>
-                <FileText size={14} />
-                <span>Skill Passport</span>
-              </button>
-              <div className="topbar-user">
-                <div className="topbar-avatar">
-                  {(currentProfile?.fullName || currentUser.email).substring(0, 2).toUpperCase()}
-                </div>
-                <div>
-                  <div className="topbar-user-name">
-                    {currentProfile?.fullName || currentUser.email.split('@')[0]}
+              <ThemeToggle />
+              <div className="topbar-user" ref={menuRef} style={{ position: 'relative' }}>
+                <button
+                  className="topbar-user-trigger"
+                  onClick={() => setUserMenuOpen(v => !v)}
+                  aria-haspopup="menu"
+                  aria-expanded={userMenuOpen}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', padding: '0.2rem 0.1rem 0.2rem 0.5rem', borderRadius: '8px' }}
+                >
+                  <div className="topbar-avatar">
+                    {(currentProfile?.fullName || currentUser.email).substring(0, 2).toUpperCase()}
                   </div>
-                  <div className="topbar-user-role">
-                    {currentUser.role === 'ADMIN' ? 'Administrator' : currentUser.role === 'RECRUITER' ? 'Recruiter' : 'Verified Candidate'}
+                  <div style={{ textAlign: 'left' }}>
+                    <div className="topbar-user-name">
+                      {currentProfile?.fullName || currentUser.email.split('@')[0]}
+                    </div>
+                    <div className="topbar-user-role">
+                      {currentUser.role === 'ADMIN' ? 'Administrator' : currentUser.role === 'RECRUITER' ? 'Recruiter' : 'Verified Candidate'}
+                    </div>
                   </div>
-                </div>
+                  <ChevronDown size={14} color="var(--text-muted)" style={{ marginLeft: '0.15rem' }} />
+                </button>
+                {userMenuOpen && (
+                  <div
+                    role="menu"
+                    style={{
+                      position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 50,
+                      minWidth: 180, background: 'var(--bg-surface)', border: '1px solid var(--border-color)',
+                      borderRadius: '8px', boxShadow: 'var(--shadow-dropdown)', padding: '0.3rem'
+                    }}
+                  >
+                    <button
+                      role="menuitem"
+                      className="topbar-menu-item"
+                      onClick={openProfile}
+                    >
+                      Edit Profile
+                    </button>
+                    <button
+                      role="menuitem"
+                      className="topbar-menu-item"
+                      onClick={() => { setUserMenuOpen(false); handleLogout(); }}
+                    >
+                      Sign Out
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>

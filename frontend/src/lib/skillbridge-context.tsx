@@ -148,6 +148,13 @@ function useSkillBridgeValue() {
   const [passportData, setPassportData] = useState<any | null>(null);
   const [copySuccess, setCopySuccess] = useState(false);
 
+  // Profile editing modal state
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [profileForm, setProfileForm] = useState({ fullName: '', githubUrl: '', portfolioUrl: '', bio: '', targetRoleId: '' });
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileSuccess, setProfileSuccess] = useState('');
+  const [profileError, setProfileError] = useState('');
+
   // Admin state
   const [adminOverview, setAdminOverview] = useState<any | null>(null);
   const [adminDashboard, setAdminDashboard] = useState<any | null>(null);
@@ -562,6 +569,36 @@ function useSkillBridgeValue() {
         }
       })
       .catch((err) => console.error('[SkillBridge] Role update failed:', err));
+  };
+
+  const handleUpdateProfile = async (patch: Partial<Profile>) => {
+    if (!currentUser || !authToken) return;
+    setProfileSaving(true);
+    setProfileError('');
+    setProfileSuccess('');
+    try {
+      const res = await fetch(`${API_BASE}/me/profile`, {
+        method: 'PATCH',
+        headers: authHeaders(),
+        body: JSON.stringify(patch)
+      });
+      const data = await res.json().then((d: any) => ({ ok: res.ok, data: d }));
+      if (!data.ok || !data.data?.userId) {
+        throw new Error(data.data?.message || data.data?.error || 'Could not update profile.');
+      }
+      const updatedProfile: Profile = data.data;
+      setCurrentProfile(updatedProfile);
+      localStorage.setItem('skillbridge_profile', JSON.stringify(updatedProfile));
+      if (patch.targetRoleId) {
+        refreshUserData(currentUser.id, currentUser.role, authToken, patch.targetRoleId);
+        fetchRoleAndSkills(patch.targetRoleId);
+      }
+      setProfileSuccess('Profile updated.');
+    } catch (err: any) {
+      setProfileError(err.message || 'Profile update failed.');
+    } finally {
+      setProfileSaving(false);
+    }
   };
 
   useEffect(() => {
@@ -1328,6 +1365,17 @@ function useSkillBridgeValue() {
     copySuccess,
     handleOpenPassport,
     handleCopyPassportMarkdown,
+    // profile editing
+    showProfileModal,
+    setShowProfileModal,
+    profileForm,
+    setProfileForm,
+    profileSaving,
+    profileSuccess,
+    setProfileSuccess,
+    profileError,
+    setProfileError,
+    handleUpdateProfile,
     // admin
     adminOverview,
     adminDashboard,

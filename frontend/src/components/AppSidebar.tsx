@@ -1,37 +1,58 @@
 'use client';
 
+import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import {
   Terminal, TrendingUp, GraduationCap, BrainCircuit, BarChart3, FolderGit2,
-  Briefcase, Sliders, LogOut, FileText, LucideIcon
+  Briefcase, Sliders, LogOut, FileText, LucideIcon, PanelLeftClose, PanelLeftOpen
 } from 'lucide-react';
 import { useSkillBridge, AppTab } from '@/lib/skillbridge-context';
-import ThemeToggle from './ThemeToggle';
 
-const GROUPS: { title: string; tabs: AppTab[] }[] = [
-  { title: 'Market Intelligence', tabs: ['market', 'curriculum'] },
-  { title: 'Practical Benchmarks', tabs: ['assessment', 'sandbox'] },
-  { title: 'Career Roadmap', tabs: ['gaps', 'actions', 'jobs'] }
+const TABS: { tab: AppTab; icon: LucideIcon; label: string }[] = [
+  { tab: 'market', icon: TrendingUp, label: 'Job Market Demand' },
+  { tab: 'curriculum', icon: GraduationCap, label: 'University Syllabi' },
+  { tab: 'assessment', icon: BrainCircuit, label: 'Diagnostic Test' },
+  { tab: 'sandbox', icon: Terminal, label: 'SQL & Code Sandbox' },
+  { tab: 'gaps', icon: BarChart3, label: 'My Skill Gaps' },
+  { tab: 'actions', icon: FolderGit2, label: 'Projects to Build' },
+  { tab: 'jobs', icon: Briefcase, label: 'Matching Jobs' }
 ];
 
-const TABS: Record<AppTab, { icon: LucideIcon; label: string }> = {
-  market: { icon: TrendingUp, label: 'Job Market Demand' },
-  curriculum: { icon: GraduationCap, label: 'University Syllabi' },
-  assessment: { icon: BrainCircuit, label: 'Diagnostic Test' },
-  sandbox: { icon: Terminal, label: 'SQL & Code Sandbox' },
-  gaps: { icon: BarChart3, label: 'My Skill Gaps' },
-  actions: { icon: FolderGit2, label: 'Projects to Build' },
-  jobs: { icon: Briefcase, label: 'Matching Jobs' },
-  admin: { icon: Sliders, label: 'Admin & Weights' }
-};
+const SIDEBAR_STORAGE_KEY = 'skillbridge_sidebar';
 
 export default function AppSidebar() {
   const pathname = usePathname();
-  const { currentUser, handleLogout, handleOpenPassport, navigate } = useSkillBridge();
-  const currentTab = pathname.split('/')[1] as AppTab;
+  const {
+    currentUser, currentProfile, role, activeTargetRoleId,
+    handleLogout, handleOpenPassport, navigate,
+    setShowProfileModal, setProfileForm
+  } = useSkillBridge();
+  const currentTab = pathname.split('/')[1];
+
+  const [expanded, setExpanded] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return localStorage.getItem(SIDEBAR_STORAGE_KEY) !== 'collapsed';
+  });
+
+  const toggleSidebar = () => {
+    const next = !expanded;
+    setExpanded(next);
+    localStorage.setItem(SIDEBAR_STORAGE_KEY, next ? 'expanded' : 'collapsed');
+  };
+
+  const openProfile = () => {
+    setProfileForm({
+      fullName: currentProfile?.fullName || currentUser!.email.split('@')[0],
+      githubUrl: currentProfile?.githubUrl || '',
+      portfolioUrl: currentProfile?.portfolioUrl || '',
+      bio: currentProfile?.bio || '',
+      targetRoleId: currentProfile?.targetRoleId || activeTargetRoleId || ''
+    });
+    setShowProfileModal(true);
+  };
 
   return (
-    <aside className="app-sidebar">
+    <aside className={`app-sidebar ${expanded ? '' : 'collapsed'}`}>
       <div className="sidebar-header">
         <div className="sidebar-brand" title="SkillBridge">
           <div className="sidebar-brand-icon">
@@ -39,44 +60,92 @@ export default function AppSidebar() {
           </div>
           <span>SkillBridge</span>
         </div>
+        <button
+          className="sidebar-icon-btn sidebar-collapse-btn"
+          onClick={toggleSidebar}
+          title={expanded ? 'Collapse sidebar' : 'Expand sidebar'}
+          aria-label={expanded ? 'Collapse sidebar' : 'Expand sidebar'}
+        >
+          {expanded ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
+        </button>
       </div>
 
-      <nav className="sidebar-nav" aria-label="Main navigation">
-        {GROUPS.map((group, gi) => (
-          <div key={group.title} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem' }}>
-            {gi > 0 && <div className="sidebar-divider" />}
-            {group.tabs.map(tab => {
-              const t = TABS[tab];
-              return (
-                <button
-                  key={tab}
-                  className={`sidebar-item ${currentTab === tab ? 'active' : ''}`}
-                  onClick={() => navigate(tab)}
-                  title={t.label}
-                  aria-label={t.label}
-                >
-                  <span className="sidebar-item-content">
-                    <t.icon size={18} />
-                    <span>{t.label}</span>
-                  </span>
-                </button>
-              );
-            })}
+      {expanded && (
+        <div className="sidebar-track-card">
+          <div className="sidebar-track-label">Active Track</div>
+          <div className="sidebar-track-title">
+            <span>{activeTargetRoleId ? (role?.title || 'Select your track') : 'Select your track'}</span>
           </div>
-        ))}
+        </div>
+      )}
+
+      <nav className="sidebar-nav">
+        <div>
+          {expanded && <div className="sidebar-section-title">Market Intelligence</div>}
+          {TABS.filter(t => t.tab === 'market' || t.tab === 'curriculum').map(t => (
+            <button
+              key={t.tab}
+              className={`sidebar-item ${currentTab === t.tab ? 'active' : ''}`}
+              onClick={() => navigate(t.tab)}
+              title={t.label}
+              aria-label={t.label}
+            >
+              <span className="sidebar-item-content">
+                <t.icon size={16} />
+                <span>{t.label}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <div>
+          {expanded && <div className="sidebar-section-title">Practical Benchmarks</div>}
+          {TABS.filter(t => t.tab === 'assessment' || t.tab === 'sandbox').map(t => (
+            <button
+              key={t.tab}
+              className={`sidebar-item ${currentTab === t.tab ? 'active' : ''}`}
+              onClick={() => navigate(t.tab)}
+              title={t.label}
+              aria-label={t.label}
+            >
+              <span className="sidebar-item-content">
+                <t.icon size={16} />
+                <span>{t.label}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <div>
+          {expanded && <div className="sidebar-section-title">Career Roadmap</div>}
+          {TABS.filter(t => t.tab === 'gaps' || t.tab === 'actions' || t.tab === 'jobs').map(t => (
+            <button
+              key={t.tab}
+              className={`sidebar-item ${currentTab === t.tab ? 'active' : ''}`}
+              onClick={() => navigate(t.tab)}
+              title={t.label}
+              aria-label={t.label}
+            >
+              <span className="sidebar-item-content">
+                <t.icon size={16} />
+                <span>{t.label}</span>
+              </span>
+            </button>
+          ))}
+        </div>
 
         {currentUser?.role === 'ADMIN' && (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem' }}>
-            <div className="sidebar-divider" />
+          <div>
+            {expanded && <div className="sidebar-section-title">Platform</div>}
             <button
               className={`sidebar-item ${currentTab === 'admin' ? 'active' : ''}`}
               onClick={() => navigate('admin')}
-              title={TABS.admin.label}
-              aria-label={TABS.admin.label}
+              title="Admin & Weights"
+              aria-label="Admin & Weights"
             >
               <span className="sidebar-item-content">
-                <TABS.admin.icon size={18} />
-                <span>{TABS.admin.label}</span>
+                <Sliders size={16} />
+                <span>Admin & Weights</span>
               </span>
             </button>
           </div>
@@ -84,12 +153,34 @@ export default function AppSidebar() {
       </nav>
 
       <div className="sidebar-footer">
-        <button className="sidebar-icon-btn" onClick={handleOpenPassport} title="Skill Passport" aria-label="Skill Passport">
-          <FileText size={17} />
+        <button
+          className="sidebar-user-card"
+          onClick={openProfile}
+          title="Edit profile"
+          aria-label="Edit profile"
+        >
+          <div className="sidebar-avatar">
+            {(currentProfile?.fullName || currentUser!.email).substring(0, 2).toUpperCase()}
+          </div>
+          {expanded && (
+            <div className="sidebar-user-info">
+              <div className="sidebar-user-name">
+                {currentProfile?.fullName || currentUser!.email.split('@')[0]}
+              </div>
+              <div className="sidebar-user-role">
+                {currentUser!.role === 'ADMIN' ? 'Administrator' : currentUser!.role === 'RECRUITER' ? 'Recruiter' : 'Verified Candidate'}
+              </div>
+            </div>
+          )}
         </button>
-        <ThemeToggle />
+
+        <button className="btn btn-secondary sidebar-passport-btn" onClick={handleOpenPassport} title="Skill Passport">
+          <FileText size={14} />
+          {expanded && <span>Skill Passport</span>}
+        </button>
+
         <button className="sidebar-icon-btn" onClick={handleLogout} title="Sign Out" aria-label="Sign Out">
-          <LogOut size={17} />
+          <LogOut size={15} />
         </button>
       </div>
     </aside>
