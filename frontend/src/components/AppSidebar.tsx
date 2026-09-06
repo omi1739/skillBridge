@@ -4,14 +4,15 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { LogOut, FileText, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
-import { useSkillBridge, AppTab } from '@/lib/skillbridge-context';
+import { useSkillBridge } from '@/lib/skillbridge-context';
 import Avatar from '@/components/ui/Avatar';
 import BrandMark from '@/components/ui/BrandMark';
 
-const NAV_SECTIONS: { title: string; items: { tab: AppTab; label: string }[] }[] = [
+const NAV_SECTIONS: { title: string; items: { tab: string; label: string }[] }[] = [
   {
     title: 'Explore',
     items: [
+      { tab: 'learn', label: 'Learning Resources' },
       { tab: 'market', label: 'Job Market Demand' },
       { tab: 'curriculum', label: 'University Syllabi' }
     ]
@@ -42,7 +43,8 @@ export default function AppSidebar() {
     currentUser, currentProfile, role, activeTargetRoleId,
     handleLogout, handleOpenPassport
   } = useSkillBridge();
-  const currentTab = pathname.split('/')[1];
+  const activeTab = pathname === '/' ? 'home' : pathname.split('/')[1];
+  const goTab = (tab: string) => router.push(tab === 'home' ? '/' : `/${tab}`);
 
   const [expanded, setExpanded] = useState(() => {
     if (typeof window === 'undefined') return true;
@@ -80,14 +82,23 @@ export default function AppSidebar() {
       )}
 
       <nav className="sidebar-nav">
+        <button
+          className={`sidebar-item ${activeTab === 'home' ? 'active' : ''}`}
+          onClick={() => goTab('home')}
+          title="Home"
+          aria-label="Home"
+        >
+          <span>Home</span>
+        </button>
+
         {NAV_SECTIONS.map(section => (
           <div key={section.title}>
             {expanded && <div className="sidebar-section-title">{section.title}</div>}
             {section.items.map(item => (
               <button
                 key={item.tab}
-                className={`sidebar-item ${currentTab === item.tab ? 'active' : ''}`}
-                onClick={() => router.push(`/${item.tab}`)}
+                className={`sidebar-item ${activeTab === item.tab ? 'active' : ''}`}
+                onClick={() => goTab(item.tab)}
                 title={item.label}
                 aria-label={item.label}
               >
@@ -101,8 +112,8 @@ export default function AppSidebar() {
           <div>
             {expanded && <div className="sidebar-section-title">Platform</div>}
             <button
-              className={`sidebar-item ${currentTab === 'admin' ? 'active' : ''}`}
-              onClick={() => router.push('/admin')}
+              className={`sidebar-item ${activeTab === 'admin' ? 'active' : ''}`}
+              onClick={() => goTab('admin')}
               title="Admin & Weights"
               aria-label="Admin & Weights"
             >

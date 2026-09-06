@@ -2,7 +2,9 @@
 
 import { useSkillBridge } from '@/lib/skillbridge-context';
 import { RolePromptView, SignInPromptView, NoEvidenceView } from './prompts';
-import { BarChart3 } from 'lucide-react';
+import { BarChart3, BookOpen } from 'lucide-react';
+import Link from 'next/link';
+import { resolveResources } from '@/lib/learning-resources';
 
 export default function GapsView() {
   const { currentUser, activeTargetRoleId, gaps, allRoles, handleRoleSelect, personalDataError } = useSkillBridge();
@@ -92,6 +94,26 @@ export default function GapsView() {
                 <span>Market Demand: <strong>{Math.round(gap.marketDemand * 100)}%</strong></span>
                 <span>Demonstrated: <strong>{profPercentage}%</strong></span>
               </div>
+
+              {gap.status !== 'MAINTAIN' && (() => {
+                const topics = resolveResources(gap.skillName);
+                const topic = topics[0];
+                if (!topic) return null;
+                return (
+                  <div style={{ marginTop: '0.85rem', paddingTop: '0.85rem', borderTop: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <BookOpen size={13} style={{ color: 'var(--accent-text)', flexShrink: 0 }} />
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Improve with:</span>
+                    {topic.resources.slice(0, 2).map((res, i) => (
+                      <a key={i} href={res.url} target="_blank" rel="noreferrer" className="badge" style={{ fontSize: '0.7rem', padding: '0.2rem 0.55rem', color: 'var(--accent-text)', textDecoration: 'none' }}>
+                        {res.source}
+                      </a>
+                    ))}
+                    <Link href={`/learn#${topic.key}`} className="badge badge-preferred" style={{ fontSize: '0.7rem', textDecoration: 'none', cursor: 'pointer' }}>
+                      All resources →
+                    </Link>
+                  </div>
+                );
+              })()}
             </div>
           );
         })}

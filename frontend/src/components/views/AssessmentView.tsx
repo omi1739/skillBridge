@@ -1,7 +1,9 @@
 'use client';
 
 import { useSkillBridge } from '@/lib/skillbridge-context';
-import { BarChart3, RotateCcw, Clock, Check, ArrowRight, BrainCircuit } from 'lucide-react';
+import { BarChart3, RotateCcw, Clock, Check, ArrowRight, BrainCircuit, ExternalLink } from 'lucide-react';
+import Link from 'next/link';
+import { resolveResources } from '@/lib/learning-resources';
 
 export default function AssessmentView() {
   const {
@@ -102,6 +104,24 @@ export default function AssessmentView() {
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                   {sub.earnedPoints} / {sub.totalPoints} points ({sub.percentage}%)
                 </div>
+                {sub.status !== 'STRENGTH' && (() => {
+                  const topics = resolveResources(sub.subSkill);
+                  const topic = topics[0];
+                  if (!topic) return null;
+                  return (
+                    <div style={{ marginTop: '0.55rem', paddingTop: '0.55rem', borderTop: '1px solid var(--border-faint)', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', fontSize: '0.75rem' }}>
+                      <span style={{ color: 'var(--text-muted)' }}>Improve:</span>
+                      {topic.resources.slice(0, 2).map((res, i) => (
+                        <a key={i} href={res.url} target="_blank" rel="noreferrer" className="badge" style={{ fontSize: '0.65rem', padding: '0.15rem 0.5rem', color: 'var(--accent-text)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                          {res.source} <ExternalLink size={9} />
+                        </a>
+                      ))}
+                      <Link href={`/learn#${topic.key}`} className="badge badge-preferred" style={{ fontSize: '0.65rem', textDecoration: 'none', cursor: 'pointer' }}>
+                        All resources →
+                      </Link>
+                    </div>
+                  );
+                })()}
               </div>
             ))}
           </div>

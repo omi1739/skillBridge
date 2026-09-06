@@ -831,6 +831,89 @@ body {
 }
 
 /* =============================================================
+   Learning resources
+   ============================================================= */
+.learn-search-input {
+  width: 100%;
+  padding: 0.6rem 0.85rem 0.6rem 2.4rem;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-family: var(--font-sans);
+  transition: border-color 0.14s ease, box-shadow 0.14s ease;
+}
+
+.learn-search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.learn-search-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: var(--shadow-glow);
+  background: var(--bg-input);
+}
+
+.learn-topic-card {
+  display: flex;
+  flex-direction: column;
+  scroll-margin-top: 96px;
+}
+
+.learn-topic-head {
+  display: flex;
+  gap: 0.7rem;
+  align-items: flex-start;
+}
+
+.learn-topic-icon {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: var(--radius-md);
+  background: var(--accent-primary-soft);
+  border: 1px solid var(--accent-primary-border);
+  color: var(--accent-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.learn-topic-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.learn-topic-blurb {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-top: 0.2rem;
+  line-height: 1.5;
+}
+
+.learn-resource-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-faint);
+  background: var(--bg-row);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: border-color 0.14s ease, color 0.14s ease;
+}
+
+.learn-resource-link:hover {
+  border-color: var(--accent-primary-border);
+  color: var(--accent-text);
+}
+
+/* =============================================================
    Cards
    ============================================================= */
 .card {

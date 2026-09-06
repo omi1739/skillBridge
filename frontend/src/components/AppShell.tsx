@@ -22,8 +22,10 @@ const PROTECTED_LABELS: Record<string, { title: string }> = {
 };
 
 const PAGE_TITLES: Record<string, string> = {
+  '/': 'Home',
   '/market': 'Job Market Demand',
   '/curriculum': 'University Syllabi',
+  '/learn': 'Learning Resources',
   '/assessment': 'Diagnostic Test',
   '/sandbox': 'SQL & Code Sandbox',
   '/gaps': 'My Skill Gaps',
@@ -40,7 +42,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   } = useSkillBridge();
   const pathname = usePathname() || '/';
   const router = useRouter();
-  const isPublicPage = pathname === '/market' || pathname === '/curriculum';
+  const isPublicPage = pathname === '/market' || pathname === '/curriculum' || pathname === '/learn';
 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
