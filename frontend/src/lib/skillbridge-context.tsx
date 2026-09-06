@@ -129,7 +129,7 @@ function useSkillBridgeValue() {
   const [expandedMatchId, setExpandedMatchId] = useState<string | null>(null);
   const [jobRemoteFilter, setJobRemoteFilter] = useState<'ALL' | 'REMOTE' | 'ONSITE'>('ALL');
   const [jobRegionFilter, setJobRegionFilter] = useState<'ALL' | 'BANGLADESH' | 'INTERNATIONAL'>('ALL');
-  const [jobSort, setJobSort] = useState<'priority' | 'recent'>('priority');
+  const [jobSort, setJobSort] = useState<'recent' | 'priority'>('recent');
   const [userProjects, setUserProjects] = useState<ProjectEvidence[]>([]);
 
   // Project submission modal state

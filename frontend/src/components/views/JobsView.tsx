@@ -1,8 +1,15 @@
 'use client';
 
+import { useMemo, useState } from 'react';
 import { useSkillBridge } from '@/lib/skillbridge-context';
 import { RemoteBadge } from '@/components/ui/badges';
 import { RolePromptView, SignInPromptView } from './prompts';
+import {
+  ChevronLeft, ChevronRight, Building2, MapPin, CheckCircle2, XCircle,
+  Calendar, ChevronDown, Layers
+} from 'lucide-react';
+
+const PAGE_SIZE = 6;
 
 export default function JobsView() {
   const {
@@ -18,6 +25,8 @@ export default function JobsView() {
     jobSort,
     setJobSort,
   } = useSkillBridge();
+
+  const [page, setPage] = useState(1);
 
   if (!currentUser) {
     return (
@@ -35,35 +44,61 @@ export default function JobsView() {
   const bdRemote = jobMatches.filter(m => m.job.isBangladesh && m.job.isRemote).length;
   const remoteCount = jobMatches.filter(m => m.job.isRemote).length;
 
-  const regionMatches = jobMatches.filter(match => {
-    if (jobRegionFilter === 'BANGLADESH') return !!match.job.isBangladesh;
-    if (jobRegionFilter === 'INTERNATIONAL') return !match.job.isBangladesh;
-    return true;
-  });
+  const filteredMatches = useMemo(() => {
+    const regionMatches = jobMatches.filter(match => {
+      if (jobRegionFilter === 'BANGLADESH') return !!match.job.isBangladesh;
+      if (jobRegionFilter === 'INTERNATIONAL') return !match.job.isBangladesh;
+      return true;
+    });
 
-  const remoteFiltered = regionMatches.filter(match => {
-    if (jobRemoteFilter === 'REMOTE') return !!match.job.isRemote;
-    if (jobRemoteFilter === 'ONSITE') return !match.job.isRemote;
-    return true;
-  });
+    const remoteFiltered = regionMatches.filter(match => {
+      if (jobRemoteFilter === 'REMOTE') return !!match.job.isRemote;
+      if (jobRemoteFilter === 'ONSITE') return !match.job.isRemote;
+      return true;
+    });
 
-  const filteredMatches = [...remoteFiltered].sort((a, b) => {
+    let sorted = [...remoteFiltered];
     if (jobSort === 'recent') {
-      return new Date(b.job.postedAt).getTime() - new Date(a.job.postedAt).getTime();
+      sorted.sort((a, b) => new Date(b.job.postedAt).getTime() - new Date(a.job.postedAt).getTime());
+    } else {
+      sorted.sort((a, b) => {
+        const pa = (a.job.isBangladesh && !a.job.isRemote) ? 0 : a.job.isRemote ? 1 : 2;
+        const pb = (b.job.isBangladesh && !b.job.isRemote) ? 0 : b.job.isRemote ? 1 : 2;
+        if (pa !== pb) return pa - pb;
+        return (b.matchScore ?? 0) - (a.matchScore ?? 0);
+      });
     }
-    const pa = (a.job.isBangladesh && !a.job.isRemote) ? 0 : a.job.isRemote ? 1 : 2;
-    const pb = (b.job.isBangladesh && !b.job.isRemote) ? 0 : b.job.isRemote ? 1 : 2;
-    if (pa !== pb) return pa - pb;
-    return (b.matchScore ?? 0) - (a.matchScore ?? 0);
-  });
+    return sorted;
+  }, [jobMatches, jobRegionFilter, jobRemoteFilter, jobSort]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredMatches.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const startIdx = (safePage - 1) * PAGE_SIZE;
+  const pageMatches = filteredMatches.slice(startIdx, startIdx + PAGE_SIZE);
+
+  const goToPage = (p: number) => {
+    setPage(Math.max(1, Math.min(totalPages, p)));
+  };
+
+  const showDate = (m: any) => {
+    const d = new Date(m.job.postedAt);
+    if (isNaN(d.getTime())) return null;
+    const today = new Date();
+    const diffDays = Math.floor((today.getTime() - d.getTime()) / 86400000);
+    if (diffDays <= 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <div className="jobs-page">
       <div className="page-header">
         <div>
+          <div className="jobs-kicker">Verified Compatibility</div>
           <h1 className="page-title">Matching Backend Jobs</h1>
           <p className="page-subtitle">
-            Bangladesh-first: on-site roles in Bangladesh are shown first, then remote / work-from-home, then other on-site postings. Compatibility scores are computed directly against your demonstrated skill evidence with full requirement traceability.
+            Bangladesh-first: on-site roles in Bangladesh are shown first, then remote, then other on-site postings. Scores are computed against your verified skill evidence with full requirement traceability.
           </p>
         </div>
       </div>
@@ -71,7 +106,7 @@ export default function JobsView() {
       <div className="filter-bar">
         <div className="filter-row">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>Region:</span>
+            <span className="filter-label">Region:</span>
             <div className="filter-segment-group">
               {([
                 { key: 'ALL', label: `All (${jobMatches.length})` },
@@ -81,7 +116,7 @@ export default function JobsView() {
                 <button
                   key={o.key}
                   className={`filter-segment-btn ${jobRegionFilter === o.key ? 'active' : ''}`}
-                  onClick={() => setJobRegionFilter(o.key)}
+                  onClick={() => { setJobRegionFilter(o.key); setPage(1); }}
                 >
                   {o.label}
                 </button>
@@ -90,7 +125,7 @@ export default function JobsView() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>Work Mode:</span>
+            <span className="filter-label">Work Mode:</span>
             <div className="filter-segment-group">
               {([
                 { key: 'ALL', label: 'All Modes' },
@@ -100,7 +135,7 @@ export default function JobsView() {
                 <button
                   key={o.key}
                   className={`filter-segment-btn ${jobRemoteFilter === o.key ? 'active' : ''}`}
-                  onClick={() => setJobRemoteFilter(o.key)}
+                  onClick={() => { setJobRemoteFilter(o.key); setPage(1); }}
                 >
                   {o.label}
                 </button>
@@ -109,106 +144,163 @@ export default function JobsView() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', paddingTop: '0.65rem', borderTop: '1px solid var(--border-subtle)' }}>
+        <div className="filter-bar-bottom">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>Sort by:</span>
+            <span className="filter-label">Sort by:</span>
             <div className="filter-segment-group">
               {([
-                { key: 'priority', label: 'Prioritize BD Onsite → Remote' },
-                { key: 'recent', label: 'Most Recent' }
+                { key: 'recent', label: 'Most Recent' },
+                { key: 'priority', label: 'Prioritize BD Onsite → Remote' }
               ] as const).map(o => (
                 <button
                   key={o.key}
                   className={`filter-segment-btn ${jobSort === o.key ? 'active' : ''}`}
-                  onClick={() => setJobSort(o.key)}
+                  onClick={() => { setJobSort(o.key); setPage(1); }}
                 >
                   {o.label}
                 </button>
               ))}
             </div>
           </div>
-          {jobSort === 'priority' && bdCount > 0 && (
-            <span style={{ color: 'var(--text-muted)', fontSize: '0.74rem' }}>
-              {bdOnsite} on-site in BD · {bdRemote} remote in BD
-            </span>
-          )}
+          <span className="filter-summary">
+            {filteredMatches.length} result{filteredMatches.length === 1 ? '' : 's'}
+          </span>
         </div>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        {filteredMatches.length === 0 && (
-          <div className="card" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-            {jobMatches.length === 0
-              ? 'No matching jobs yet — sign in and take the diagnostic to see tailored backend postings.'
-              : 'No jobs match the selected filter.'}
-          </div>
-        )}
-        {filteredMatches.map(match => (
-          <div key={match.job.id} className="card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
-              <div>
-                <h3 style={{ fontSize: '1.15rem', fontWeight: 700 }}>{match.job.title}</h3>
-                <div style={{ color: 'var(--accent-text)', fontSize: '0.85rem', fontWeight: 500, marginTop: '0.15rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  {match.job.company}
-                  {match.job.location ? <span style={{ color: 'var(--text-muted)' }}>• {match.job.location}</span> : null}
-                  {match.job.isBangladesh && (
-                    <span className="badge-chip" style={{ background: 'var(--teal-bg)', color: 'var(--accent-text)', border: '1px solid var(--teal-border)' }}>
-                      <span className="badge-chip-dot" style={{ background: 'var(--teal)' }} />
-                      Bangladesh
-                    </span>
-                  )}
-                  <RemoteBadge isRemote={match.job.isRemote} location={match.job.location} />
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <div style={{
-                  padding: '0.35rem 0.75rem',
-                  borderRadius: '6px',
-                  fontFamily: 'var(--font-mono)',
-                  fontWeight: 700,
-                  fontSize: '1.1rem',
-                  background: match.matchScore >= 70 ? 'var(--success-bg)' : 'var(--info-bg)',
-                  color: match.matchScore >= 70 ? 'var(--success-text)' : 'var(--info-text)',
-                  border: `1px solid ${match.matchScore >= 70 ? 'var(--success-border)' : 'var(--info-border)'}`
-                }}>
-                  {Math.round(match.matchScore)}% Match
-                </div>
-              </div>
+      <div className="jobs-results">
+        <div className="jobs-list">
+          {filteredMatches.length === 0 && (
+            <div className="card jobs-empty">
+              {jobMatches.length === 0
+                ? 'No matching jobs yet — sign in and take the diagnostic to see tailored backend postings.'
+                : 'No jobs match the selected filter.'}
             </div>
+          )}
+          {pageMatches.map(match => {
+            const score = Math.round(match.matchScore);
+            const scoreTier = score >= 70 ? 'high' : score >= 45 ? 'mid' : 'low';
+            const isExpanded = expandedMatchId === match.job.id;
+            const dateLabel = showDate(match);
+            return (
+              <article key={match.job.id} className={`card job-card ${isExpanded ? 'expanded' : ''}`}>
+                <div className="job-card-head">
+                  <div className="job-card-identity">
+                    <h3 className="job-card-title">{match.job.title}</h3>
+                    <div className="job-card-company">
+                      <Building2 size={13} />
+                      <span>{match.job.company}</span>
+                      {match.job.location ? (
+                        <>
+                          <span className="job-card-dot" />
+                          <MapPin size={12} />
+                          <span className="job-card-location">{match.job.location}</span>
+                        </>
+                      ) : null}
+                    </div>
+                    <div className="job-card-badges">
+                      {match.job.isBangladesh && (
+                        <span className="badge-chip" style={{ background: 'var(--teal-bg)', color: 'var(--accent-text)', border: '1px solid var(--teal-border)' }}>
+                          <span className="badge-chip-dot" style={{ background: 'var(--teal)' }} />
+                          Bangladesh
+                        </span>
+                      )}
+                      <RemoteBadge isRemote={match.job.isRemote} location={match.job.location} />
+                      {dateLabel && (
+                        <span className="job-card-date">
+                          <Calendar size={11} /> {dateLabel}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className={`match-score match-score-${scoreTier}`}>
+                    <span className="match-score-num">{score}%</span>
+                    <span className="match-score-label">Match</span>
+                  </div>
+                </div>
 
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '0.75rem 0' }}>
-              {match.job.description}
-            </p>
+                <p className="job-card-desc">{match.job.description}</p>
 
-            <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-              <div style={{ fontSize: '0.775rem' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Verified Matches: </span>
-                <strong style={{ color: 'var(--success-text)' }}>{match.matchedSkills.map(m => m.canonicalName).join(', ') || 'None yet'}</strong>
-              </div>
+                <div className="job-card-skills">
+                  <span className="job-card-skills-label">Verified matches</span>
+                  <div className="job-card-skill-chips">
+                    {match.matchedSkills.map(m => (
+                      <span key={m.skillId} className="job-skill-chip">
+                        <CheckCircle2 size={11} />
+                        {m.canonicalName}
+                      </span>
+                    ))}
+                    {match.matchedSkills.length === 0 && (
+                      <span className="job-skill-chip job-skill-chip-empty">None yet</span>
+                    )}
+                  </div>
+                </div>
 
-              <button
-                className="btn btn-secondary"
-                onClick={() => setExpandedMatchId(expandedMatchId === match.job.id ? null : match.job.id)}
-                style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }}
-              >
-                {expandedMatchId === match.job.id ? 'Hide Details' : 'View Role Details'}
-              </button>
-            </div>
+                <div className="job-card-footer">
+                  <button
+                    className="btn btn-secondary job-card-toggle"
+                    onClick={() => setExpandedMatchId(isExpanded ? null : match.job.id)}
+                    aria-expanded={isExpanded}
+                  >
+                    {isExpanded ? 'Hide Details' : 'View Role Details'}
+                    <ChevronDown size={14} className={isExpanded ? 'rotate-180' : ''} />
+                  </button>
+                </div>
 
-            {expandedMatchId === match.job.id && (
-              <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>{match.explanation}</div>
-                {match.missingSkills.length > 0 && (
-                  <div style={{ fontSize: '0.775rem', marginTop: '0.5rem' }}>
-                    <span style={{ color: 'var(--text-muted)' }}>Missing Skills: </span>
-                    <span style={{ color: 'var(--danger-text)' }}>{match.missingSkills.map(m => m.canonicalName).join(', ')}</span>
+                {isExpanded && (
+                  <div className="job-card-details">
+                    <p className="job-card-explanation">{match.explanation}</p>
+                    {match.missingSkills.length > 0 && (
+                      <div className="job-card-missing">
+                        <span className="job-card-missing-label">Missing skills</span>
+                        <div className="job-card-missing-chips">
+                          {match.missingSkills.map(m => (
+                            <span key={m.skillId} className="job-missing-chip">
+                              <XCircle size={11} />
+                              {m.canonicalName}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
-            )}
-          </div>
-        ))}
+              </article>
+            );
+          })}
+        </div>
+
+        {filteredMatches.length > PAGE_SIZE && (
+          <nav className="jobs-pagination" aria-label="Job results pagination">
+            <button
+              className="jobs-page-btn"
+              onClick={() => goToPage(safePage - 1)}
+              disabled={safePage === 1}
+              aria-label="Previous page"
+            >
+              <ChevronLeft size={15} />
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+              <button
+                key={p}
+                className={`jobs-page-btn ${p === safePage ? 'active' : ''}`}
+                onClick={() => goToPage(p)}
+                aria-label={`Page ${p}`}
+                aria-current={p === safePage ? 'page' : undefined}
+              >
+                {p}
+              </button>
+            ))}
+            <button
+              className="jobs-page-btn"
+              onClick={() => goToPage(safePage + 1)}
+              disabled={safePage === totalPages}
+              aria-label="Next page"
+            >
+              <ChevronRight size={15} />
+            </button>
+          </nav>
+        )}
       </div>
     </div>
   );
