@@ -19,11 +19,11 @@ export function RemoteBadge({ isRemote, location }: { isRemote?: boolean; locati
   const loc = remote ? (location && !/remote|work from home|wfh/i.test(location) ? location : 'Work from Home') : (location || 'Onsite');
   return (
     <span className="badge-chip" style={{
-      background: remote ? 'rgba(45, 212, 191, 0.1)' : 'rgba(255, 255, 255, 0.05)',
-      color: remote ? '#5eead4' : 'var(--text-secondary)',
-      border: remote ? '1px solid rgba(45, 212, 191, 0.25)' : '1px solid var(--border-color)'
+      background: remote ? 'var(--success-bg)' : 'var(--bg-raise)',
+      color: remote ? 'var(--accent-text)' : 'var(--text-secondary)',
+      border: remote ? '1px solid var(--success-border)' : '1px solid var(--border-color)'
     }}>
-      <span className="badge-chip-dot" style={{ background: remote ? '#2dd4bf' : 'var(--text-muted)' }} />
+      <span className="badge-chip-dot" style={{ background: remote ? 'var(--teal)' : 'var(--text-muted)' }} />
       {remote ? 'Remote · WFH' : loc}
     </span>
   );

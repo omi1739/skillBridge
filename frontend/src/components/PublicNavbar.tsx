@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { TrendingUp, GraduationCap, LogIn } from 'lucide-react';
+import { Terminal, TrendingUp, GraduationCap, LogIn } from 'lucide-react';
 import { useSkillBridge } from '@/lib/skillbridge-context';
+import ThemeToggle from './ThemeToggle';
 
 export default function PublicNavbar() {
   const pathname = usePathname();
@@ -15,6 +16,9 @@ export default function PublicNavbar() {
     <header className="public-navbar">
       <div className="public-nav-container">
         <Link href="/" className="brand">
+          <span className="brand-mark">
+            <Terminal size={16} />
+          </span>
           <span>SkillBridge</span>
         </Link>
 
@@ -29,8 +33,10 @@ export default function PublicNavbar() {
             href="/curriculum"
             className={`btn btn-ghost ${pathname === '/curriculum' ? 'active' : ''}`}
           >
-            <GraduationCap size={15} /> University Syllabi ({totalCurriculaCount})
+            <GraduationCap size={15} /> Syllabi ({totalCurriculaCount})
           </Link>
+
+          <ThemeToggle />
 
           <button
             className="btn btn-secondary"

@@ -64,7 +64,7 @@ export default function ProjectModal() {
           </div>
 
           {projectSuccessMsg && (
-            <div style={{ color: '#6ee7b7', fontSize: '0.85rem', background: 'rgba(16, 185, 129, 0.1)', padding: '0.75rem', borderRadius: '6px' }}>
+            <div style={{ color: 'var(--success-text)', fontSize: '0.85rem', background: 'var(--success-bg)', padding: '0.75rem', borderRadius: '6px' }}>
               {projectSuccessMsg}
             </div>
           )}

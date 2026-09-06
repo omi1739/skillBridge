@@ -42,7 +42,7 @@ export default function SandboxView() {
       </div>
 
       {generateError && (
-        <div style={{ fontSize: '0.8rem', color: '#fda4af', background: 'rgba(244, 63, 94, 0.08)', border: '1px solid rgba(244, 63, 94, 0.2)', padding: '0.7rem 0.9rem', borderRadius: '6px' }}>
+        <div style={{ fontSize: '0.8rem', color: 'var(--danger-text)', background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', padding: '0.7rem 0.9rem', borderRadius: '6px' }}>
           {generateError}
         </div>
       )}
@@ -105,7 +105,7 @@ export default function SandboxView() {
                     </div>
                     <pre
                       className="code-block"
-                      style={{ fontSize: '0.75rem', whiteSpace: 'pre-wrap', color: '#6ee7b7' }}
+                      style={{ fontSize: '0.75rem', whiteSpace: 'pre-wrap', color: 'var(--success-text)' }}
                     >
                       <code>{referenceSolution}</code>
                     </pre>
@@ -138,7 +138,7 @@ export default function SandboxView() {
                   width: '100%',
                   height: '240px',
                   background: 'var(--bg-inset)',
-                  color: '#5eead4',
+                  color: 'var(--text-primary)',
                   border: '1px solid var(--border-color)',
                   borderRadius: '6px',
                   padding: '0.85rem',
@@ -153,23 +153,23 @@ export default function SandboxView() {
                 <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
                     {sandboxResult.passed ? (
-                      <CheckCircle2 size={16} color="#10b981" />
+                      <CheckCircle2 size={16} color="var(--success)" />
                     ) : (
-                      <AlertCircle size={16} color="#f43f5e" />
+                      <AlertCircle size={16} color="var(--danger)" />
                     )}
-                    <span style={{ fontWeight: 600, fontSize: '0.85rem', color: sandboxResult.passed ? '#6ee7b7' : '#fda4af' }}>
+                    <span style={{ fontWeight: 600, fontSize: '0.85rem', color: sandboxResult.passed ? 'var(--success-text)' : 'var(--danger-text)' }}>
                       {sandboxResult.passed ? 'All Test Assertions Passed' : 'Tests Failed'}
                     </span>
                   </div>
 
                   {(sandboxResult.error || sandboxResult.message) && (
-                    <p style={{ color: '#fda4af', fontSize: '0.8rem' }}>{sandboxResult.error || sandboxResult.message}</p>
+                    <p style={{ color: 'var(--danger-text)', fontSize: '0.8rem' }}>{sandboxResult.error || sandboxResult.message}</p>
                   )}
 
                   {sandboxResult.testResults && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '0.5rem' }}>
                       {sandboxResult.testResults.map((t: any, idx: number) => (
-                        <div key={idx} style={{ fontSize: '0.8rem', color: t.passed ? '#6ee7b7' : '#fda4af' }}>
+                        <div key={idx} style={{ fontSize: '0.8rem', color: t.passed ? 'var(--success-text)' : 'var(--danger-text)' }}>
                           {t.passed ? '✓' : '✗'} {t.testName}
                         </div>
                       ))}

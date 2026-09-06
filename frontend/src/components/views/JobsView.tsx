@@ -152,8 +152,8 @@ export default function JobsView() {
                   {match.job.company}
                   {match.job.location ? <span style={{ color: 'var(--text-muted)' }}>• {match.job.location}</span> : null}
                   {match.job.isBangladesh && (
-                    <span className="badge-chip" style={{ background: 'rgba(20, 184, 166, 0.1)', color: 'var(--accent-text)', border: '1px solid rgba(45, 212, 191, 0.25)' }}>
-                      <span className="badge-chip-dot" style={{ background: '#2dd4bf' }} />
+                    <span className="badge-chip" style={{ background: 'var(--teal-bg)', color: 'var(--accent-text)', border: '1px solid var(--teal-border)' }}>
+                      <span className="badge-chip-dot" style={{ background: 'var(--teal)' }} />
                       Bangladesh
                     </span>
                   )}
@@ -168,9 +168,9 @@ export default function JobsView() {
                   fontFamily: 'var(--font-mono)',
                   fontWeight: 700,
                   fontSize: '1.1rem',
-                  background: match.matchScore >= 70 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(59, 130, 246, 0.1)',
-                  color: match.matchScore >= 70 ? '#6ee7b7' : '#93c5fd',
-                  border: `1px solid ${match.matchScore >= 70 ? 'rgba(16, 185, 129, 0.3)' : 'rgba(59, 130, 246, 0.3)'}`
+                  background: match.matchScore >= 70 ? 'var(--success-bg)' : 'var(--info-bg)',
+                  color: match.matchScore >= 70 ? 'var(--success-text)' : 'var(--info-text)',
+                  border: `1px solid ${match.matchScore >= 70 ? 'var(--success-border)' : 'var(--info-border)'}`
                 }}>
                   {Math.round(match.matchScore)}% Match
                 </div>
@@ -184,7 +184,7 @@ export default function JobsView() {
             <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
               <div style={{ fontSize: '0.775rem' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Verified Matches: </span>
-                <strong style={{ color: '#6ee7b7' }}>{match.matchedSkills.map(m => m.canonicalName).join(', ') || 'None yet'}</strong>
+                <strong style={{ color: 'var(--success-text)' }}>{match.matchedSkills.map(m => m.canonicalName).join(', ') || 'None yet'}</strong>
               </div>
 
               <button
@@ -202,7 +202,7 @@ export default function JobsView() {
                 {match.missingSkills.length > 0 && (
                   <div style={{ fontSize: '0.775rem', marginTop: '0.5rem' }}>
                     <span style={{ color: 'var(--text-muted)' }}>Missing Skills: </span>
-                    <span style={{ color: '#fda4af' }}>{match.missingSkills.map(m => m.canonicalName).join(', ')}</span>
+                    <span style={{ color: 'var(--danger-text)' }}>{match.missingSkills.map(m => m.canonicalName).join(', ')}</span>
                   </div>
                 )}
               </div>

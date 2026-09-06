@@ -23,7 +23,7 @@ export default function PassportModal() {
               <Printer size={15} /> Print
             </button>
             <button className="btn btn-secondary" onClick={handleCopyPassportMarkdown} title="Copy Markdown" style={{ padding: '0.4rem 0.6rem' }}>
-              {copySuccess ? <Check size={15} color="#10b981" /> : <Copy size={15} />}
+              {copySuccess ? <Check size={15} color="var(--success)" /> : <Copy size={15} />}
             </button>
             <button className="btn btn-ghost" onClick={() => setShowPassportModal(false)} style={{ padding: '0.4rem' }}>
               <X size={18} />
@@ -35,11 +35,11 @@ export default function PassportModal() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>{passportData.candidate?.name || passportData.candidate?.fullName || 'Candidate'}</h3>
-              <div style={{ fontSize: '0.85rem', color: '#60a5fa' }}>{passportData.candidate?.targetRole || 'Not selected'}</div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--info)' }}>{passportData.candidate?.targetRole || 'Not selected'}</div>
             </div>
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Target Alignment</div>
-              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#10b981', fontFamily: 'var(--font-mono)' }}>
+              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--success)', fontFamily: 'var(--font-mono)' }}>
                 {passportData.metrics?.overallAlignment ?? passportData.alignmentScore ?? 0}%
               </div>
             </div>

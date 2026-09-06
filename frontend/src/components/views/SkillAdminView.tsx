@@ -23,10 +23,10 @@ export default function SkillAdminView() {
   const questions = adminSkillQuestions || [];
   return (
     <div className="card" style={{ marginBottom: '1.5rem', overflow: 'hidden', padding: '0' }}>
-      <div className="card-header" style={{ alignItems: 'center', background: 'rgba(167,139,250,0.06)' }}>
+      <div className="card-header" style={{ alignItems: 'center', background: 'var(--violet-bg)' }}>
         <div>
           <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Database size={18} style={{ color: '#a78bfa' }} /> Skill Question Bank
+            <Database size={18} style={{ color: 'var(--violet)' }} /> Skill Question Bank
           </h2>
           <p className="card-subtitle">Review AI-generated questions and manage the skill question bank.</p>
         </div>
@@ -69,7 +69,7 @@ export default function SkillAdminView() {
             </div>
           </div>
           {adminQMsg && (
-            <div style={{ marginTop: '0.6rem', fontSize: '0.82rem', color: adminQMsg.ok ? '#34d399' : '#fb7185' }}>{adminQMsg.text}</div>
+            <div style={{ marginTop: '0.6rem', fontSize: '0.82rem', color: adminQMsg.ok ? 'var(--success-text)' : 'var(--danger-text)' }}>{adminQMsg.text}</div>
           )}
         </div>
 
@@ -95,9 +95,9 @@ export default function SkillAdminView() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.6rem', flexWrap: 'wrap' }}>
                   <div style={{ whiteSpace: 'pre-wrap' }}><strong>{q.questionText}</strong></div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                    <span className="badge" style={{ background: 'rgba(167,139,250,0.1)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.2)' }}>{q.difficulty}</span>
+                    <span className="badge" style={{ background: 'var(--violet-bg)', color: 'var(--violet)', border: '1px solid var(--violet-border)' }}>{q.difficulty}</span>
                     <span className="badge badge-preferred" style={{ fontSize: '0.65rem' }}>{q.questionType}</span>
-                    <span className="badge" style={{ background: q.verificationStatus === 'pending_review' ? 'rgba(245,158,11,0.1)' : 'rgba(148,163,184,0.1)', color: '#94a3b8', border: '1px solid rgba(148,163,184,0.2)', fontSize: '0.65rem', textTransform: 'capitalize' }}>{String(q.verificationStatus).replace('_', ' ')}</span>
+                    <span className="badge" style={{ background: q.verificationStatus === 'pending_review' ? 'var(--warning-bg)' : 'var(--bg-row)', color: 'var(--text-muted)', border: '1px solid var(--border-color)', fontSize: '0.65rem', textTransform: 'capitalize' }}>{String(q.verificationStatus).replace('_', ' ')}</span>
                   </div>
                 </div>
                 <div style={{ marginTop: '0.4rem', color: 'var(--text-muted)', fontSize: '0.75rem' }}>

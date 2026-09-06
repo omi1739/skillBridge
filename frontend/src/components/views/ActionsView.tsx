@@ -21,9 +21,9 @@ export default function ActionsView() {
       <div className="card" style={{ textAlign: 'center', padding: '2.5rem', maxWidth: '560px', margin: '2rem auto' }}>
         <div style={{
           width: '52px', height: '52px', borderRadius: '50%', margin: '0 auto 1rem',
-          background: 'rgba(244, 63, 94, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center'
+          background: 'var(--danger-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center'
         }}>
-          <AlertCircle size={22} style={{ color: '#fb7185' }} />
+          <AlertCircle size={22} style={{ color: 'var(--danger)' }} />
         </div>
         <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 0.6rem' }}>Could not load your recommendations</h2>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: '0 auto', maxWidth: '420px' }}>
@@ -93,7 +93,7 @@ export default function ActionsView() {
           {userProjects.map(proj => (
             <div key={proj.id} style={{ background: 'var(--bg-inset-panel)', padding: '1rem', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <a href={proj.repoUrl} target="_blank" rel="noreferrer" style={{ color: '#60a5fa', fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.4rem', textDecoration: 'none' }}>
+                <a href={proj.repoUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--info)', fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.4rem', textDecoration: 'none' }}>
                   <Github size={14} /> {proj.title} <ExternalLink size={12} />
                 </a>
                 <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>
@@ -105,7 +105,7 @@ export default function ActionsView() {
               </p>
               <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                 {proj.detectedStack.map((tech, idx) => (
-                  <span key={idx} style={{ background: 'var(--bg-chip)', color: '#93c5fd', fontSize: '0.7rem', padding: '0.15rem 0.45rem', borderRadius: '4px' }}>
+                  <span key={idx} style={{ background: 'var(--bg-chip)', color: 'var(--info-text)', fontSize: '0.7rem', padding: '0.15rem 0.45rem', borderRadius: '4px' }}>
                     {tech}
                   </span>
                 ))}

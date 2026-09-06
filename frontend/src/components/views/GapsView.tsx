@@ -21,9 +21,9 @@ export default function GapsView() {
       <div className="card" style={{ textAlign: 'center', padding: '2.5rem', maxWidth: '560px', margin: '2rem auto' }}>
         <div style={{
           width: '52px', height: '52px', borderRadius: '50%', margin: '0 auto 1rem',
-          background: 'rgba(244, 63, 94, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center'
+          background: 'var(--danger-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center'
         }}>
-          <BarChart3 size={22} style={{ color: '#fb7185' }} />
+          <BarChart3 size={22} style={{ color: 'var(--danger)' }} />
         </div>
         <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 0.6rem' }}>Could not load your skill gaps</h2>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: '0 auto 1.5rem', maxWidth: '420px' }}>
@@ -81,7 +81,7 @@ export default function GapsView() {
                   <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
                     Priority Score
                   </div>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 800, fontFamily: 'var(--font-mono)', color: gap.priorityScore > 0.4 ? '#fda4af' : gap.priorityScore > 0.2 ? '#fcd34d' : '#6ee7b7' }}>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 800, fontFamily: 'var(--font-mono)', color: gap.priorityScore > 0.4 ? 'var(--danger-text)' : gap.priorityScore > 0.2 ? 'var(--warning-text)' : 'var(--success-text)' }}>
                     {gap.priorityScore.toFixed(3)}
                   </div>
                 </div>

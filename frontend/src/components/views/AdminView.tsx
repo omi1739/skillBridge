@@ -33,7 +33,7 @@ export default function AdminView() {
   } = useSkillBridge();
 
   const dash = adminDashboard || null;
-  const roleColor: Record<string, string> = { ADMIN: '#f59e0b', RECRUITER: '#22d3ee', USER: '#14b8a6' };
+  const roleColor: Record<string, string> = { ADMIN: 'var(--warning)', RECRUITER: 'var(--info)', USER: 'var(--teal)' };
 
   const roleCount = (r: string) =>
     dash && Array.isArray(dash.byRole)
@@ -47,11 +47,11 @@ export default function AdminView() {
     const start = cursor;
     const end = cursor + frac * 360;
     cursor = end;
-    return `${roleColor[x.role] || '#64748b'} ${start}deg ${end}deg`;
+    return `${roleColor[x.role] || 'var(--text-muted)'} ${start}deg ${end}deg`;
   });
   const donutBg = gradients.length
     ? `conic-gradient(${gradients.join(', ')})`
-    : `conic-gradient(#14b8a6 0deg 360deg)`;
+    : `conic-gradient(var(--teal) 0deg 360deg)`;
 
   const signupData = dash?.recentSignups || [];
   const maxSignups = Math.max(1, ...signupData.map((s: any) => s.count));
@@ -65,9 +65,9 @@ export default function AdminView() {
       <div className="card" style={{ textAlign: 'center', padding: '2.5rem', maxWidth: '560px', margin: '2rem auto' }}>
         <div style={{
           width: '52px', height: '52px', borderRadius: '50%', margin: '0 auto 1rem',
-          background: 'rgba(244, 63, 94, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center'
+          background: 'var(--danger-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center'
         }}>
-          <ShieldAlert size={22} style={{ color: '#fb7185' }} />
+          <ShieldAlert size={22} style={{ color: 'var(--danger)' }} />
         </div>
         <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 0.6rem' }}>Access Restricted</h2>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: '0 auto', maxWidth: '420px' }}>
@@ -117,15 +117,15 @@ export default function AdminView() {
             </div>
             <div className="stat-card">
               <div className="stat-label">Admins</div>
-              <div className="stat-value" style={{ color: '#f59e0b' }}>{dash ? roleCount('ADMIN') : '—'}</div>
+              <div className="stat-value" style={{ color: 'var(--warning)' }}>{dash ? roleCount('ADMIN') : '—'}</div>
             </div>
             <div className="stat-card">
               <div className="stat-label">Recruiters</div>
-              <div className="stat-value" style={{ color: '#22d3ee' }}>{dash ? roleCount('RECRUITER') : '—'}</div>
+              <div className="stat-value" style={{ color: 'var(--info)' }}>{dash ? roleCount('RECRUITER') : '—'}</div>
             </div>
             <div className="stat-card">
               <div className="stat-label">Regular Users</div>
-              <div className="stat-value" style={{ color: '#14b8a6' }}>{dash ? roleCount('USER') : '—'}</div>
+              <div className="stat-value" style={{ color: 'var(--teal)' }}>{dash ? roleCount('USER') : '—'}</div>
             </div>
           </div>
 
@@ -145,7 +145,7 @@ export default function AdminView() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: 140 }}>
                   {(dash?.byRole || []).map((x: any) => (
                     <div key={x.role} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem' }}>
-                      <span style={{ width: 10, height: 10, borderRadius: 3, background: roleColor[x.role] || '#64748b' }} />
+                      <span style={{ width: 10, height: 10, borderRadius: 3, background: roleColor[x.role] || 'var(--text-muted)' }} />
                       <span style={{ color: 'var(--text-secondary)' }}>{x.role}</span>
                       <strong style={{ color: 'var(--text-primary)', marginLeft: 'auto' }}>{x.count}</strong>
                     </div>
@@ -257,7 +257,7 @@ export default function AdminView() {
             </button>
 
             {aliasSaveSuccess && (
-              <div style={{ color: '#6ee7b7', fontSize: '0.8rem' }}>✓ Alias mapping registered.</div>
+              <div style={{ color: 'var(--success-text)', fontSize: '0.8rem' }}>✓ Alias mapping registered.</div>
             )}
           </form>
         </div>
@@ -313,7 +313,7 @@ export default function AdminView() {
               </button>
 
               {weightSaveSuccess && (
-                <div style={{ color: '#6ee7b7', fontSize: '0.8rem' }}>✓ Role weight updated and gaps recalculated.</div>
+                <div style={{ color: 'var(--success-text)', fontSize: '0.8rem' }}>✓ Role weight updated and gaps recalculated.</div>
               )}
             </form>
           )}
@@ -327,7 +327,7 @@ export default function AdminView() {
         </p>
 
         {adminUserMsg && (
-          <div style={{ marginBottom: '0.9rem', padding: '0.6rem 0.8rem', borderRadius: '6px', fontSize: '0.82rem', background: adminUserMsg.ok ? 'rgba(16,185,129,0.12)' : 'rgba(248,113,113,0.14)', color: adminUserMsg.ok ? '#6ee7b7' : '#fca5a5' }}>
+          <div style={{ marginBottom: '0.9rem', padding: '0.6rem 0.8rem', borderRadius: '6px', fontSize: '0.82rem', background: adminUserMsg.ok ? 'var(--success-bg)' : 'var(--danger-bg)', color: adminUserMsg.ok ? 'var(--success-text)' : 'var(--danger-text)' }}>
             {adminUserMsg.text}
           </div>
         )}
@@ -381,7 +381,7 @@ export default function AdminView() {
                 <tr key={u.id} style={{ borderBottom: '1px solid var(--border-faint)' }}>
                   <td style={{ padding: '0.6rem 0.5rem 0.6rem 0' }}>
                     <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                      {u.fullName || '—'} {isSelf && <span style={{ color: '#5eead4', fontSize: '0.72rem' }}>(you)</span>}
+                      {u.fullName || '—'} {isSelf && <span style={{ color: 'var(--accent-text)', fontSize: '0.72rem' }}>(you)</span>}
                     </div>
                     <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{u.email}</div>
                   </td>
@@ -411,7 +411,7 @@ export default function AdminView() {
                       disabled={isSelf}
                       onClick={() => handleDeleteUser(u.id, u.email)}
                       className="btn"
-                      style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', background: 'rgba(248,113,113,0.12)', color: '#fca5a5', border: '1px solid rgba(248,113,113,0.35)' }}
+                      style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', background: 'var(--danger-bg)', color: 'var(--danger-text)', border: '1px solid var(--danger-border)' }}
                     >
                       Delete
                     </button>

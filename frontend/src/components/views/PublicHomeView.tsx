@@ -44,10 +44,10 @@ export default function PublicHomeView() {
         </div>
 
         <div style={{ marginTop: '1.5rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-          <span className="trust-pill"><span style={{ width: 6, height: 6, borderRadius: '50%', background: '#2dd4bf', display: 'inline-block' }} /> Verified Postings</span>
-          <span className="trust-pill"><span style={{ width: 6, height: 6, borderRadius: '50%', background: '#34d399', display: 'inline-block' }} /> Live Ingestion</span>
-          <span className="trust-pill"><span style={{ width: 6, height: 6, borderRadius: '50%', background: '#38bdf8', display: 'inline-block' }} /> Remote &amp; Onsite Roles</span>
-          <span className="trust-pill"><span style={{ width: 6, height: 6, borderRadius: '50%', background: '#a78bfa', display: 'inline-block' }} /> Verifiable Evidence</span>
+          <span className="trust-pill"><span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--teal)', display: 'inline-block' }} /> Verified Postings</span>
+          <span className="trust-pill"><span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--success)', display: 'inline-block' }} /> Live Ingestion</span>
+          <span className="trust-pill"><span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--info)', display: 'inline-block' }} /> Remote &amp; Onsite Roles</span>
+          <span className="trust-pill"><span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--violet)', display: 'inline-block' }} /> Verifiable Evidence</span>
         </div>
 
         <div className="stat-grid-3" style={{ marginTop: '2.5rem', textAlign: 'left' }}>
@@ -87,7 +87,7 @@ export default function PublicHomeView() {
                   <div key={rs.skillId}>
                     <div className="demand-row-label">
                       <span className="demand-skill">
-                        <CheckCircle2 size={14} color="#5eead4" />
+                        <CheckCircle2 size={14} color="var(--accent-text)" />
                         <span>{rs.skill?.canonicalName || rs.skillId}</span>
                       </span>
                       <span className="demand-pct">{pct}% of jobs</span>

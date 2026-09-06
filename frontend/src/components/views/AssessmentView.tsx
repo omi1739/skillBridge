@@ -23,9 +23,9 @@ export default function AssessmentView() {
       <div className="card" style={{ textAlign: 'center', padding: '2.5rem', maxWidth: '560px', margin: '2rem auto' }}>
         <div style={{
           width: '52px', height: '52px', borderRadius: '50%', margin: '0 auto 1rem',
-          background: 'rgba(56,189,248,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center'
+          background: 'var(--info-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center'
         }}>
-          <BrainCircuit size={22} style={{ color: '#38bdf8' }} />
+          <BrainCircuit size={22} style={{ color: 'var(--info)' }} />
         </div>
         <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 0.6rem' }}>Loading Diagnostic Test…</h2>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: '0 auto 1.5rem', maxWidth: '420px' }}>
@@ -53,12 +53,12 @@ export default function AssessmentView() {
             width: '72px',
             height: '72px',
             borderRadius: '50%',
-            background: attemptResult.passed ? 'rgba(16, 185, 129, 0.15)' : 'rgba(244, 63, 94, 0.15)',
+            background: attemptResult.passed ? 'var(--success-bg)' : 'var(--danger-bg)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             margin: '0 auto 1rem auto',
-            border: `2px solid ${attemptResult.passed ? '#10b981' : '#f43f5e'}`
+            border: `2px solid ${attemptResult.passed ? 'var(--success)' : 'var(--danger)'}`
           }}>
             <span style={{ fontSize: '1.6rem', fontWeight: 800, fontFamily: 'var(--font-mono)' }}>
               {attemptResult.score}%
@@ -148,13 +148,13 @@ export default function AssessmentView() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.8rem', marginTop: '0.5rem' }}>
                     <div>
                       <span style={{ color: 'var(--text-muted)' }}>Your answer: </span>
-                      <span style={{ color: r.correct ? '#6ee7b7' : '#fda4af', fontWeight: 600 }}>
+                      <span style={{ color: r.correct ? 'var(--success-text)' : 'var(--danger-text)', fontWeight: 600 }}>
                         {r.userAnswer || '(not answered)'}
                       </span>
                     </div>
                     <div>
                       <span style={{ color: 'var(--text-muted)' }}>Correct answer: </span>
-                      <span style={{ color: '#6ee7b7', fontWeight: 600 }}>{r.correctAnswer}</span>
+                      <span style={{ color: 'var(--success-text)', fontWeight: 600 }}>{r.correctAnswer}</span>
                     </div>
                   </div>
 
@@ -171,7 +171,7 @@ export default function AssessmentView() {
                         lineHeight: 1.5
                       }}
                     >
-                      <strong style={{ color: '#93c5fd' }}>Explanation: </strong>
+                      <strong style={{ color: 'var(--info-text)' }}>Explanation: </strong>
                       {r.explanation}
                     </div>
                   )}
@@ -211,7 +211,7 @@ export default function AssessmentView() {
           <p className="page-subtitle">{questions.length} multi-part questions testing practical Node.js, SQL, and HTTP engineering skills.</p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--bg-chip)', border: '1px solid var(--border-color)', padding: '0.45rem 0.85rem', borderRadius: '6px', fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}>
-          <Clock size={15} color="#93c5fd" />
+          <Clock size={15} color="var(--info-text)" />
           <span>{`${Math.floor(timeRemaining / 60).toString().padStart(2, '0')}:${(timeRemaining % 60).toString().padStart(2, '0')}`}</span>
         </div>
       </div>
@@ -233,7 +233,7 @@ export default function AssessmentView() {
           />
         </div>
 
-        <h2 style={{ fontSize: '1.15rem', fontWeight: 600, marginBottom: '1rem', color: '#f3f4f6' }}>
+        <h2 style={{ fontSize: '1.15rem', fontWeight: 600, marginBottom: '1rem', color: 'var(--text-primary)' }}>
           {currentQuestion.prompt}
         </h2>
 
@@ -253,7 +253,7 @@ export default function AssessmentView() {
                 onClick={() => handleAnswerSelect(currentQuestion.id, opt)}
               >
                 <span>{opt}</span>
-                {isSelected && <Check size={16} color="#60a5fa" />}
+                {isSelected && <Check size={16} color="var(--info)" />}
               </button>
             );
           })}

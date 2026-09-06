@@ -92,7 +92,7 @@ export default function SkillAssessmentView() {
             Total questions: <strong>{skillAssessCfg.easy + skillAssessCfg.medium + skillAssessCfg.hard}</strong>
           </div>
 
-          {skillAssessError && <div className="error-banner" style={{ color: '#f87171', fontSize: '0.82rem' }}>{skillAssessError}</div>}
+          {skillAssessError && <div className="error-banner" style={{ color: 'var(--danger-text)', fontSize: '0.82rem' }}>{skillAssessError}</div>}
 
           <div style={{ display: 'flex', gap: '0.75rem' }}>
             <button className="btn btn-primary" onClick={startSkillAssessment} disabled={isStartingSkill || !skillAssessSelectedSkill}>
@@ -126,7 +126,7 @@ export default function SkillAssessmentView() {
                   <span style={{ color: 'var(--text-muted)' }}> · {new Date(h.completedAt).toLocaleDateString()}</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                  <span className="badge" style={{ background: 'rgba(16,185,129,0.1)', color: '#34d399', border: '1px solid rgba(16,185,129,0.2)' }}>{h.skillLevel}</span>
+                  <span className="badge" style={{ background: 'var(--success-bg)', color: 'var(--success)', border: '1px solid var(--success-border)' }}>{h.skillLevel}</span>
                   <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{h.score}%</span>
                   <button className="btn btn-secondary" style={{ fontSize: '0.72rem', padding: '0.3rem 0.7rem' }} onClick={() => loadSkillAssessResult(h.id)}>
                     View Result
@@ -205,7 +205,7 @@ export default function SkillAssessmentView() {
                 >
                   <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', marginRight: '0.5rem' }}>{(q.options || []).indexOf(opt) + 1}</span>
                   <span style={{ whiteSpace: 'pre-wrap', textAlign: 'left' }}>{opt}</span>
-                  {answered && isSel && <CheckCircle2 size={16} style={{ marginLeft: 'auto', color: '#34d399' }} />}
+                  {answered && isSel && <CheckCircle2 size={16} style={{ marginLeft: 'auto', color: 'var(--success)' }} />}
                 </button>
               );
             })}
@@ -234,7 +234,7 @@ export default function SkillAssessmentView() {
           )}
 
           {answered ? (
-            <div className="confirmed-banner" style={{ marginTop: '1rem', padding: '0.6rem 0.8rem', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', color: '#34d399' }}>
+            <div className="confirmed-banner" style={{ marginTop: '1rem', padding: '0.6rem 0.8rem', background: 'var(--success-bg)', border: '1px solid var(--success-border)', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', color: 'var(--success-text)' }}>
               <ShieldCheck size={14} /> Answer recorded and evaluated securely. You can change it before submitting the assessment.
             </div>
           ) : (
@@ -290,10 +290,10 @@ export default function SkillAssessmentView() {
 
         <div style={{ display: 'grid', gridTemplateColumns: '0.9fr 2fr', gap: '1.5rem' }}>
           <div className="card" style={{ textAlign: 'center', padding: '1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.75rem' }}>
-            <div style={{ width: '84px', height: '84px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `3px solid ${r.score >= 70 ? '#10b981' : r.score >= 40 ? '#f59e0b' : '#f43f5e'}`, background: 'rgba(255,255,255,0.03)' }}>
+            <div style={{ width: '84px', height: '84px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `3px solid ${r.score >= 70 ? 'var(--success)' : r.score >= 40 ? 'var(--warning)' : 'var(--danger)'}`, background: 'var(--bg-raise)' }}>
               <span style={{ fontSize: '1.5rem', fontWeight: 800, fontFamily: 'var(--font-mono)' }}>{r.score}%</span>
             </div>
-            <span className="badge" style={{ background: 'rgba(16,185,129,0.1)', color: '#34d399', border: '1px solid rgba(16,185,129,0.2)', fontSize: '0.85rem' }}>
+            <span className="badge" style={{ background: 'var(--success-bg)', color: 'var(--success)', border: '1px solid var(--success-border)', fontSize: '0.85rem' }}>
               {r.skillLevel}
             </span>
             <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
@@ -313,7 +313,7 @@ export default function SkillAssessmentView() {
               <h3 className="card-title" style={{ marginBottom: '0.75rem' }}>Topic Performance</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
                 {(r.topicResults || []).map((t: any) => {
-                  const color = t.status === 'STRENGTH' ? '#10b981' : t.status === 'MODERATE' ? '#f59e0b' : '#f43f5e';
+                  const color = t.status === 'STRENGTH' ? 'var(--success)' : t.status === 'MODERATE' ? 'var(--warning)' : 'var(--danger)';
                   return (
                     <div key={t.topic}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '0.3rem' }}>
@@ -331,11 +331,11 @@ export default function SkillAssessmentView() {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div className="card">
-                <h3 className="card-title" style={{ color: '#34d399', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Strengths</h3>
+                <h3 className="card-title" style={{ color: 'var(--success-text)', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Strengths</h3>
                 {r.strengths?.length ? r.strengths.map((s: string) => <div key={s} style={{ fontSize: '0.82rem', padding: '0.2rem 0' }}>• {s}</div>) : <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>None yet.</div>}
               </div>
               <div className="card">
-                <h3 className="card-title" style={{ color: '#fb7185', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Needs Work</h3>
+                <h3 className="card-title" style={{ color: 'var(--danger-text)', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Needs Work</h3>
                 {r.needsImprovement?.length ? r.needsImprovement.map((s: string) => <div key={s} style={{ fontSize: '0.82rem', padding: '0.2rem 0' }}>• {s}</div>) : <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Nothing critical — great job.</div>}
               </div>
             </div>
@@ -347,12 +347,12 @@ export default function SkillAssessmentView() {
                   {r.detailedResults.map((d: any, i: number) => (
                     <div key={i} style={{ padding: '0.65rem 0.7rem', background: 'var(--bg-row)', border: '1px solid var(--border-faint)', borderRadius: '6px', fontSize: '0.82rem' }}>
                       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
-                        {d.correct ? <CheckCircle2 size={15} style={{ color: '#10b981', flexShrink: 0, marginTop: '2px' }} /> : <X size={15} style={{ color: '#f43f5e', flexShrink: 0, marginTop: '2px' }} />}
+                        {d.correct ? <CheckCircle2 size={15} style={{ color: 'var(--success)', flexShrink: 0, marginTop: '2px' }} /> : <X size={15} style={{ color: 'var(--danger)', flexShrink: 0, marginTop: '2px' }} />}
                         <div>
                           <div style={{ whiteSpace: 'pre-wrap' }}><strong>Q{i + 1}.</strong> {d.question?.prompt}</div>
                           {d.question?.codeSnippet && <pre className="code-block" style={{ marginTop: '0.4rem' }}>{d.question.codeSnippet}</pre>}
-                          <div style={{ marginTop: '0.4rem', color: 'var(--text-secondary)' }}>Your answer: <span style={{ color: d.correct ? '#34d399' : '#fb7185' }}>{d.userAnswer || '(no answer)'}</span></div>
-                          <div style={{ color: 'var(--text-secondary)' }}>Correct: <span style={{ color: '#34d399' }}>{d.correctAnswer}</span></div>
+                          <div style={{ marginTop: '0.4rem', color: 'var(--text-secondary)' }}>Your answer: <span style={{ color: d.correct ? 'var(--success-text)' : 'var(--danger-text)' }}>{d.userAnswer || '(no answer)'}</span></div>
+                          <div style={{ color: 'var(--text-secondary)' }}>Correct: <span style={{ color: 'var(--success-text)' }}>{d.correctAnswer}</span></div>
                           <div style={{ color: 'var(--text-muted)', marginTop: '0.2rem' }}>{d.explanation}</div>
                         </div>
                       </div>

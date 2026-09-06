@@ -27,9 +27,9 @@ export default function MarketView() {
         <div className="card" style={{ textAlign: 'center', padding: '2.5rem', maxWidth: '560px', margin: '2rem auto' }}>
           <div style={{
             width: '52px', height: '52px', borderRadius: '50%', margin: '0 auto 1rem',
-            background: 'rgba(56,189,248,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center'
+            background: 'var(--info-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center'
           }}>
-            <ArrowRight size={22} style={{ color: '#38bdf8' }} />
+            <ArrowRight size={22} style={{ color: 'var(--info)' }} />
           </div>
           <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 0.6rem' }}>Loading Job Market Demand…</h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: '0 auto', maxWidth: '420px' }}>
@@ -135,7 +135,7 @@ export default function MarketView() {
                       style={{
                         fontWeight: 700,
                         fontFamily: 'var(--font-mono)',
-                        color: isRequired ? '#f87171' : '#60a5fa',
+                        color: isRequired ? 'var(--danger)' : 'var(--info)',
                         background: 'none',
                         border: 'none',
                         cursor: 'pointer',

@@ -10,9 +10,9 @@ export function RolePromptView() {
     <div className="card" style={{ textAlign: 'center', padding: '2.5rem', maxWidth: '560px', margin: '2rem auto' }}>
       <div style={{
         width: '52px', height: '52px', borderRadius: '50%', margin: '0 auto 1rem',
-        background: 'rgba(56,189,248,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center'
+        background: 'var(--info-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center'
       }}>
-        <Sliders size={22} style={{ color: '#38bdf8' }} />
+        <Sliders size={22} style={{ color: 'var(--info)' }} />
       </div>
       <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 0.6rem' }}>Choose Your Target Role</h2>
       <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: '0 auto 1.5rem', maxWidth: '420px' }}>
@@ -47,9 +47,9 @@ export function SignInPromptView({ title, subtitle }: { title: string; subtitle:
     <div className="card" style={{ textAlign: 'center', padding: '2.5rem', maxWidth: '560px', margin: '2rem auto' }}>
       <div style={{
         width: '52px', height: '52px', borderRadius: '50%', margin: '0 auto 1rem',
-        background: 'rgba(251,191,36,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center'
+        background: 'var(--warning-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center'
       }}>
-        <LogIn size={22} style={{ color: '#fbbf24' }} />
+        <LogIn size={22} style={{ color: 'var(--warning)' }} />
       </div>
       <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 0.6rem' }}>{title}</h2>
       <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: '0 auto 1.5rem', maxWidth: '420px' }}>
@@ -73,9 +73,9 @@ export function NoEvidenceView() {
     <div className="card" style={{ textAlign: 'center', padding: '2.5rem', maxWidth: '560px', margin: '2rem auto' }}>
       <div style={{
         width: '52px', height: '52px', borderRadius: '50%', margin: '0 auto 1rem',
-        background: 'rgba(16,185,129,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center'
+        background: 'var(--success-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center'
       }}>
-        <ShieldCheck size={22} style={{ color: '#34d399' }} />
+        <ShieldCheck size={22} style={{ color: 'var(--success)' }} />
       </div>
       <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 0.6rem' }}>You haven't verified any skills yet</h2>
       <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: '0 auto 1.5rem', maxWidth: '440px' }}>
