@@ -830,14 +830,13 @@ function useSkillBridgeValue() {
   };
 
   const handleGoogleClick = () => {
+    // GSI renders the real button into googleBtnRef. Click whatever button
+    // GSI produced (its iframe may be cross-origin, so we trigger from the
+    // visible button's wrapping element which GSI wires up itself).
     const host = googleBtnHiddenRef.current;
     if (!host) return;
-    const iframe = host.querySelector('iframe');
-    if (iframe?.contentWindow) {
-      const innerDoc = iframe.contentWindow.document;
-      const b = innerDoc?.querySelector('button, [role="button"]');
-      if (b) { (b as HTMLElement).click(); return; }
-    }
+    const btn = host.querySelector('button');
+    if (btn) { btn.click(); return; }
     host.click?.();
   };
 
@@ -959,7 +958,9 @@ function useSkillBridgeValue() {
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID || !showAuthModal) return;
     const w = window as any;
+    let cancelled = false;
     const initGoogle = () => {
+      if (cancelled) return;
       w.google.accounts.id.initialize({
         client_id: GOOGLE_CLIENT_ID,
         callback: (resp: any) => { if (resp?.credential) handleGoogleCredential(resp.credential); },
@@ -971,9 +972,9 @@ function useSkillBridgeValue() {
           theme: 'outline',
           size: 'large',
           text: 'continue_with',
-          type: 'icon',
-          shape: 'circle',
-          width: 300,
+          type: 'standard',
+          shape: 'rectangular',
+          width: '300',
         });
       }
     };
@@ -983,7 +984,7 @@ function useSkillBridgeValue() {
     script.async = true;
     script.onload = initGoogle;
     document.body.appendChild(script);
-    return () => { script.remove(); };
+    return () => { cancelled = true; script.remove(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showAuthModal]);
 
