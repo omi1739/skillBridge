@@ -23,7 +23,7 @@ export default function PublicHomeView() {
       icon: GraduationCap,
       kicker: 'Students',
       title: 'Students finishing computer science',
-      desc: 'See which syllabus gaps actually matter to employers, benchmark yourself with practical tests, and target your next semester around real demand.',
+      desc: 'Close the gap between your syllabus and what employers actually ask for.',
       cta: 'Explore the Market',
       onClick: () => router.push('/market')
     },
@@ -31,7 +31,7 @@ export default function PublicHomeView() {
       icon: Briefcase,
       kicker: 'Job Seekers',
       title: 'Job seekers chasing backend roles',
-      desc: 'Get explainable match scores against live junior backend postings, make up your verified gaps, and present a machine-verifiable skills passport.',
+      desc: 'Match against verified junior postings and prove your skills with evidence.',
       cta: 'Browse Matching Jobs',
       onClick: () => router.push('/jobs')
     },
@@ -39,7 +39,7 @@ export default function PublicHomeView() {
       icon: RefreshCcw,
       kicker: 'Career Switchers',
       title: 'Career switchers with a plan',
-      desc: 'Skip generic tutorial advice. Follow a prioritized, evidence-backed roadmap built from hundreds of filtered job postings and hands-on benchmarks.',
+      desc: 'Follow a prioritized, evidence-backed roadmap — not generic tutorials.',
       cta: 'Take the Diagnostic',
       onClick: () => router.push('/assessment')
     }
@@ -55,7 +55,7 @@ export default function PublicHomeView() {
           Real job requirements, measured against real skills.
         </h1>
         <p className="dev-hero-desc">
-          SkillBridge continuously analyzes junior backend job postings from verified employers — including remote / work-from-home roles — then tests your SQL and Node.js skills in a live sandbox to show exactly what to learn next.
+          SkillBridge ingests live junior backend postings, benchmarks your SQL &amp; Node.js in a real sandbox, and shows exactly what to learn next.
         </p>
 
         <div className="landing-actions">
@@ -73,8 +73,7 @@ export default function PublicHomeView() {
         <div style={{ marginTop: '1.5rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center' }}>
           <span className="trust-pill"><span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--teal)', display: 'inline-block' }} /> Verified Postings</span>
           <span className="trust-pill"><span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--success)', display: 'inline-block' }} /> Live Ingestion</span>
-          <span className="trust-pill"><span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--info)', display: 'inline-block' }} /> Remote &amp; Onsite Roles</span>
-          <span className="trust-pill"><span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--violet)', display: 'inline-block' }} /> Verifiable Evidence</span>
+          <span className="trust-pill"><span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--info)', display: 'inline-block' }} /> Remote &amp; Onsite</span>
         </div>
 
         <div className="stat-grid-3" style={{ marginTop: '2.5rem', textAlign: 'left' }}>
@@ -154,24 +153,18 @@ export default function PublicHomeView() {
           <div className="about-grid">
             <div className="about-card">
               <span className="about-card-kicker">Live Intelligence</span>
-              <h3>Real, verified job postings</h3>
-              <p>
-                Continuously ingested junior backend roles — remote / work-from-home and onsite — from verified employers. Skills are derived from production requirements rather than speculative advice.
-              </p>
+              <h3>Skills from verified postings</h3>
+              <p>Requirements derived from live employer postings — not speculative advice.</p>
             </div>
             <div className="about-card">
               <span className="about-card-kicker">Empirical Baseline</span>
               <h3>Skills measured, not guessed</h3>
-              <p>
-                Benchmark your SQL queries and Node.js code against production test assertions, pinpointing deterministic gaps standing between you and target roles.
-              </p>
+              <p>SQL and code judged against production-grade test assertions in a live sandbox.</p>
             </div>
             <div className="about-card">
               <span className="about-card-kicker">Transparent Matching</span>
-              <h3>Verifiable evidence passport</h3>
-              <p>
-                Traceable match scores with full requirement breakdown. Export verified skill passports backed by live sandbox results and GitHub code verification.
-              </p>
+              <h3>Evidence-backed applications</h3>
+              <p>Explainable match scores with a verifiable skills passport for every role.</p>
             </div>
           </div>
         </div>
@@ -199,14 +192,14 @@ export default function PublicHomeView() {
         <div className="about-section">
           <div className="about-heading">
             <span className="about-kicker">How it works</span>
-            <h2 className="about-title">Four steps from “what should I learn?” to “I got the job”.</h2>
+            <h2 className="about-title">Four steps from skill building to job matching.</h2>
           </div>
           <div className="steps-grid">
             {[
-              { step: '01', title: 'Market Intelligence', desc: 'Explore exact technologies junior backend employers ask for, derived dynamically from live postings.' },
-              { step: '02', title: 'Diagnostic Benchmarks', desc: 'Take practical timed challenges and run SQL & code queries against test assertions in a live sandbox.' },
-              { step: '03', title: 'Gap Prioritization', desc: 'Identify high-leverage missing skills prioritized by role weight, employer frequency, and demonstrated proficiency.' },
-              { step: '04', title: 'Matching Applications', desc: 'Browse matched remote and onsite postings with explainable compatibility scores and verified skill passports.' }
+              { step: '01', title: 'Market Intelligence', desc: 'See exactly what junior backend employers ask for, updated live.' },
+              { step: '02', title: 'Diagnostic Benchmarks', desc: 'Practical timed challenges with test-asserted grading in a real sandbox.' },
+              { step: '03', title: 'Gap Prioritization', desc: 'Know the highest-leverage missing skills and what to build next.' },
+              { step: '04', title: 'Matching Applications', desc: 'Browse matched roles with explainable scores and verified evidence.' }
             ].map(item => (
               <div key={item.step} className="step-card">
                 <span className="step-number">{item.step}</span>

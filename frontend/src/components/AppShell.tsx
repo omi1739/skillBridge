@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { usePathname } from 'next/navigation';
-import { ChevronDown, X } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { ChevronDown, Menu, X } from 'lucide-react';
 import { useSkillBridge } from '@/lib/skillbridge-context';
 import AppSidebar from './AppSidebar';
 import PublicNavbar from './PublicNavbar';
 import ThemeToggle from './ThemeToggle';
+import Avatar from '@/components/ui/Avatar';
 import { SignInPromptView } from '@/components/views/prompts';
 
 const PROTECTED_LABELS: Record<string, { title: string }> = {
@@ -15,7 +16,8 @@ const PROTECTED_LABELS: Record<string, { title: string }> = {
   '/gaps': { title: 'Sign in to see your personalized skill gaps' },
   '/actions': { title: 'Sign in to see project recommendations' },
   '/jobs': { title: 'Sign in to see matching jobs' },
-  '/admin': { title: 'Sign in to access admin tools' }
+  '/admin': { title: 'Sign in to access admin tools' },
+  '/profile': { title: 'Sign in to view your profile' }
 };
 
 const PAGE_TITLES: Record<string, string> = {
@@ -26,19 +28,21 @@ const PAGE_TITLES: Record<string, string> = {
   '/gaps': 'My Skill Gaps',
   '/actions': 'Projects to Build',
   '/jobs': 'Matching Jobs',
-  '/admin': 'Admin & Ontology Console'
+  '/admin': 'Admin & Ontology Console',
+  '/profile': 'My Profile'
 };
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const {
     currentUser, currentProfile, role, activeTargetRoleId,
-    globalError, dismissGlobalError, handleLogout,
-    setShowProfileModal, setProfileForm
+    globalError, dismissGlobalError, handleLogout
   } = useSkillBridge();
   const pathname = usePathname() || '/';
+  const router = useRouter();
   const isPublicPage = pathname === '/market' || pathname === '/curriculum';
 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -52,17 +56,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return () => document.removeEventListener('mousedown', handler);
   }, [userMenuOpen]);
 
-  const openProfile = () => {
-    setProfileForm({
-      fullName: currentProfile?.fullName || currentUser!.email.split('@')[0],
-      githubUrl: currentProfile?.githubUrl || '',
-      portfolioUrl: currentProfile?.portfolioUrl || '',
-      bio: currentProfile?.bio || '',
-      targetRoleId: currentProfile?.targetRoleId || activeTargetRoleId || ''
-    });
-    setShowProfileModal(true);
+  useEffect(() => {
+    document.body.classList.toggle('mobile-sidebar-open', mobileSidebarOpen);
+    return () => document.body.classList.remove('mobile-sidebar-open');
+  }, [mobileSidebarOpen]);
+
+  useEffect(() => {
+    setMobileSidebarOpen(false);
     setUserMenuOpen(false);
-  };
+  }, [pathname]);
 
   const errorBanner = globalError ? (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 1000, display: 'flex', justifyContent: 'center', padding: '0.75rem 1rem' }}>
@@ -106,10 +108,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="app-shell">
       <AppSidebar />
+      {mobileSidebarOpen && <div className="mobile-sidebar-overlay" onClick={() => setMobileSidebarOpen(false)} />}
       {errorBanner}
       <div className="app-main-col">
         <header className="topbar">
           <div className="topbar-inner">
+            <button className="btn btn-ghost topbar-menu-btn" onClick={() => setMobileSidebarOpen(true)} aria-label="Open menu">
+              <Menu size={18} />
+            </button>
             <div className="topbar-title">
               <span>{pageTitle}</span>
               {trackLabel && <span className="topbar-track">{trackLabel}</span>}
@@ -124,9 +130,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   aria-expanded={userMenuOpen}
                   style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', padding: '0.2rem 0.1rem 0.2rem 0.5rem', borderRadius: '8px' }}
                 >
-                  <div className="topbar-avatar">
-                    {(currentProfile?.fullName || currentUser.email).substring(0, 2).toUpperCase()}
-                  </div>
+                  <Avatar
+                    src={currentUser?.avatarUrl}
+                    name={currentProfile?.fullName}
+                    email={currentUser?.email}
+                    size={32}
+                  />
                   <div style={{ textAlign: 'left' }}>
                     <div className="topbar-user-name">
                       {currentProfile?.fullName || currentUser.email.split('@')[0]}
@@ -149,9 +158,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     <button
                       role="menuitem"
                       className="topbar-menu-item"
-                      onClick={openProfile}
+                      onClick={() => { setUserMenuOpen(false); router.push('/profile'); }}
                     >
-                      Edit Profile
+                      View Profile
                     </button>
                     <button
                       role="menuitem"

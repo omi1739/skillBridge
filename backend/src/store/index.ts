@@ -210,6 +210,7 @@ export class AppDataStore {
       currentStatus: r.current_status || undefined,
       googleId: r.google_id || undefined,
       provider: r.provider || 'EMAIL',
+      avatarUrl: r.avatar_url || undefined,
       createdAt: r.created_at
     };
   }

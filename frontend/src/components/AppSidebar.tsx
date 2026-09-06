@@ -1,12 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { usePathname } from 'next/navigation';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   Terminal, TrendingUp, GraduationCap, BrainCircuit, BarChart3, FolderGit2,
   Briefcase, Sliders, LogOut, FileText, LucideIcon, PanelLeftClose, PanelLeftOpen
 } from 'lucide-react';
 import { useSkillBridge, AppTab } from '@/lib/skillbridge-context';
+import Avatar from '@/components/ui/Avatar';
 
 const TABS: { tab: AppTab; icon: LucideIcon; label: string }[] = [
   { tab: 'market', icon: TrendingUp, label: 'Job Market Demand' },
@@ -22,10 +24,10 @@ const SIDEBAR_STORAGE_KEY = 'skillbridge_sidebar';
 
 export default function AppSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const {
     currentUser, currentProfile, role, activeTargetRoleId,
-    handleLogout, handleOpenPassport, navigate,
-    setShowProfileModal, setProfileForm
+    handleLogout, handleOpenPassport, navigate
   } = useSkillBridge();
   const currentTab = pathname.split('/')[1];
 
@@ -40,26 +42,19 @@ export default function AppSidebar() {
     localStorage.setItem(SIDEBAR_STORAGE_KEY, next ? 'expanded' : 'collapsed');
   };
 
-  const openProfile = () => {
-    setProfileForm({
-      fullName: currentProfile?.fullName || currentUser!.email.split('@')[0],
-      githubUrl: currentProfile?.githubUrl || '',
-      portfolioUrl: currentProfile?.portfolioUrl || '',
-      bio: currentProfile?.bio || '',
-      targetRoleId: currentProfile?.targetRoleId || activeTargetRoleId || ''
-    });
-    setShowProfileModal(true);
+  const goToProfile = () => {
+    router.push('/profile');
   };
 
   return (
     <aside className={`app-sidebar ${expanded ? '' : 'collapsed'}`}>
       <div className="sidebar-header">
-        <div className="sidebar-brand" title="SkillBridge">
+        <Link href="/" className="sidebar-brand" title="SkillBridge">
           <div className="sidebar-brand-icon">
             <Terminal size={17} />
           </div>
           <span>SkillBridge</span>
-        </div>
+        </Link>
         <button
           className="sidebar-icon-btn sidebar-collapse-btn"
           onClick={toggleSidebar}
@@ -155,13 +150,16 @@ export default function AppSidebar() {
       <div className="sidebar-footer">
         <button
           className="sidebar-user-card"
-          onClick={openProfile}
-          title="Edit profile"
-          aria-label="Edit profile"
+          onClick={goToProfile}
+          title="View profile"
+          aria-label="View profile"
         >
-          <div className="sidebar-avatar">
-            {(currentProfile?.fullName || currentUser!.email).substring(0, 2).toUpperCase()}
-          </div>
+          <Avatar
+            src={currentUser?.avatarUrl}
+            name={currentProfile?.fullName}
+            email={currentUser?.email}
+            size={30}
+          />
           {expanded && (
             <div className="sidebar-user-info">
               <div className="sidebar-user-name">

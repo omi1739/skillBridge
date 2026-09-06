@@ -2,6 +2,7 @@ export interface GoogleProfile {
   email: string;
   fullName: string;
   googleId: string;
+  picture?: string;
 }
 
 const TOKENINFO_BASE = 'https://oauth2.googleapis.com/tokeninfo';
@@ -44,7 +45,8 @@ export async function verifyGoogleIdToken(idToken: string): Promise<GoogleProfil
   return {
     email,
     fullName: typeof payload.name === 'string' ? payload.name : defaultNameFromEmail(email),
-    googleId: typeof payload.sub === 'string' ? payload.sub : `google_${email}`
+    googleId: typeof payload.sub === 'string' ? payload.sub : `google_${email}`,
+    picture: typeof payload.picture === 'string' ? payload.picture : undefined
   };
 }
 

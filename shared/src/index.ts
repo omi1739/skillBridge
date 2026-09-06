@@ -10,6 +10,7 @@ export interface User {
   role: UserRole;
   currentStatus?: CurrentStatus;
   googleId?: string;
+  avatarUrl?: string;
   provider?: 'EMAIL' | 'GOOGLE';
   createdAt: string;
 }

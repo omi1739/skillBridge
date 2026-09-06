@@ -364,7 +364,8 @@ export default function AdminView() {
           </div>
         </div>
 
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+        <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', minWidth: 520 }}>
           <thead>
             <tr style={{ textAlign: 'left', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-color)' }}>
               <th style={{ padding: '0.5rem 0.5rem 0.5rem 0' }}>Name / Email</th>
@@ -428,6 +429,7 @@ export default function AdminView() {
             )}
           </tbody>
         </table>
+        </div>
 
         {/* Pagination */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.9rem' }}>

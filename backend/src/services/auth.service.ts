@@ -138,6 +138,7 @@ export class AuthService {
       email: string;
       fullName: string;
       googleId: string;
+      picture?: string;
     },
     currentStatus?: string
   ): Promise<{ token: string; user: User; profile: Profile; isNewUser: boolean }> {
@@ -151,6 +152,13 @@ export class AuthService {
       const profile = await this.findProfile(existing.id);
       if (!profile) {
         throw new Error('User profile record not found.');
+      }
+      if (profileInfo.picture && existing.avatarUrl !== profileInfo.picture) {
+        await query(
+          `UPDATE users SET avatar_url = $1, updated_at = $2::timestamptz WHERE id = $3`,
+          [profileInfo.picture, new Date().toISOString(), existing.id]
+        );
+        existing.avatarUrl = profileInfo.picture;
       }
       const token = this.signToken({ userId: existing.id, email: existing.email, role: existing.role });
       return { token, user: existing, profile, isNewUser: false };
@@ -168,6 +176,7 @@ export class AuthService {
       currentStatus: status as User['currentStatus'],
       googleId: profileInfo.googleId,
       provider: 'GOOGLE',
+      avatarUrl: profileInfo.picture,
       createdAt: now
     };
     const profile: Profile = {
@@ -181,9 +190,9 @@ export class AuthService {
 
     await withTransaction(async client => {
       await client.query(
-        `INSERT INTO users (id, email, role, current_status, google_id, provider, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7::timestamptz, $8::timestamptz)`,
-        [userId, cleanEmail, 'USER', status || null, profileInfo.googleId, 'GOOGLE', now, now]
+        `INSERT INTO users (id, email, role, current_status, google_id, provider, avatar_url, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::timestamptz, $9::timestamptz)`,
+        [userId, cleanEmail, 'USER', status || null, profileInfo.googleId, 'GOOGLE', user.avatarUrl || null, now, now]
       );
       await client.query(
         `INSERT INTO profiles (id, user_id, full_name, target_role_id, created_at, updated_at)
@@ -254,6 +263,7 @@ export class AuthService {
       currentStatus: r.current_status || undefined,
       googleId: r.google_id || undefined,
       provider: r.provider || 'EMAIL',
+      avatarUrl: r.avatar_url || undefined,
       createdAt: r.created_at
     };
   }

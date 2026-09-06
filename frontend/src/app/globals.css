@@ -690,6 +690,11 @@ body {
   white-space: nowrap;
 }
 
+.topbar-menu-btn {
+  display: none;
+  padding: 0.4rem;
+}
+
 .topbar-user-trigger {
   outline: none;
 }
@@ -1596,6 +1601,124 @@ body {
 }
 
 /* =============================================================
+   Profile page
+   ============================================================= */
+.badge-accent {
+  background: var(--accent-primary-soft);
+  color: var(--accent-text);
+  border: 1px solid var(--accent-primary-border);
+}
+
+.badge-neutral {
+  background: var(--bg-raise);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+}
+
+.profile-header-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.1rem;
+  flex-wrap: wrap;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-card);
+}
+
+.profile-avatar-lg {
+  border-radius: 18px !important;
+  border: 2px solid var(--border-color);
+}
+
+.profile-name {
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.profile-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-card);
+}
+
+.profile-section-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  margin-bottom: 1.1rem;
+}
+
+.profile-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 0.3rem;
+}
+
+.profile-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.88rem;
+  color: var(--accent-text);
+  text-decoration: none;
+}
+
+.profile-link:hover {
+  text-decoration: underline;
+}
+
+.profile-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding-bottom: 0.9rem;
+  border-bottom: 1px solid var(--border-faint);
+}
+
+.profile-row:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.profile-row-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--bg-raise);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.profile-actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.profile-textarea {
+  padding-left: 0.85rem;
+  resize: vertical;
+  min-height: 100px;
+}
+
+/* =============================================================
    Modals
    ============================================================= */
 .modal-backdrop {
@@ -1608,6 +1731,8 @@ body {
   justify-content: center;
   z-index: 100;
   padding: 1rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 [data-theme='dark'] .modal-backdrop {
@@ -1622,8 +1747,10 @@ body {
   width: 100%;
   padding: 1.75rem;
   box-shadow: var(--shadow-dropdown);
-  max-height: 92vh;
+  max-height: calc(100dvh - 2rem);
   overflow-y: auto;
+  margin: auto;
+  overscroll-behavior: contain;
 }
 
 input:focus-visible,
@@ -1871,7 +1998,97 @@ button:focus-visible {
   text-decoration: underline;
 }
 
-@media (max-width: 720px) {
+@media (min-width: 769px) and (max-width: 1024px) {
+  .app-sidebar,
+  .app-sidebar.collapsed {
+    width: 68px;
+  }
+  .app-sidebar .sidebar-brand span,
+  .app-sidebar .sidebar-track-card,
+  .app-sidebar .sidebar-section-title,
+  .app-sidebar .sidebar-item-content span,
+  .app-sidebar .sidebar-user-info {
+    display: none;
+  }
+  .app-sidebar .sidebar-header {
+    justify-content: center;
+    padding: 0.75rem 0;
+  }
+  .app-sidebar .sidebar-nav {
+    align-items: center;
+    padding: 0.75rem 0;
+    gap: 0.2rem;
+  }
+  .app-sidebar .sidebar-item {
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    margin-bottom: 0;
+  }
+  .app-sidebar .sidebar-item-content {
+    justify-content: center;
+  }
+  .app-sidebar .sidebar-footer {
+    align-items: center;
+    padding: 0.55rem 0 0.7rem;
+    gap: 0.3rem;
+  }
+  .app-sidebar .sidebar-user-card {
+    justify-content: center;
+    width: 36px;
+    padding: 0.25rem;
+  }
+  .app-sidebar .sidebar-passport-btn {
+    justify-content: center;
+    width: 36px;
+    padding: 0.5rem;
+  }
+  .app-sidebar .sidebar-icon-btn {
+    width: 36px;
+    height: 36px;
+  }
+  .app-main {
+    padding: 1.5rem 1.25rem 4rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-shell {
+    display: block;
+  }
+  .app-sidebar,
+  .app-sidebar.collapsed {
+    position: fixed;
+    left: 0;
+    top: 0;
+    height: 100dvh;
+    width: 280px;
+    z-index: 300;
+    transform: translateX(-105%);
+    transition: transform 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: var(--shadow-dropdown);
+  }
+  body.mobile-sidebar-open .app-sidebar,
+  body.mobile-sidebar-open .app-sidebar.collapsed {
+    transform: none;
+  }
+  body.mobile-sidebar-open {
+    overflow: hidden;
+  }
+  .mobile-sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 15, 25, 0.5);
+    z-index: 290;
+    backdrop-filter: blur(2px);
+  }
+  .topbar-menu-btn {
+    display: inline-flex;
+  }
+  .topbar-inner {
+    padding: 0 0.75rem;
+    gap: 0.6rem;
+  }
   .topbar-user-name,
   .topbar-user-role,
   .topbar-track {
@@ -1883,8 +2100,53 @@ button:focus-visible {
   .public-nav-container {
     padding: 0 1rem;
   }
-  .public-navbar .brand-badge-pill {
+  .public-navbar .brand-badge-pill,
+  .public-navbar .btn-ghost {
     display: none;
+  }
+  .dev-hero {
+    padding: 2.5rem 0.75rem 1.5rem;
+  }
+  .dev-hero-desc {
+    font-size: 0.94rem;
+  }
+  .skills-section {
+    padding: 1.4rem 1.1rem;
+  }
+  .modal-box {
+    padding: 1.25rem;
+  }
+  .profile-header-card {
+    padding: 1.1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .public-navbar .btn {
+    font-size: 0.78rem;
+    padding: 0.45rem 0.7rem;
+  }
+  .dev-hero-title {
+    font-size: 1.55rem;
+    letter-spacing: -0.02em;
+  }
+  .landing-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .landing-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+  .trust-pill {
+    font-size: 0.7rem;
+    padding: 0.25rem 0.7rem;
+  }
+  .skills-section-head {
+    flex-direction: column;
+  }
+  .page-header {
+    flex-direction: column;
   }
 }
 
