@@ -3,21 +3,34 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import {
-  Terminal, TrendingUp, GraduationCap, BrainCircuit, BarChart3, FolderGit2,
-  Briefcase, Sliders, LogOut, FileText, LucideIcon, PanelLeftClose, PanelLeftOpen
-} from 'lucide-react';
+import { LogOut, FileText, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useSkillBridge, AppTab } from '@/lib/skillbridge-context';
 import Avatar from '@/components/ui/Avatar';
+import BrandMark from '@/components/ui/BrandMark';
 
-const TABS: { tab: AppTab; icon: LucideIcon; label: string }[] = [
-  { tab: 'market', icon: TrendingUp, label: 'Job Market Demand' },
-  { tab: 'curriculum', icon: GraduationCap, label: 'University Syllabi' },
-  { tab: 'assessment', icon: BrainCircuit, label: 'Diagnostic Test' },
-  { tab: 'sandbox', icon: Terminal, label: 'SQL & Code Sandbox' },
-  { tab: 'gaps', icon: BarChart3, label: 'My Skill Gaps' },
-  { tab: 'actions', icon: FolderGit2, label: 'Projects to Build' },
-  { tab: 'jobs', icon: Briefcase, label: 'Matching Jobs' }
+const NAV_SECTIONS: { title: string; items: { tab: AppTab; label: string }[] }[] = [
+  {
+    title: 'Explore',
+    items: [
+      { tab: 'market', label: 'Job Market Demand' },
+      { tab: 'curriculum', label: 'University Syllabi' }
+    ]
+  },
+  {
+    title: 'Benchmarks',
+    items: [
+      { tab: 'assessment', label: 'Diagnostic Test' },
+      { tab: 'sandbox', label: 'SQL & Code Sandbox' }
+    ]
+  },
+  {
+    title: 'Career',
+    items: [
+      { tab: 'gaps', label: 'My Skill Gaps' },
+      { tab: 'actions', label: 'Projects to Build' },
+      { tab: 'jobs', label: 'Matching Jobs' }
+    ]
+  }
 ];
 
 const SIDEBAR_STORAGE_KEY = 'skillbridge_sidebar';
@@ -27,7 +40,7 @@ export default function AppSidebar() {
   const router = useRouter();
   const {
     currentUser, currentProfile, role, activeTargetRoleId,
-    handleLogout, handleOpenPassport, navigate
+    handleLogout, handleOpenPassport
   } = useSkillBridge();
   const currentTab = pathname.split('/')[1];
 
@@ -42,106 +55,58 @@ export default function AppSidebar() {
     localStorage.setItem(SIDEBAR_STORAGE_KEY, next ? 'expanded' : 'collapsed');
   };
 
-  const goToProfile = () => {
-    router.push('/profile');
-  };
-
   return (
     <aside className={`app-sidebar ${expanded ? '' : 'collapsed'}`}>
       <div className="sidebar-header">
         <Link href="/" className="sidebar-brand" title="SkillBridge">
-          <div className="sidebar-brand-icon">
-            <Terminal size={17} />
-          </div>
+          <BrandMark size={30} className="sidebar-brand-icon" />
           <span>SkillBridge</span>
         </Link>
         <button
           className="sidebar-icon-btn sidebar-collapse-btn"
           onClick={toggleSidebar}
-          title={expanded ? 'Collapse sidebar' : 'Expand sidebar'}
-          aria-label={expanded ? 'Collapse sidebar' : 'Expand sidebar'}
+          title={expanded ? 'Hide sidebar' : 'Show sidebar'}
+          aria-label={expanded ? 'Hide sidebar' : 'Show sidebar'}
         >
           {expanded ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
         </button>
       </div>
 
-      {expanded && (
+      {expanded && activeTargetRoleId && (
         <div className="sidebar-track-card">
-          <div className="sidebar-track-label">Active Track</div>
-          <div className="sidebar-track-title">
-            <span>{activeTargetRoleId ? (role?.title || 'Select your track') : 'Select your track'}</span>
-          </div>
+          <div className="sidebar-track-label">Active track</div>
+          <div className="sidebar-track-title">{role?.title || 'Select your track'}</div>
         </div>
       )}
 
       <nav className="sidebar-nav">
-        <div>
-          {expanded && <div className="sidebar-section-title">Market Intelligence</div>}
-          {TABS.filter(t => t.tab === 'market' || t.tab === 'curriculum').map(t => (
-            <button
-              key={t.tab}
-              className={`sidebar-item ${currentTab === t.tab ? 'active' : ''}`}
-              onClick={() => navigate(t.tab)}
-              title={t.label}
-              aria-label={t.label}
-            >
-              <span className="sidebar-item-content">
-                <t.icon size={16} />
-                <span>{t.label}</span>
-              </span>
-            </button>
-          ))}
-        </div>
-
-        <div>
-          {expanded && <div className="sidebar-section-title">Practical Benchmarks</div>}
-          {TABS.filter(t => t.tab === 'assessment' || t.tab === 'sandbox').map(t => (
-            <button
-              key={t.tab}
-              className={`sidebar-item ${currentTab === t.tab ? 'active' : ''}`}
-              onClick={() => navigate(t.tab)}
-              title={t.label}
-              aria-label={t.label}
-            >
-              <span className="sidebar-item-content">
-                <t.icon size={16} />
-                <span>{t.label}</span>
-              </span>
-            </button>
-          ))}
-        </div>
-
-        <div>
-          {expanded && <div className="sidebar-section-title">Career Roadmap</div>}
-          {TABS.filter(t => t.tab === 'gaps' || t.tab === 'actions' || t.tab === 'jobs').map(t => (
-            <button
-              key={t.tab}
-              className={`sidebar-item ${currentTab === t.tab ? 'active' : ''}`}
-              onClick={() => navigate(t.tab)}
-              title={t.label}
-              aria-label={t.label}
-            >
-              <span className="sidebar-item-content">
-                <t.icon size={16} />
-                <span>{t.label}</span>
-              </span>
-            </button>
-          ))}
-        </div>
+        {NAV_SECTIONS.map(section => (
+          <div key={section.title}>
+            {expanded && <div className="sidebar-section-title">{section.title}</div>}
+            {section.items.map(item => (
+              <button
+                key={item.tab}
+                className={`sidebar-item ${currentTab === item.tab ? 'active' : ''}`}
+                onClick={() => router.push(`/${item.tab}`)}
+                title={item.label}
+                aria-label={item.label}
+              >
+                <span>{item.label}</span>
+              </button>
+            ))}
+          </div>
+        ))}
 
         {currentUser?.role === 'ADMIN' && (
           <div>
             {expanded && <div className="sidebar-section-title">Platform</div>}
             <button
               className={`sidebar-item ${currentTab === 'admin' ? 'active' : ''}`}
-              onClick={() => navigate('admin')}
+              onClick={() => router.push('/admin')}
               title="Admin & Weights"
               aria-label="Admin & Weights"
             >
-              <span className="sidebar-item-content">
-                <Sliders size={16} />
-                <span>Admin & Weights</span>
-              </span>
+              <span>Admin & Weights</span>
             </button>
           </div>
         )}
@@ -150,7 +115,7 @@ export default function AppSidebar() {
       <div className="sidebar-footer">
         <button
           className="sidebar-user-card"
-          onClick={goToProfile}
+          onClick={() => router.push('/profile')}
           title="View profile"
           aria-label="View profile"
         >
@@ -161,24 +126,29 @@ export default function AppSidebar() {
             size={30}
           />
           {expanded && (
-            <div className="sidebar-user-info">
-              <div className="sidebar-user-name">
+            <span className="sidebar-user-info">
+              <span className="sidebar-user-name">
                 {currentProfile?.fullName || currentUser!.email.split('@')[0]}
-              </div>
-              <div className="sidebar-user-role">
+              </span>
+              <span className="sidebar-user-role">
                 {currentUser!.role === 'ADMIN' ? 'Administrator' : currentUser!.role === 'RECRUITER' ? 'Recruiter' : 'Verified Candidate'}
-              </div>
-            </div>
+              </span>
+            </span>
           )}
         </button>
 
-        <button className="btn btn-secondary sidebar-passport-btn" onClick={handleOpenPassport} title="Skill Passport">
-          <FileText size={14} />
-          {expanded && <span>Skill Passport</span>}
+        <button className="sidebar-text-btn" onClick={handleOpenPassport} title="Skill Passport">
+          <span className="sidebar-text-btn-label">
+            <FileText size={14} /> Skill Passport
+          </span>
+          <span className="sidebar-icon-only"><FileText size={15} /></span>
         </button>
 
-        <button className="sidebar-icon-btn" onClick={handleLogout} title="Sign Out" aria-label="Sign Out">
-          <LogOut size={15} />
+        <button className="sidebar-text-btn" onClick={handleLogout} title="Sign Out" aria-label="Sign Out">
+          <span className="sidebar-text-btn-label">
+            <LogOut size={14} /> Sign Out
+          </span>
+          <span className="sidebar-icon-only"><LogOut size={15} /></span>
         </button>
       </div>
     </aside>

@@ -2,9 +2,10 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Terminal, TrendingUp, GraduationCap, LogIn } from 'lucide-react';
+import { TrendingUp, GraduationCap, LogIn } from 'lucide-react';
 import { useSkillBridge } from '@/lib/skillbridge-context';
 import ThemeToggle from './ThemeToggle';
+import BrandMark from '@/components/ui/BrandMark';
 
 export default function PublicNavbar() {
   const pathname = usePathname();
@@ -16,9 +17,7 @@ export default function PublicNavbar() {
     <header className="public-navbar">
       <div className="public-nav-container">
         <Link href="/" className="brand">
-          <span className="brand-mark">
-            <Terminal size={16} />
-          </span>
+          <BrandMark size={26} />
           <span>SkillBridge</span>
         </Link>
 

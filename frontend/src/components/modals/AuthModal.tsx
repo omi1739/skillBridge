@@ -1,6 +1,7 @@
 'use client';
 
-import { X, Sliders, LogIn, PlusCircle, AlertCircle, Users, Mail, Lock, ShieldCheck, GraduationCap, Target, ArrowRight, Play } from 'lucide-react';
+import { X, LogIn, PlusCircle, AlertCircle, Users, Mail, Lock, ShieldCheck, GraduationCap, Target, ArrowRight, Play } from 'lucide-react';
+import BrandMark from '@/components/ui/BrandMark';
 import { useSkillBridge } from '@/lib/skillbridge-context';
 import { GOOGLE_CLIENT_ID } from '@/lib/config';
 import { CURRENT_STATUS_OPTIONS } from '@/lib/constants';
@@ -34,9 +35,7 @@ export default function AuthModal() {
 
           {/* Brand header */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '0.5rem' }}>
-            <div className="auth-brand-mark">
-              <Sliders size={15} />
-            </div>
+            <BrandMark size={34} className="auth-brand-mark" />
             <div>
               <h2 style={{ fontSize: '1.15rem', fontWeight: 800, letterSpacing: '-0.01em', lineHeight: 1.2 }}>
                 {authMode === 'LOGIN' ? 'Welcome back' : 'Create your account'}

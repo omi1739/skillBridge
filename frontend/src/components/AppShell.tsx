@@ -9,6 +9,7 @@ import PublicNavbar from './PublicNavbar';
 import ThemeToggle from './ThemeToggle';
 import Avatar from '@/components/ui/Avatar';
 import { SignInPromptView } from '@/components/views/prompts';
+import SiteFooter from './SiteFooter';
 
 const PROTECTED_LABELS: Record<string, { title: string }> = {
   '/assessment': { title: 'Sign in to take assessments' },
@@ -98,6 +99,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             children
           )}
         </div>
+        <SiteFooter />
       </div>
     );
   }
@@ -176,6 +178,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
         <main className="app-main">{children}</main>
+        <SiteFooter />
       </div>
     </div>
   );

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useSkillBridge } from '@/lib/skillbridge-context';
 import PublicNavbar from '@/components/PublicNavbar';
 import PublicHomeView from '@/components/views/PublicHomeView';
+import SiteFooter from '@/components/SiteFooter';
 
 export default function LandingPage() {
   const router = useRouter();
@@ -24,6 +25,7 @@ export default function LandingPage() {
       <div className="public-container">
         <PublicHomeView />
       </div>
+      <SiteFooter />
     </div>
   );
 }
