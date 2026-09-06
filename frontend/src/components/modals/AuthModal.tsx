@@ -148,6 +148,7 @@ export default function AuthModal() {
                 value={authForm.password}
                 onChange={e => setAuthForm({ ...authForm, password: e.target.value })}
                 required
+                minLength={authMode === 'REGISTER' ? 8 : undefined}
                 className="auth-input"
               />
             </div>

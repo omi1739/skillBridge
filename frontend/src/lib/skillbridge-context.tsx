@@ -51,6 +51,20 @@ function useSkillBridgeValue() {
   const [authError, setAuthError] = useState('');
   const [isAuthLoading, setIsAuthLoading] = useState(false);
 
+  // Global, user-facing error surface for async failures that previously
+  // only logged to the console.
+  const [globalError, setGlobalError] = useState<string | null>(null);
+  const [personalDataError, setPersonalDataError] = useState(false);
+
+  const reportError = (msg: string) => setGlobalError(msg);
+  const dismissGlobalError = () => setGlobalError(null);
+
+  useEffect(() => {
+    if (!globalError) return;
+    const timer = setTimeout(() => setGlobalError(null), 6000);
+    return () => clearTimeout(timer);
+  }, [globalError]);
+
   // Role catalog + target role selection (progressive prompt flow)
   const [allRoles, setAllRoles] = useState<Role[]>([]);
   const [roleDraft, setRoleDraft] = useState('');
@@ -89,6 +103,7 @@ function useSkillBridgeValue() {
   const [skillQuestionIdx, setSkillQuestionIdx] = useState(0);
   const [skillAnswers, setSkillAnswers] = useState<Record<string, string | string[]>>({});
   const [skillSavedCorrect, setSkillSavedCorrect] = useState<Record<string, boolean>>({});
+  const [skillAnswered, setSkillAnswered] = useState<Record<string, boolean>>({});
   const [isStartingSkill, setIsStartingSkill] = useState(false);
   const [isSubmittingSkill, setIsSubmittingSkill] = useState(false);
   const [skillAssessError, setSkillAssessError] = useState('');
@@ -225,6 +240,7 @@ function useSkillBridgeValue() {
     setSkillResult(null);
     setViewingResultId(null);
     setSkillAnswers({});
+    setSkillAnswered({});
     setSkillQuestionIdx(0);
     try {
       const res = await fetch(`${API_BASE}/assessments`, {
@@ -250,7 +266,6 @@ function useSkillBridgeValue() {
 
   const submitSkillAnswer = async (questionId: string, answer: string | string[]) => {
     if (!skillSession) return;
-    if (skillSavedCorrect[questionId]) return;
     try {
       const res = await fetch(`${API_BASE}/assessments/session/${skillSession.id}/answers`, {
         method: 'POST',
@@ -261,6 +276,7 @@ function useSkillBridgeValue() {
       if (!res.ok) throw new Error(data.message || 'Answer could not be saved.');
       setSkillSavedCorrect(prev => ({ ...prev, [questionId]: data.correct }));
       setSkillAnswers(prev => ({ ...prev, [questionId]: answer }));
+      setSkillAnswered(prev => ({ ...prev, [questionId]: true }));
     } catch (err: any) {
       setSkillAssessError(err.message || 'Answer could not be saved.');
     }
@@ -326,6 +342,7 @@ function useSkillBridgeValue() {
     setViewingResultId(null);
     setSkillAnswers({});
     setSkillSavedCorrect({});
+    setSkillAnswered({});
     setSkillQuestionIdx(0);
     setSkillAssessError('');
   };
@@ -336,6 +353,7 @@ function useSkillBridgeValue() {
     setSkillQuestionIdx(0);
     setSkillAnswers({});
     setSkillSavedCorrect({});
+    setSkillAnswered({});
   };
 
   useEffect(() => {
@@ -372,22 +390,23 @@ function useSkillBridgeValue() {
     }
     const token = t || authToken;
     const targetRole = roleId || currentProfile?.targetRoleId || null;
+    setPersonalDataError(false);
 
     if (targetRole) {
       fetch(`${API_BASE}/me/gaps?userId=${userId}&roleId=${targetRole}`, { headers: headersFor(token) })
         .then(res => res.json())
         .then(data => { if (Array.isArray(data)) setGaps(data); })
-        .catch((err) => console.error('[SkillBridge] Data load failed:', err));
+        .catch((err) => { console.error('[SkillBridge] Data load failed:', err); setPersonalDataError(true); });
 
       fetch(`${API_BASE}/me/recommendations?userId=${userId}&roleId=${targetRole}`, { headers: headersFor(token) })
         .then(res => res.json())
         .then(data => { if (Array.isArray(data)) setRecommendations(data); })
-        .catch((err) => console.error('[SkillBridge] Data load failed:', err));
+        .catch((err) => { console.error('[SkillBridge] Data load failed:', err); setPersonalDataError(true); });
 
       fetch(`${API_BASE}/jobs/matches?userId=${userId}&roleId=${targetRole}`, { headers: headersFor(token) })
         .then(res => res.json())
         .then(data => { if (Array.isArray(data)) setJobMatches(data); })
-        .catch((err) => console.error('[SkillBridge] Data load failed:', err));
+        .catch((err) => { console.error('[SkillBridge] Data load failed:', err); setPersonalDataError(true); });
 
       fetchJobs(token);
     } else {
@@ -400,7 +419,7 @@ function useSkillBridgeValue() {
     fetch(`${API_BASE}/me/projects?userId=${userId}`, { headers: headersFor(token) })
       .then(res => res.json())
       .then(data => setUserProjects(data))
-      .catch((err) => console.error('[SkillBridge] Data load failed:', err));
+      .catch((err) => { console.error('[SkillBridge] Data load failed:', err); setPersonalDataError(true); });
 
     if (role === 'ADMIN') {
       fetch(`${API_BASE}/admin/overview`, { headers: headersFor(token) })
@@ -650,6 +669,7 @@ function useSkillBridgeValue() {
       }
     } catch (err) {
       console.error(err);
+      reportError('Demo login failed. Please try again.');
     } finally {
       setIsAuthLoading(false);
     }
@@ -660,26 +680,61 @@ function useSkillBridgeValue() {
     setAuthError('');
     setIsAuthLoading(true);
 
+    const email = authForm.email.trim();
+    const password = authForm.password;
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setIsAuthLoading(false);
+      setAuthError('Please enter a valid email address.');
+      return;
+    }
+
+    if (authMode === 'REGISTER') {
+      if (password.length < 8) {
+        setIsAuthLoading(false);
+        setAuthError('Password must be at least 8 characters long.');
+        return;
+      }
+      if (!/[A-Za-z]/.test(password) || !/\d/.test(password)) {
+        setIsAuthLoading(false);
+        setAuthError('Password must contain at least one letter and one number.');
+        return;
+      }
+      if (password !== authForm.confirmPassword) {
+        setIsAuthLoading(false);
+        setAuthError('Passwords do not match.');
+        return;
+      }
+      if (!authForm.fullName.trim()) {
+        setIsAuthLoading(false);
+        setAuthError('Full name is required.');
+        return;
+      }
+      if (!authForm.currentStatus) {
+        setIsAuthLoading(false);
+        setAuthError('Please select your current status.');
+        return;
+      }
+    } else if (!password) {
+      setIsAuthLoading(false);
+      setAuthError('Password is required.');
+      return;
+    }
+
     const endpoint = authMode === 'REGISTER' ? `${API_BASE}/auth/register` : `${API_BASE}/auth/login`;
     const payload = authMode === 'REGISTER'
       ? {
-          email: authForm.email,
-          password: authForm.password,
+          email,
+          password,
           confirmPassword: authForm.confirmPassword,
-          fullName: authForm.fullName,
-          currentStatus: authForm.currentStatus || undefined,
+          fullName: authForm.fullName.trim(),
+          currentStatus: authForm.currentStatus,
           targetRoleId: authForm.targetRoleId || undefined
         }
       : {
-          email: authForm.email,
-          password: authForm.password
+          email,
+          password
         };
-
-    if (authMode === 'REGISTER' && authForm.password !== authForm.confirmPassword) {
-      setIsAuthLoading(false);
-      setAuthError('Passwords do not match.');
-      return;
-    }
 
     try {
       const res = await fetch(endpoint, {
@@ -782,10 +837,12 @@ function useSkillBridgeValue() {
     try {
       const res = await fetch(`${API_BASE}/me/report?userId=${activeUserId}&roleId=${effectiveRoleId}`, { headers: authHeaders() });
       const data = await res.json();
+      if (!res.ok) throw new Error(data.message || data.error || 'Could not load your skill passport.');
       setPassportData(data);
       setShowPassportModal(true);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      reportError(err.message || 'Could not load your skill passport.');
     }
   };
 
@@ -830,16 +887,26 @@ function useSkillBridgeValue() {
         headers: authHeaders(),
         body: JSON.stringify({
           userId: activeUserId,
-          timeSpentSeconds: assessment.timeLimitMinutes * 60 - timeRemaining,
           answers: answersPayload
         })
       });
 
-      const attempt = await res.json();
-      setAttemptResult(attempt);
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || data.error || 'Could not submit assessment.');
+      }
+      // The backend returns `{ attempt, gaps, detailedResults }`; the view reads
+      // score/passed/points off the attempt, so merge the top-level
+      // detailedResults back onto it.
+      if (data && data.attempt) {
+        setAttemptResult({ ...data.attempt, detailedResults: data.detailedResults });
+      } else {
+        setAttemptResult(data);
+      }
       refreshUserData();
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      reportError(err.message || 'Could not submit assessment.');
+      console.error('[SkillBridge] Assessment submit failed:', err);
     } finally {
       setIsSubmittingAssessment(false);
     }
@@ -927,7 +994,9 @@ function useSkillBridgeValue() {
       if (!res.ok) throw new Error(data.message || data.error || 'No solution available.');
       setReferenceSolution(data.referenceSolution || '');
     } catch (err: any) {
-      setReferenceSolution(`Could not load solution: ${err.message}`);
+      console.error(err);
+      reportError(err.message || 'Could not load the reference solution.');
+      setReferenceSolution(null);
     } finally {
       setIsLoadingSolution(false);
     }
@@ -966,7 +1035,7 @@ function useSkillBridgeValue() {
 
   const handleProjectSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!projectForm.title || !projectForm.repoUrl) return;
+    if (!projectForm.title.trim() || !projectForm.repoUrl.trim()) return;
 
     setIsSubmittingProject(true);
     setProjectSuccessMsg('');
@@ -977,16 +1046,18 @@ function useSkillBridgeValue() {
         headers: authHeaders(),
         body: JSON.stringify({
           userId: activeUserId,
-          title: projectForm.title,
-          repoUrl: projectForm.repoUrl,
+          title: projectForm.title.trim(),
+          repoUrl: projectForm.repoUrl.trim(),
           description: projectForm.description,
           primarySkills: projectForm.primarySkills
         })
       });
 
       const data = await res.json();
-      if (data.project) {
-        const status = data.project.verificationStatus;
+      if (!data.project) {
+        throw new Error(data.message || data.error || 'Could not submit project.');
+      }
+      const status = data.project.verificationStatus;
         const statusMsg =
           status === 'VERIFIED'
             ? `Successfully verified ${data.project.title}! Detected stack: ${data.project.detectedStack.join(', ')}.`
@@ -1000,9 +1071,9 @@ function useSkillBridgeValue() {
           setShowProjectModal(false);
           setProjectSuccessMsg('');
         }, 3000);
-      }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      reportError(err.message || 'Could not submit project.');
     } finally {
       setIsSubmittingProject(false);
     }
@@ -1010,14 +1081,14 @@ function useSkillBridgeValue() {
 
   const handleCreateAlias = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!aliasForm.rawAlias || !aliasForm.canonicalSkillId) return;
+    if (!aliasForm.rawAlias.trim() || !aliasForm.canonicalSkillId) return;
 
     try {
       const res = await fetch(`${API_BASE}/admin/skills/alias`, {
         method: 'POST',
         headers: authHeaders(),
         body: JSON.stringify({
-          alias: aliasForm.rawAlias,
+          alias: aliasForm.rawAlias.trim(),
           skillId: aliasForm.canonicalSkillId
         })
       });
@@ -1027,9 +1098,12 @@ function useSkillBridgeValue() {
         setAliasForm({ rawAlias: '', canonicalSkillId: '' });
         refreshUserData();
         setTimeout(() => setAliasSaveSuccess(false), 3000);
+      } else {
+        throw new Error(data.message || 'Could not create alias.');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      reportError(err.message || 'Could not create alias.');
     }
   };
 
@@ -1049,9 +1123,12 @@ function useSkillBridgeValue() {
         fetchRoleAndSkills();
         refreshUserData();
         setTimeout(() => setWeightSaveSuccess(false), 3000);
+      } else {
+        throw new Error(data.message || 'Could not update role weights.');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      reportError(err.message || 'Could not update role weights.');
     }
   };
 
@@ -1111,6 +1188,12 @@ function useSkillBridgeValue() {
   const activeChallenge = challenges[selectedChallengeIdx];
 
   return {
+    // global error surface
+    globalError,
+    dismissGlobalError,
+    reportError,
+    personalDataError,
+    setPersonalDataError,
     // auth
     currentUser,
     setCurrentUser,
@@ -1176,6 +1259,7 @@ function useSkillBridgeValue() {
     skillAnswers,
     setSkillAnswers,
     skillSavedCorrect,
+    skillAnswered,
     isStartingSkill,
     isSubmittingSkill,
     skillAssessError,

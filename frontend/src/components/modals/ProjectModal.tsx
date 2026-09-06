@@ -29,6 +29,7 @@ export default function ProjectModal() {
               value={projectForm.title}
               onChange={e => setProjectForm({ ...projectForm, title: e.target.value })}
               required
+              minLength={1}
               style={{ width: '100%', padding: '0.65rem', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '0.85rem' }}
             />
           </div>
@@ -43,6 +44,8 @@ export default function ProjectModal() {
               value={projectForm.repoUrl}
               onChange={e => setProjectForm({ ...projectForm, repoUrl: e.target.value })}
               required
+              pattern="https?://.+"
+              title="Please enter a valid GitHub repository URL (https://...)"
               style={{ width: '100%', padding: '0.65rem', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '0.85rem' }}
             />
           </div>

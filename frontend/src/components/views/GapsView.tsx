@@ -2,9 +2,10 @@
 
 import { useSkillBridge } from '@/lib/skillbridge-context';
 import { RolePromptView, SignInPromptView, NoEvidenceView } from './prompts';
+import { BarChart3 } from 'lucide-react';
 
 export default function GapsView() {
-  const { currentUser, activeTargetRoleId, gaps, allRoles, handleRoleSelect } = useSkillBridge();
+  const { currentUser, activeTargetRoleId, gaps, allRoles, handleRoleSelect, personalDataError } = useSkillBridge();
 
   if (!currentUser) {
     return (
@@ -15,6 +16,22 @@ export default function GapsView() {
     );
   }
   if (!activeTargetRoleId) return <RolePromptView />;
+  if (personalDataError) {
+    return (
+      <div className="card" style={{ textAlign: 'center', padding: '2.5rem', maxWidth: '560px', margin: '2rem auto' }}>
+        <div style={{
+          width: '52px', height: '52px', borderRadius: '50%', margin: '0 auto 1rem',
+          background: 'rgba(244, 63, 94, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }}>
+          <BarChart3 size={22} style={{ color: '#fb7185' }} />
+        </div>
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 0.6rem' }}>Could not load your skill gaps</h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: '0 auto 1.5rem', maxWidth: '420px' }}>
+          We hit an error while fetching your personalized gap analysis. Please try again.
+        </p>
+      </div>
+    );
+  }
   if (gaps.length === 0) return <NoEvidenceView />;
 
   return (

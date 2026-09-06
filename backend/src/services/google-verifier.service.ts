@@ -4,11 +4,6 @@ export interface GoogleProfile {
   googleId: string;
 }
 
-export interface GoogleLoginResponse {
-  profile: GoogleProfile;
-  isNewUser: boolean;
-}
-
 const TOKENINFO_BASE = 'https://oauth2.googleapis.com/tokeninfo';
 
 /**
@@ -22,10 +17,6 @@ const TOKENINFO_BASE = 'https://oauth2.googleapis.com/tokeninfo';
  */
 export function getGoogleClientId(): string | undefined {
   return process.env.GOOGLE_CLIENT_ID || undefined;
-}
-
-export function hasGoogleClientId(): boolean {
-  return Boolean(getGoogleClientId());
 }
 
 export async function verifyGoogleIdToken(idToken: string): Promise<GoogleProfile> {
@@ -67,4 +58,4 @@ function defaultNameFromEmail(email: string): string {
     .trim() || 'Google User';
 }
 
-export const googleVerifier = { verifyGoogleIdToken, getGoogleClientId, hasGoogleClientId };
+export const googleVerifier = { verifyGoogleIdToken, getGoogleClientId };

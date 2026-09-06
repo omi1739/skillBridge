@@ -67,11 +67,6 @@ export class CreateAssessmentDto {
   hardCount?: number;
 }
 
-export class SubmitAnswerDto {
-  @IsNotEmpty()
-  answer!: any;
-}
-
 export class SubmitAnswerByIdDto {
   @IsString()
   @IsNotEmpty()

@@ -74,11 +74,15 @@ function setupFetch() {
     if (url.includes('/assessments/diagnostic')) {
       return response(ASSESSMENT);
     }
+    if (url.includes('/assessments/') && url.includes('/submit')) {
+      return response({
+        attempt: { score: 60, totalPointsEarned: 30, maxPoints: 50, passed: false, subSkillScores: [], status: 'COMPLETED' },
+        gaps: [],
+        detailedResults: []
+      });
+    }
     if (url.includes('/assessments/assessment_backend_diagnostic')) {
       return response(ASSESSMENT);
-    }
-    if (url.includes('/assessments/') && url.includes('/submit')) {
-      return response({ score: 60, passed: false });
     }
     if (url.includes('/sandbox/challenges')) {
       return response(CHALLENGES);
@@ -216,7 +220,6 @@ describe('SkillBridge app API contract (multi-route)', () => {
 
       const body = JSON.parse(submit!.body!);
       expect(body).toHaveProperty('userId');
-      expect(body).toHaveProperty('timeSpentSeconds');
       expect(Array.isArray(body.answers)).toBe(true);
       expect(body.answers).toHaveLength(ASSESSMENT.questions.length);
       for (const a of body.answers) {
@@ -224,6 +227,9 @@ describe('SkillBridge app API contract (multi-route)', () => {
         expect(a).toHaveProperty('selectedAnswer');
       }
     });
+
+    await screen.findByRole('heading', { name: /Diagnostic Test Results/i });
+    expect(screen.getAllByText('60%').length).toBeGreaterThan(0);
   }, 30000);
 
   it('runs an SQL sandbox challenge with the query payload shape', async () => {

@@ -220,15 +220,6 @@ export async function createAssessmentSession(input: {
   );
 }
 
-export async function getAssessmentSession(id: string): Promise<any | undefined> {
-  const rows = await query<AttemptRow>(
-    `SELECT * FROM assessment_attempts WHERE id = $1`,
-    [id]
-  );
-  if (rows.length === 0) return undefined;
-  return rows[0];
-}
-
 export async function getSessionByAttemptId(id: string): Promise<AttemptRow | undefined> {
   const rows = await query<AttemptRow>(`SELECT * FROM assessment_attempts WHERE id = $1`, [id]);
   return rows.length ? rows[0] : undefined;

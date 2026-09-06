@@ -21,6 +21,20 @@ async function resolveDemoRole(): Promise<string> {
   return demoUser?.role || 'USER';
 }
 
+/**
+ * The demo token is a development convenience that always resolves to the
+ * fixed demo identity. Only exact, known-bad tokens are accepted so the
+ * suffix can never be abused to claim another identity.
+ */
+const DEMO_TOKEN = 'demo_token';
+const DEMO_USER = 'demo_user_01';
+const DEMO_TOKEN_FOR_USER = `${DEMO_TOKEN}_${DEMO_USER}`;
+const DEMO_EMAIL = 'candidate@skillbridge.org';
+
+function isDemoToken(token: string): boolean {
+  return token === DEMO_TOKEN || token === DEMO_TOKEN_FOR_USER;
+}
+
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -28,19 +42,13 @@ export class JwtAuthGuard implements CanActivate {
     const header = request.headers.authorization;
 
     if (!header || !header.startsWith('Bearer ')) {
-      const demoHeader = request.headers['x-demo-user'];
-      if (demoHeader) {
-        const role = await resolveDemoRole();
-        request.user = { userId: 'demo_user_01', email: 'candidate@skillbridge.org', role };
-        return true;
-      }
       throw new UnauthorizedException('Authentication required. Provide a valid Bearer token.');
     }
 
     const token = header.slice('Bearer '.length).trim();
-    if (token === 'demo_token' || token.startsWith('demo_token_')) {
+    if (isDemoToken(token)) {
       const role = await resolveDemoRole();
-      request.user = { userId: 'demo_user_01', email: 'candidate@skillbridge.org', role };
+      request.user = { userId: DEMO_USER, email: DEMO_EMAIL, role };
       return true;
     }
 
@@ -62,18 +70,15 @@ export class OptionalJwtAuthGuard implements CanActivate {
 
     if (header && header.startsWith('Bearer ')) {
       const token = header.slice('Bearer '.length).trim();
-      if (token === 'demo_token' || token.startsWith('demo_token_')) {
+      if (isDemoToken(token)) {
         const role = await resolveDemoRole();
-        request.user = { userId: 'demo_user_01', email: 'candidate@skillbridge.org', role };
+        request.user = { userId: DEMO_USER, email: DEMO_EMAIL, role };
         return true;
       }
       const payload = authService.verifyToken(token);
       if (payload) {
         request.user = payload;
       }
-    } else if (request.headers['x-demo-user']) {
-      const role = await resolveDemoRole();
-      request.user = { userId: 'demo_user_01', email: 'candidate@skillbridge.org', role };
     }
     return true;
   }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useSkillBridge } from '@/lib/skillbridge-context';
-import { BarChart3, RotateCcw, Clock, Check, ArrowRight } from 'lucide-react';
+import { BarChart3, RotateCcw, Clock, Check, ArrowRight, BrainCircuit } from 'lucide-react';
 
 export default function AssessmentView() {
   const {
@@ -18,7 +18,25 @@ export default function AssessmentView() {
     timeRemaining,
   } = useSkillBridge();
 
-  if (!assessment) return null;
+  if (!assessment) {
+    return (
+      <div className="card" style={{ textAlign: 'center', padding: '2.5rem', maxWidth: '560px', margin: '2rem auto' }}>
+        <div style={{
+          width: '52px', height: '52px', borderRadius: '50%', margin: '0 auto 1rem',
+          background: 'rgba(56,189,248,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }}>
+          <BrainCircuit size={22} style={{ color: '#38bdf8' }} />
+        </div>
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 0.6rem' }}>Loading Diagnostic Test…</h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: '0 auto 1.5rem', maxWidth: '420px' }}>
+          Preparing your practical Node.js, SQL, and HTTP engineering benchmark. This can take a moment.
+        </p>
+        <button className="btn btn-secondary" onClick={() => loadDiagnostic(12)}>
+          <RotateCcw size={14} /> Retry
+        </button>
+      </div>
+    );
+  }
 
   if (attemptResult) {
     return (
@@ -167,7 +185,19 @@ export default function AssessmentView() {
   }
 
   const questions = assessment.questions || [];
-  if (questions.length === 0) return null;
+  if (questions.length === 0) {
+    return (
+      <div className="card" style={{ textAlign: 'center', padding: '2.5rem', maxWidth: '560px', margin: '2rem auto' }}>
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 0.6rem' }}>No questions available</h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: '0 auto 1.5rem', maxWidth: '420px' }}>
+          The diagnostic question bank is empty right now. Please try again later.
+        </p>
+        <button className="btn btn-secondary" onClick={() => loadDiagnostic(12)}>
+          <RotateCcw size={14} /> Retry
+        </button>
+      </div>
+    );
+  }
 
   const currentQuestion = questions[currentQuestionIdx];
   const isAnswered = currentQuestion && !!userAnswers[currentQuestion.id];

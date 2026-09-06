@@ -1,11 +1,11 @@
 'use client';
 
-import { PlusCircle, FolderGit2, Github, ExternalLink } from 'lucide-react';
+import { PlusCircle, FolderGit2, Github, ExternalLink, AlertCircle } from 'lucide-react';
 import { useSkillBridge } from '@/lib/skillbridge-context';
 import { RolePromptView, SignInPromptView, NoEvidenceView } from './prompts';
 
 export default function ActionsView() {
-  const { currentUser, activeTargetRoleId, recommendations, userProjects, setShowProjectModal } = useSkillBridge();
+  const { currentUser, activeTargetRoleId, recommendations, userProjects, setShowProjectModal, personalDataError } = useSkillBridge();
 
   if (!currentUser) {
     return (
@@ -16,6 +16,22 @@ export default function ActionsView() {
     );
   }
   if (!activeTargetRoleId) return <RolePromptView />;
+  if (personalDataError) {
+    return (
+      <div className="card" style={{ textAlign: 'center', padding: '2.5rem', maxWidth: '560px', margin: '2rem auto' }}>
+        <div style={{
+          width: '52px', height: '52px', borderRadius: '50%', margin: '0 auto 1rem',
+          background: 'rgba(244, 63, 94, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }}>
+          <AlertCircle size={22} style={{ color: '#fb7185' }} />
+        </div>
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 0.6rem' }}>Could not load your recommendations</h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: '0 auto', maxWidth: '420px' }}>
+          We hit an error while fetching your project recommendations. Please try again.
+        </p>
+      </div>
+    );
+  }
   if (recommendations.length === 0) return <NoEvidenceView />;
 
   return (

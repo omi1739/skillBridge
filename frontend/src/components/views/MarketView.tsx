@@ -22,7 +22,22 @@ export default function MarketView() {
   } = useSkillBridge();
 
     if (currentUser && !activeTargetRoleId) return <RolePromptView />;
-    if (!role) return null;
+    if (!role) {
+      return (
+        <div className="card" style={{ textAlign: 'center', padding: '2.5rem', maxWidth: '560px', margin: '2rem auto' }}>
+          <div style={{
+            width: '52px', height: '52px', borderRadius: '50%', margin: '0 auto 1rem',
+            background: 'rgba(56,189,248,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+            <ArrowRight size={22} style={{ color: '#38bdf8' }} />
+          </div>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 0.6rem' }}>Loading Job Market Demand…</h2>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: '0 auto', maxWidth: '420px' }}>
+            Fetching live market requirement data for the junior backend track.
+          </p>
+        </div>
+      );
+    }
     const totalJobsCount = landingStats?.jobPostings ?? allJobs.length;
     const employerCount = new Set(allJobs.map(j => j.company)).size;
     const sourceList = marketProvenance?.sources?.length

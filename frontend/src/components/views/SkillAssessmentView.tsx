@@ -15,6 +15,7 @@ export default function SkillAssessmentView() {
     skillAnswers,
     setSkillAnswers,
     skillSavedCorrect,
+    skillAnswered,
     isStartingSkill,
     isSubmittingSkill,
     skillAssessError,
@@ -74,14 +75,14 @@ export default function SkillAssessmentView() {
             {(['easy', 'medium', 'hard'] as const).map((level) => (
               <div key={level}>
                 <label className="auth-label" style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'capitalize', marginBottom: '0.3rem' }}>
-                  {level}
+                  {level} {level === 'easy' && <span style={{ color: 'var(--text-muted)' }}>(min 1)</span>}
                 </label>
                 <input
                   type="number"
-                  min={0}
+                  min={level === 'easy' ? 1 : 0}
                   max={30}
                   value={skillAssessCfg[level]}
-                  onChange={(e) => setSkillAssessCfg(prev => ({ ...prev, [level]: Math.max(0, Number(e.target.value)) }))}
+                  onChange={(e) => setSkillAssessCfg(prev => ({ ...prev, [level]: Math.max(level === 'easy' ? 1 : 0, Number(e.target.value)) }))}
                   style={{ width: '100%', padding: '0.6rem 0.8rem', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '7px', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: '0.9rem' }}
                 />
               </div>
@@ -144,7 +145,7 @@ export default function SkillAssessmentView() {
     const idx = Math.min(skillQuestionIdx, questions.length - 1);
     const q = questions[idx];
     if (!q) return null;
-    const answered = !!skillSavedCorrect[q.id];
+    const answered = !!skillAnswered[q.id];
     const selected = skillAnswers[q.id];
 
     const pick = (opt: string) => {

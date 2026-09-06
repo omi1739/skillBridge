@@ -36,7 +36,7 @@ async function bootstrap() {
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
-      forbidNonWhitelisted: process.env.NODE_ENV === 'production',
+      forbidNonWhitelisted: true,
       transform: true
     })
   );

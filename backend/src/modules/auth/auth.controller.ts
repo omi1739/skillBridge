@@ -68,20 +68,20 @@ export class AuthController {
   }
 
   @Get('me/gaps')
-  async getGaps(@Query('userId') queryUserId?: string, @Query('roleId') roleId?: string) {
-    const userId = queryUserId || 'demo_user_01';
-    return this.authService.getGaps(userId, roleId);
+  @UseGuards(JwtAuthGuard)
+  async getGaps(@CurrentUser() user: AuthPayload, @Query('roleId') roleId?: string) {
+    return this.authService.getGaps(user.userId, roleId);
   }
 
   @Get('me/recommendations')
-  async getRecommendations(@Query('userId') queryUserId?: string, @Query('roleId') roleId?: string) {
-    const userId = queryUserId || 'demo_user_01';
-    return this.authService.getRecommendations(userId, roleId);
+  @UseGuards(JwtAuthGuard)
+  async getRecommendations(@CurrentUser() user: AuthPayload, @Query('roleId') roleId?: string) {
+    return this.authService.getRecommendations(user.userId, roleId);
   }
 
   @Get('me/report')
-  async getCareerReport(@Query('userId') queryUserId?: string, @Query('roleId') roleId?: string) {
-    const userId = queryUserId || 'demo_user_01';
-    return this.authService.getCareerReport(userId, roleId);
+  @UseGuards(JwtAuthGuard)
+  async getCareerReport(@CurrentUser() user: AuthPayload, @Query('roleId') roleId?: string) {
+    return this.authService.getCareerReport(user.userId, roleId);
   }
 }

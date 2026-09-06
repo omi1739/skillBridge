@@ -290,25 +290,6 @@ export class AppDataStore {
     return this.getEvidence(userId);
   }
 
-  async upsertEvidence(ev: SkillEvidence): Promise<void> {
-    await withTransaction(async client => {
-      await client.query(
-        `INSERT INTO skill_evidence
-           (id, user_id, skill_id, source_type, source_id, proficiency_score, confidence, metadata_json, created_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::timestamptz)
-         ON CONFLICT (user_id, skill_id, source_type)
-         DO UPDATE SET source_id=EXCLUDED.source_id,
-                       proficiency_score=EXCLUDED.proficiency_score,
-                       confidence=EXCLUDED.confidence,
-                       metadata_json=EXCLUDED.metadata_json,
-                       created_at=EXCLUDED.created_at`,
-        [ev.id, ev.userId, ev.skillId, ev.sourceType, ev.sourceId || null,
-         ev.proficiencyScore, ev.confidence,
-         ev.metadata ? JSON.stringify(ev.metadata) : null, ev.createdAt]
-      );
-    });
-  }
-
   // ---- Skill gaps (persisted analysis) ----
   async saveGaps(userId: string, gaps: SkillGap[]): Promise<void> {
     if (gaps.length === 0) return;
@@ -441,11 +422,6 @@ export class AppDataStore {
        attempt.completedAt || null, attempt.score, attempt.totalPointsEarned,
        attempt.maxPoints, attempt.passed, JSON.stringify(attempt.subSkillScores), attempt.status]
     );
-  }
-
-  async getAttemptsCount(): Promise<number> {
-    const rows = await query<{ c: string }>(`SELECT COUNT(*)::text AS c FROM assessment_attempts`);
-    return Number(rows[0]?.c || 0);
   }
 
   // ---- Jobs ----

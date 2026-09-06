@@ -1,6 +1,7 @@
 'use client';
 
 import { useSkillBridge } from '@/lib/skillbridge-context';
+import { ShieldAlert } from 'lucide-react';
 
 export default function AdminView() {
   const {
@@ -58,6 +59,23 @@ export default function AdminView() {
     const d = new Date(iso + 'T00:00:00');
     return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   };
+
+  if (currentUser?.role !== 'ADMIN') {
+    return (
+      <div className="card" style={{ textAlign: 'center', padding: '2.5rem', maxWidth: '560px', margin: '2rem auto' }}>
+        <div style={{
+          width: '52px', height: '52px', borderRadius: '50%', margin: '0 auto 1rem',
+          background: 'rgba(244, 63, 94, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }}>
+          <ShieldAlert size={22} style={{ color: '#fb7185' }} />
+        </div>
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 0.6rem' }}>Access Restricted</h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: '0 auto', maxWidth: '420px' }}>
+          The Admin & Ontology Console is limited to administrator accounts. Your account does not have the required role.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
