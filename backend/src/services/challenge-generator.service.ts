@@ -61,8 +61,6 @@ interface ChatMessage {
 }
 
 export class ChallengeGeneratorService {
-  private static idCounter = 0;
-
   private get apiKey(): string {
     return process.env.OPENAI_API_KEY || '';
   }
@@ -71,64 +69,9 @@ export class ChallengeGeneratorService {
     return this.apiKey.length > 0;
   }
 
-  private static offlineBank: GeneratedChallenge[] = [
-    {
-      id: 'gen_sql_adv_01',
-      title: 'SQL: Running Total with Window Function',
-      type: 'SQL',
-      skillId: 'skill_sql',
-      difficulty: 'Intermediate',
-      description:
-        'Given a sales table, write a query that returns each sale row plus a running total of revenue ordered by sale_date. Use a window function.',
-      starterCode: `-- Write your query below
-SELECT id, sale_date, amount,
-       SUM(amount) OVER (ORDER BY sale_date) AS running_total
-FROM sales
-ORDER BY sale_date;`,
-      referenceSolution:
-        'Use SUM(amount) OVER (ORDER BY sale_date) to compute a cumulative running total.',
-      schemaPreview: 'sales (id INT, sale_date DATE, amount NUMERIC)',
-      sampleDataDescription: 'A handful of dated sale records with varying amounts.',
-      schemaSql: `CREATE TABLE sales (id INT, sale_date DATE, amount NUMERIC);`,
-      seedSql: `INSERT INTO sales (id, sale_date, amount) VALUES
-  (1, '2024-01-01', 100),
-  (2, '2024-01-02', 250),
-  (3, '2024-01-03', 75),
-  (4, '2024-01-04', 300);`,
-      referenceQuery: `SELECT id, sale_date, amount,
-       SUM(amount) OVER (ORDER BY sale_date) AS running_total
-FROM sales ORDER BY sale_date;`,
-      verified: true
-    },
-    {
-      id: 'gen_js_adv_01',
-      title: 'JavaScript: Chunk Array into Groups',
-      type: 'JAVASCRIPT',
-      skillId: 'skill_javascript',
-      difficulty: 'Intermediate',
-      description:
-        'Implement chunkItems(arr, size) that splits an array into groups of the given size, keeping the final partial group if one remains.',
-      starterCode: `function chunkItems(arr, size) {
-  const out = [];
-  for (let i = 0; i < arr.length; i += size) {
-    out.push(arr.slice(i, i + size));
-  }
-  return out;
-}`,
-      referenceSolution:
-        'Iterate the array in steps of the group size, slicing out each sub-array with arr.slice(i, i + size) and pushing it onto the result.',
-      testCases: [
-        { name: 'Splits array into equal groups', input: '[[1,2,3,4,5,6],2]', expected: '[[1,2],[3,4],[5,6]]' },
-        { name: 'Keeps final partial group', input: '[[1,2,3,4,5],2]', expected: '[[1,2],[3,4],[5]]' },
-        { name: 'Handles empty array', input: '[[],3]', expected: '[]' }
-      ],
-      verified: true
-    }
-  ];
-
   /**
    * Generate a new challenge. When the API key is present it calls the model;
-   * otherwise it draws from the curated offline bank.
+   * otherwise no challenge can be produced (the offline bank has been removed).
    */
   async generate(req: GenerationRequest): Promise<GeneratedChallenge> {
     if (!req || !req.type) {
@@ -138,89 +81,17 @@ FROM sales ORDER BY sale_date;`,
       const generated = await this.generateWithModel(req);
       // Validate generated SQL by executing the reference query against the seed.
       if (generated.type === 'SQL' && !(await this.sqlSelfCheck(generated))) {
-        // Fall back to the offline bank if the model output does not self-validate.
-        return this.drawOffline(req.type, req.skillId, req.difficulty);
+        throw new BadRequestException('Generated SQL challenge failed self-validation. Try again.');
       }
       return generated;
     }
-    return this.drawOffline(req.type, req.skillId, req.difficulty);
+    throw new BadRequestException('Challenge generation is unavailable without an API key.');
   }
 
   async getReferenceSolution(id: string): Promise<{ referenceSolution: string } | null> {
-    const offline = this.offlineById(id);
-    if (offline) return { referenceSolution: offline.referenceSolution };
     const dyn = dynamicChallenges.get(id);
     if (dyn) return { referenceSolution: dyn.referenceSolution };
     return null;
-  }
-
-  getOfflineChallenge(id: string): GeneratedChallenge | undefined {
-    return this.offlineById(id);
-  }
-
-  private offlineById(id: string): GeneratedChallenge | undefined {
-    return ChallengeGeneratorService.offlineBank.find(c => c.id === id);
-  }
-
-  private drawOffline(
-    type: 'SQL' | 'JAVASCRIPT',
-    skillId?: string,
-    difficulty?: string
-  ): GeneratedChallenge {
-    const pool = ChallengeGeneratorService.offlineBank.filter(
-      c => c.type === type &&
-        (!skillId || c.skillId === skillId) &&
-        (!difficulty || c.difficulty === difficulty)
-    );
-    const source = pool.length > 0 ? pool : ChallengeGeneratorService.offlineBank.filter(c => c.type === type);
-    if (source.length === 0) {
-      // Fallback: mirror a deterministic simple challenge.
-      return this.fallbackChallenge(type);
-    }
-    return source[ChallengeGeneratorService.idCounter++ % source.length];
-  }
-
-  private fallbackChallenge(type: 'SQL' | 'JAVASCRIPT'): GeneratedChallenge {
-    if (type === 'SQL') {
-      return {
-        id: `gen_sql_fb_${ChallengeGeneratorService.idCounter++}`,
-        title: 'SQL: Simple Aggregation',
-        type: 'SQL',
-        skillId: 'skill_sql',
-        difficulty: 'Beginner',
-        description: 'Return each department name and its employee count ordered by name.',
-        starterCode: `SELECT d.name, COUNT(e.id) AS cnt
-FROM departments d
-LEFT JOIN employees e ON d.id = e.department_id
-GROUP BY d.name
-ORDER BY d.name;`,
-        referenceSolution: 'Group by department and count employees using LEFT JOIN.',
-        schemaSql: 'CREATE TABLE departments (id INT, name VARCHAR);\nCREATE TABLE employees (id INT, name VARCHAR, department_id INT);',
-        seedSql: `INSERT INTO departments (id,name) VALUES (1,'Eng'),(2,'Sales');
-INSERT INTO employees (id,name,department_id) VALUES (1,'A',1),(2,'B',1),(3,'C',2);`,
-        referenceQuery: `SELECT d.name, COUNT(e.id) AS cnt FROM departments d LEFT JOIN employees e ON d.id=e.department_id GROUP BY d.name ORDER BY d.name;`,
-        schemaPreview: 'departments (id INT, name VARCHAR)\nemployees (id INT, name VARCHAR, department_id INT)',
-        sampleDataDescription: 'Two departments and three employees.',
-        verified: true
-      };
-    }
-    return {
-      id: `gen_js_fb_${ChallengeGeneratorService.idCounter++}`,
-      title: 'JavaScript: Double Even Numbers',
-      type: 'JAVASCRIPT',
-      skillId: 'skill_javascript',
-      difficulty: 'Beginner',
-      description: 'Implement a function doubleEvens(arr) that returns a new array with only even numbers doubled.',
-      starterCode: `function doubleEvens(arr) {
-  return arr.filter(x => x % 2 === 0).map(x => x * 2);
-}`,
-      referenceSolution: 'Filter to evens, then map each to double.',
-      testCases: [
-        { name: 'Doubles even numbers only', input: '[1,2,3,4]', expected: '[4,8]' },
-        { name: 'Empty array returns empty', input: '[]', expected: '[]' }
-      ],
-      verified: true
-    };
   }
 
   private async generateWithModel(req: GenerationRequest): Promise<GeneratedChallenge> {

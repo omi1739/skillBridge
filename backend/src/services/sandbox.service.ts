@@ -5,7 +5,6 @@ import { store } from '../store';
 import { gapService } from './gap.service';
 import {
   GeneratedChallenge,
-  challengeGenerator,
   getDynamicChallenges,
   getDynamicChallenge
 } from './challenge-generator.service';
@@ -44,106 +43,10 @@ interface SqlFixture {
   referenceQuery: string;
 }
 
-const SQL_FIXTURES: Record<string, SqlFixture> = {
-  challenge_sql_01: {
-    skillId: 'skill_sql',
-    proficiency: 0.95,
-    schemaSql: `CREATE TABLE departments (id INT, name VARCHAR);
-CREATE TABLE employees (id INT, name VARCHAR, department_id INT, salary NUMERIC);`,
-    seedSql: `INSERT INTO departments (id, name) VALUES
-  (1, 'Engineering'), (2, 'Marketing'), (3, 'Sales'), (4, 'Support');
-INSERT INTO employees (id, name, department_id, salary) VALUES
-  (1, 'Alice', 1, 80000), (2, 'Bob', 1, 90000),
-  (3, 'Charlie', 1, 85000), (4, 'Diana', 1, 95000),
-  (5, 'Eve', 2, 65000), (6, 'Frank', 2, 65000),
-  (7, 'Grace', 3, 70000), (8, 'Heidi', 4, 50000);`,
-    referenceQuery: `SELECT d.name AS department_name, COUNT(e.id) AS employee_count, AVG(e.salary) AS avg_salary
-FROM departments d
-JOIN employees e ON d.id = e.department_id
-GROUP BY d.name
-HAVING COUNT(e.id) > 1 AND AVG(e.salary) > 60000
-ORDER BY avg_salary DESC;`
-  },
-  challenge_sql_02: {
-    skillId: 'skill_postgresql',
-    proficiency: 0.90,
-    schemaSql: `CREATE TABLE customers (id INT, name VARCHAR, email VARCHAR);
-CREATE TABLE orders (id INT, customer_id INT, order_date DATE, total NUMERIC);`,
-    seedSql: `INSERT INTO customers (id, name, email) VALUES
-  (1, 'Nafis Ahmed', 'nafis@example.com'),
-  (2, 'Tanvir Hossain', 'tanvir@example.com'),
-  (3, 'Rahim Uddin', 'rahim@example.com'),
-  (4, 'Sadia Rahman', 'sadia@example.com');
-INSERT INTO orders (id, customer_id, order_date, total) VALUES
-  (1, 3, '2024-01-10', 150.00),
-  (2, 4, '2024-02-15', 320.50),
-  (3, 3, '2024-03-01', 85.00);`,
-    referenceQuery: `SELECT c.name, c.email
-FROM customers c
-LEFT JOIN orders o ON c.id = o.customer_id
-WHERE o.id IS NULL
-ORDER BY c.name ASC;`
-  }
-};
+const SQL_FIXTURES: Record<string, SqlFixture> = {};
 
 export class SandboxService {
-  // Predefined Hands-On Challenges
-  private challenges: SandboxChallenge[] = [
-    {
-      id: 'challenge_sql_01',
-      title: 'SQL: High-Earning Departments Aggregation',
-      type: 'SQL',
-      skillId: 'skill_sql',
-      difficulty: 'Intermediate',
-      description: 'Write a query to find the department name, number of employees, and average salary for all departments with more than 1 employee and average salary > 60,000. Order by average salary descending.',
-      schemaPreview: `departments (id INT, name VARCHAR)
-employees (id INT, name VARCHAR, department_id INT, salary NUMERIC)`,
-      sampleDataDescription: 'Preloaded with 4 departments and 8 employee records across Engineering, Marketing, Sales, and Support.',
-      starterCode: `-- Write your SQL query below
-SELECT d.name AS department_name, COUNT(e.id) AS employee_count, AVG(e.salary) AS avg_salary
-FROM departments d
-JOIN employees e ON d.id = e.department_id
-GROUP BY d.name
-HAVING COUNT(e.id) > 1 AND AVG(e.salary) > 60000
-ORDER BY avg_salary DESC;`,
-      testCasesCount: 2
-    },
-    {
-      id: 'challenge_sql_02',
-      title: 'SQL: Find Inactive Customers (Anti-Join)',
-      type: 'SQL',
-      skillId: 'skill_postgresql',
-      difficulty: 'Beginner',
-      description: 'Write a query to list all customer names and emails who have NEVER placed an order. Use a LEFT JOIN or NOT EXISTS.',
-      schemaPreview: `customers (id INT, name VARCHAR, email VARCHAR)
-orders (id INT, customer_id INT, order_date DATE, total NUMERIC)`,
-      starterCode: `-- Find customers with zero orders
-SELECT c.name, c.email
-FROM customers c
-LEFT JOIN orders o ON c.id = o.customer_id
-WHERE o.id IS NULL
-ORDER BY c.name ASC;`,
-      testCasesCount: 2
-    },
-    {
-      id: 'challenge_js_01',
-      title: 'JavaScript: Async Batch Execution Worker',
-      type: 'JAVASCRIPT',
-      skillId: 'skill_javascript',
-      difficulty: 'Intermediate',
-      description: 'Implement a batch processor `batchMap(items, batchSize, fn)` that processes an array of items through an async function `fn` with a maximum concurrency of `batchSize` at any given time, returning all results in original order.',
-      starterCode: `async function batchMap(items, batchSize, fn) {
-  const results = [];
-  for (let i = 0; i < items.length; i += batchSize) {
-    const chunk = items.slice(i, i + batchSize);
-    const chunkResults = await Promise.all(chunk.map(item => fn(item)));
-    results.push(...chunkResults);
-  }
-  return results;
-}`,
-      testCasesCount: 3
-    }
-  ];
+  private challenges: SandboxChallenge[] = [];
 
   public getChallenges(): SandboxChallenge[] {
     const dynamic: SandboxChallenge[] = getDynamicChallenges().map(toSandboxChallenge);
@@ -239,61 +142,9 @@ ORDER BY c.name ASC;`,
     const timeoutMs = 5000;
 
     try {
-      const dyn = getDynamicChallenge(challengeId) || challengeGenerator.getOfflineChallenge(challengeId);
+      const dyn = getDynamicChallenge(challengeId);
       if (dyn && dyn.type === 'JAVASCRIPT' && dyn.testCases && dyn.testCases.length > 0) {
         return await this.runDynamicJs(dyn, userCode, userId, startTime, timeoutMs);
-      }
-
-      if (challengeId === 'challenge_js_01') {
-        const userFunction = this.runUserFunction(userCode, timeoutMs);
-        if (typeof userFunction !== 'function') {
-          return {
-            passed: false,
-            message: 'Provided code does not define a `batchMap` function.',
-            executionTimeMs: Date.now() - startTime
-          };
-        }
-
-        // Run Test Case 1: Simple array doubling preserving order
-        const items1 = [1, 2, 3, 4, 5];
-        const res1 = await withTimeout(userFunction(items1, 2, async (x: number) => x * 2), timeoutMs);
-        const expected1 = [2, 4, 6, 8, 10];
-        const pass1 = JSON.stringify(res1) === JSON.stringify(expected1);
-
-        // Run Test Case 2: Concurrency check
-        let activeConcurrent = 0;
-        let maxConcurrentObserved = 0;
-        const items2 = [10, 20, 30, 40, 50, 60];
-        const res2: any = await withTimeout(
-          userFunction(items2, 2, async (x: number) => {
-            activeConcurrent++;
-            maxConcurrentObserved = Math.max(maxConcurrentObserved, activeConcurrent);
-            await new Promise(r => setTimeout(r, 10));
-            activeConcurrent--;
-            return x + 1;
-          }),
-          timeoutMs
-        );
-        const pass2 = maxConcurrentObserved <= 2 && res2.length === 6;
-
-        const allPassed = pass1 && pass2;
-        const testResults = [
-          { testName: 'Preserves item order and return values', passed: pass1, expected: expected1, actual: res1 },
-          { testName: 'Enforces maximum concurrency limit <= 2', passed: pass2, expected: 'max 2 concurrent', actual: `${maxConcurrentObserved} concurrent` }
-        ];
-
-        let verifiedEvidence;
-        if (allPassed) {
-          verifiedEvidence = await this.recordVerifiedEvidence(userId, 'skill_javascript', 0.95);
-        }
-
-        return {
-          passed: allPassed,
-          message: allPassed ? 'All test cases passed! Async concurrency bounded correctly.' : 'Some test assertions failed.',
-          executionTimeMs: Date.now() - startTime,
-          testResults,
-          verifiedEvidence
-        };
       }
     } catch (err: any) {
       return {
@@ -398,38 +249,6 @@ ORDER BY c.name ASC;`,
     const probe = new vm.Script(`${code}\n;${name};`);
     const candidate = probe.runInContext(context, { timeout: timeoutMs });
     return typeof candidate === 'function' ? candidate : undefined;
-  }
-
-  /**
-   * Evaluates candidate code inside a Node VM context that exposes only a safe
-   * subset of globals, and returns the exported `batchMap` function reference.
-   */
-  private runUserFunction(code: string, timeoutMs: number): ((...args: any[]) => any) | undefined {
-    const sandboxGlobals = {
-      Promise,
-      setTimeout,
-      clearTimeout,
-      console,
-      Math,
-      Number,
-      String,
-      Array,
-      Object,
-      Boolean,
-      JSON,
-      Symbol,
-      Error,
-      Date,
-      RegExp
-    };
-
-    const context = vm.createContext(Object.assign(Object.create(null), sandboxGlobals));
-    const script = new vm.Script(`${code}\n;batchMap;`);
-    const candidate = script.runInContext(context, { timeout: timeoutMs });
-    if (typeof candidate !== 'function') {
-      return undefined;
-    }
-    return candidate;
   }
 
   private async recordVerifiedEvidence(userId: string, skillId: string, proficiency: number): Promise<SkillEvidence> {

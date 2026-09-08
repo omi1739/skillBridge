@@ -2,134 +2,7 @@ import { CurriculumProfile, CurriculumComparisonResult, Role } from '@skillbridg
 import { store } from '../store';
 
 export class CurriculumService {
-  private curricula: CurriculumProfile[] = [
-    {
-      id: 'curr_bsc_cse',
-      institutionName: 'Standard B.Sc. in Computer Science & Engineering (Bangladesh Curriculum)',
-      type: 'UNIVERSITY_DEGREE',
-      coverageAreas: [
-        {
-          skillId: 'skill_sql',
-          canonicalName: 'SQL',
-          academicEmphasis: 'HIGH',
-          practicalHoursEstimate: 45,
-          syllabusTopics: ['Relational Algebra', 'ER Diagrams', '3NF / BCNF Normalization', 'Basic Joins', 'Triggers & Procedures']
-        },
-        {
-          skillId: 'skill_javascript',
-          canonicalName: 'JavaScript',
-          academicEmphasis: 'THEORY_ONLY',
-          practicalHoursEstimate: 10,
-          syllabusTopics: ['Basic Web Tech', 'DOM Manipulation', 'Basic Syntax']
-        },
-        {
-          skillId: 'skill_nodejs',
-          canonicalName: 'Node.js',
-          academicEmphasis: 'NOT_COVERED',
-          practicalHoursEstimate: 0,
-          syllabusTopics: ['Not part of core academic syllabus (C/C++/Java focus)']
-        },
-        {
-          skillId: 'skill_postgresql',
-          canonicalName: 'PostgreSQL',
-          academicEmphasis: 'THEORY_ONLY',
-          practicalHoursEstimate: 10,
-          syllabusTopics: ['General RDBMS concepts (often taught using Oracle or MySQL)']
-        },
-        {
-          skillId: 'skill_rest_api',
-          canonicalName: 'REST APIs',
-          academicEmphasis: 'THEORY_ONLY',
-          practicalHoursEstimate: 8,
-          syllabusTopics: ['HTTP Protocol basics', 'Client-Server architecture']
-        },
-        {
-          skillId: 'skill_git',
-          canonicalName: 'Git',
-          academicEmphasis: 'NOT_COVERED',
-          practicalHoursEstimate: 0,
-          syllabusTopics: ['Expected as extracurricular/self-taught']
-        },
-        {
-          skillId: 'skill_docker',
-          canonicalName: 'Docker',
-          academicEmphasis: 'NOT_COVERED',
-          practicalHoursEstimate: 0,
-          syllabusTopics: ['DevOps & containerization absent from undergraduate syllabus']
-        },
-        {
-          skillId: 'skill_redis',
-          canonicalName: 'Redis',
-          academicEmphasis: 'NOT_COVERED',
-          practicalHoursEstimate: 0,
-          syllabusTopics: ['In-memory caching architectures not covered']
-        }
-      ]
-    },
-    {
-      id: 'curr_bootcamp',
-      institutionName: 'Accelerated Web Development Bootcamp',
-      type: 'BOOTCAMP',
-      coverageAreas: [
-        {
-          skillId: 'skill_javascript',
-          canonicalName: 'JavaScript',
-          academicEmphasis: 'HIGH',
-          practicalHoursEstimate: 80,
-          syllabusTopics: ['ES6+', 'Async/Await', 'Event Loop', 'DOM', 'Promises']
-        },
-        {
-          skillId: 'skill_nodejs',
-          canonicalName: 'Node.js',
-          academicEmphasis: 'HIGH',
-          practicalHoursEstimate: 60,
-          syllabusTopics: ['Express.js', 'Middleware', 'REST API Architecture', 'JWT Auth']
-        },
-        {
-          skillId: 'skill_rest_api',
-          canonicalName: 'REST APIs',
-          academicEmphasis: 'HIGH',
-          practicalHoursEstimate: 40,
-          syllabusTopics: ['CRUD Endpoints', 'Status Codes', 'Error Contracts', 'Pagination']
-        },
-        {
-          skillId: 'skill_git',
-          canonicalName: 'Git',
-          academicEmphasis: 'HIGH',
-          practicalHoursEstimate: 25,
-          syllabusTopics: ['GitHub PRs', 'Branching', 'Merge Conflicts', 'Rebasing']
-        },
-        {
-          skillId: 'skill_sql',
-          canonicalName: 'SQL',
-          academicEmphasis: 'MODERATE',
-          practicalHoursEstimate: 20,
-          syllabusTopics: ['Basic CRUD Queries', 'Simple Joins', 'ORM/Prisma usage']
-        },
-        {
-          skillId: 'skill_postgresql',
-          canonicalName: 'PostgreSQL',
-          academicEmphasis: 'MODERATE',
-          practicalHoursEstimate: 20,
-          syllabusTopics: ['Basic Tables', 'Foreign Keys']
-        },
-        {
-          skillId: 'skill_docker',
-          canonicalName: 'Docker',
-          academicEmphasis: 'THEORY_ONLY',
-          practicalHoursEstimate: 5,
-          syllabusTopics: ['Basic container concept']
-        },
-        {
-          skillId: 'skill_redis',
-          canonicalName: 'Redis',
-          academicEmphasis: 'NOT_COVERED',
-          practicalHoursEstimate: 0,
-          syllabusTopics: ['Caching overlooked in fast-paced curricula']
-        }
-      ]
-    }
-  ];
+  private curricula: CurriculumProfile[] = [];
 
   public getCurricula(): CurriculumProfile[] {
     return this.curricula;
@@ -137,6 +10,9 @@ export class CurriculumService {
 
   public async analyzeCurriculum(curriculumId: string, roleId: string = 'role_junior_backend'): Promise<CurriculumComparisonResult> {
     const curriculum = this.curricula.find(c => c.id === curriculumId) || this.curricula[0];
+    if (!curriculum) {
+      throw new Error(`Curriculum ${curriculumId} not found`);
+    }
     const role: Role | undefined = await store.getRole(roleId);
     if (!role) {
       throw new Error(`Role ${roleId} not found`);

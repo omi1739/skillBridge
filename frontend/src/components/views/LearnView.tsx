@@ -118,7 +118,7 @@ export default function LearnView() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   const grouped = getTopicsByCategory();
-  const selected = TOPIC_RESOURCES.find(t => t.key === selectedKey) || TOPIC_RESOURCES[0];
+  const selected = TOPIC_RESOURCES.find(t => t.key === selectedKey) || TOPIC_RESOURCES[0] || null;
 
   useEffect(() => {
     const topic = searchParams.get('topic');
@@ -187,7 +187,13 @@ export default function LearnView() {
       </button>
 
       <main className="learn-main">
-        <TopicDetail topic={selected} />
+        {selected ? <TopicDetail topic={selected} /> : (
+          <div className="learn-detail">
+            <div className="learn-sidebar-empty">
+              No learning resources available yet.
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
