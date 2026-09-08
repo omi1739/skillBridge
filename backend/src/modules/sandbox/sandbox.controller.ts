@@ -14,6 +14,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthPayload } from '../../services/auth.service';
 import { RunSqlDto, RunCodeDto } from '../../dto/sandbox.dto';
+import { RateLimitGuard } from '../../common/rate-limit.guard';
+import { RateLimit, RateWindow } from '../../common/rate-limit.decorators';
 
 @Controller('sandbox')
 export class SandboxController {
@@ -30,6 +32,9 @@ export class SandboxController {
   }
 
   @Post('generate')
+  @UseGuards(RateLimitGuard)
+  @RateLimit(10)
+  @RateWindow(60_000)
   async generateChallenge(@Body() body: { type?: string; skillId?: string; difficulty?: string }) {
     return this.sandboxService.generateChallenge(
       (body.type || 'SQL') as 'SQL' | 'JAVASCRIPT',
@@ -39,6 +44,9 @@ export class SandboxController {
   }
 
   @Get('reference-solution/:challengeId')
+  @UseGuards(RateLimitGuard)
+  @RateLimit(30)
+  @RateWindow(60_000)
   async referenceSolution(@Param('challengeId') challengeId: string) {
     return this.sandboxService.getReferenceSolution(challengeId);
   }
@@ -46,22 +54,26 @@ export class SandboxController {
   @Post('run-sql')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
+  @UseGuards(RateLimitGuard)
+  @RateLimit(60)
+  @RateWindow(60_000)
   async runSQL(
-    @CurrentUser() user: AuthPayload | undefined,
+    @CurrentUser() user: AuthPayload,
     @Body() body: RunSqlDto
   ) {
-    const candidateId = user?.userId || body.userId || 'demo_user_01';
-    return this.sandboxService.runSQL(body.challengeId, body.query, candidateId);
+    return this.sandboxService.runSQL(body.challengeId, body.query, user.userId);
   }
 
   @Post('run-code')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
+  @UseGuards(RateLimitGuard)
+  @RateLimit(60)
+  @RateWindow(60_000)
   async runCode(
-    @CurrentUser() user: AuthPayload | undefined,
+    @CurrentUser() user: AuthPayload,
     @Body() body: RunCodeDto
   ) {
-    const candidateId = user?.userId || body.userId || 'demo_user_01';
-    return this.sandboxService.runCode(body.challengeId, body.code, candidateId);
+    return this.sandboxService.runCode(body.challengeId, body.code, user.userId);
   }
 }

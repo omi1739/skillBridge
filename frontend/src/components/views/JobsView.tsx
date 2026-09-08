@@ -28,22 +28,6 @@ export default function JobsView() {
 
   const [page, setPage] = useState(1);
 
-  if (!currentUser) {
-    return (
-      <SignInPromptView
-        title="Sign in to see matching jobs"
-        subtitle="Job matches are computed against your demonstrated skill evidence and ranked by compatibility for your target role."
-      />
-    );
-  }
-  if (!activeTargetRoleId) return <RolePromptView />;
-
-  const bdCount = jobMatches.filter(m => m.job.isBangladesh).length;
-  const internationalCount = jobMatches.length - bdCount;
-  const bdOnsite = jobMatches.filter(m => m.job.isBangladesh && !m.job.isRemote).length;
-  const bdRemote = jobMatches.filter(m => m.job.isBangladesh && m.job.isRemote).length;
-  const remoteCount = jobMatches.filter(m => m.job.isRemote).length;
-
   const filteredMatches = useMemo(() => {
     const regionMatches = jobMatches.filter(match => {
       if (jobRegionFilter === 'BANGLADESH') return !!match.job.isBangladesh;
@@ -70,6 +54,22 @@ export default function JobsView() {
     }
     return sorted;
   }, [jobMatches, jobRegionFilter, jobRemoteFilter, jobSort]);
+
+  if (!currentUser) {
+    return (
+      <SignInPromptView
+        title="Sign in to see matching jobs"
+        subtitle="Job matches are computed against your demonstrated skill evidence and ranked by compatibility for your target role."
+      />
+    );
+  }
+  if (!activeTargetRoleId) return <RolePromptView />;
+
+  const bdCount = jobMatches.filter(m => m.job.isBangladesh).length;
+  const internationalCount = jobMatches.length - bdCount;
+  const bdOnsite = jobMatches.filter(m => m.job.isBangladesh && !m.job.isRemote).length;
+  const bdRemote = jobMatches.filter(m => m.job.isBangladesh && m.job.isRemote).length;
+  const remoteCount = jobMatches.filter(m => m.job.isRemote).length;
 
   const totalPages = Math.max(1, Math.ceil(filteredMatches.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);

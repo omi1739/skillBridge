@@ -1,10 +1,6 @@
 import { IsString, IsNotEmpty, IsOptional, IsArray, IsUrl } from 'class-validator';
 
 export class ProjectSubmissionDto {
-  @IsOptional()
-  @IsString()
-  userId?: string;
-
   @IsString()
   @IsNotEmpty()
   title!: string;

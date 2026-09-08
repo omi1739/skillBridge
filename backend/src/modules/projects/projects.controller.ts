@@ -3,7 +3,6 @@ import {
   Get,
   Post,
   Body,
-  Query,
   Inject,
   UseGuards
 } from '@nestjs/common';
@@ -19,18 +18,17 @@ export class ProjectsController {
 
   @Get('me/projects')
   @UseGuards(OptionalJwtAuthGuard)
-  async getMyProjects(@CurrentUser() user: AuthPayload | undefined, @Query('userId') queryUserId?: string) {
-    const userId = user?.userId || queryUserId || 'demo_user_01';
+  async getMyProjects(@CurrentUser() user: AuthPayload | undefined) {
+    const userId = user?.userId || 'demo_user_01';
     return this.projectsService.getProjects(userId);
   }
 
   @Post('me/projects')
   @UseGuards(JwtAuthGuard)
   async submitProject(
-    @CurrentUser() user: AuthPayload | undefined,
+    @CurrentUser() user: AuthPayload,
     @Body() body: ProjectSubmissionDto
   ) {
-    const userId = user?.userId || body.userId || 'demo_user_01';
-    return this.projectsService.submitProject(userId, body.title, body.repoUrl, body.description, body.primarySkills);
+    return this.projectsService.submitProject(user.userId, body.title, body.repoUrl, body.description, body.primarySkills);
   }
 }

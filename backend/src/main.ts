@@ -19,9 +19,14 @@ async function bootstrap() {
   // Enable CORS for the frontend. In development reflect any origin (true); in
   // production restrict to the frontend origin(s) via the CORS_ORIGIN env var
   // (comma-separated), e.g. CORS_ORIGIN=https://skillbridge.vercel.app
+  // When CORS_ORIGIN is unset in production, deny cross-origin requests entirely.
+  const isProd = process.env.NODE_ENV === 'production';
   const corsOrigin = process.env.CORS_ORIGIN
     ? process.env.CORS_ORIGIN.split(',').map(o => o.trim()).filter(Boolean)
-    : true;
+    : isProd ? [] : true;
+  if (isProd && !process.env.CORS_ORIGIN) {
+    logger.warn('CORS_ORIGIN is not set in production — cross-origin requests are blocked.');
+  }
   app.enableCors({
     origin: corsOrigin,
     credentials: true,

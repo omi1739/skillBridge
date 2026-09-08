@@ -1,6 +1,8 @@
 import { Controller, Get, Param, Query, Inject, UseGuards } from '@nestjs/common';
 import { JobsService } from './jobs.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { AuthPayload } from '../../services/auth.service';
 
 @Controller('jobs')
 @UseGuards(JwtAuthGuard)
@@ -13,14 +15,12 @@ export class JobsController {
   }
 
   @Get('matches')
-  async getMatches(@Query('userId') queryUserId?: string, @Query('roleId') roleId?: string) {
-    const userId = queryUserId || 'demo_user_01';
-    return this.jobsService.getMatches(userId, roleId);
+  async getMatches(@CurrentUser() user: AuthPayload, @Query('roleId') roleId?: string) {
+    return this.jobsService.getMatches(user.userId, roleId);
   }
 
   @Get(':id/match')
-  async getJobMatch(@Param('id') id: string, @Query('userId') queryUserId?: string) {
-    const userId = queryUserId || 'demo_user_01';
-    return this.jobsService.matchJob(userId, id);
+  async getJobMatch(@CurrentUser() user: AuthPayload, @Param('id') id: string) {
+    return this.jobsService.matchJob(user.userId, id);
   }
 }

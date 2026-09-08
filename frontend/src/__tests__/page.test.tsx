@@ -235,7 +235,7 @@ describe('SkillBridge app API contract (multi-route)', () => {
       expect(submit!.method).toBe('POST');
 
       const body = JSON.parse(submit!.body!);
-      expect(body).toHaveProperty('userId');
+      expect(body).not.toHaveProperty('userId');
       expect(Array.isArray(body.answers)).toBe(true);
       expect(body.answers).toHaveLength(ASSESSMENT.questions.length);
       for (const a of body.answers) {
@@ -270,7 +270,7 @@ describe('SkillBridge app API contract (multi-route)', () => {
       const body = JSON.parse(run!.body!);
       expect(body).toHaveProperty('challengeId', 'ch_sql_first');
       expect(body).toHaveProperty('query');
-      expect(body).toHaveProperty('userId');
+      expect(body).not.toHaveProperty('userId');
       expect(body).not.toHaveProperty('code');
     });
   }, 30000);

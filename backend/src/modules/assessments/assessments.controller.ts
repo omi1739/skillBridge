@@ -147,7 +147,10 @@ export class AssessmentsController {
     @CurrentUser() user: AuthPayload | undefined,
     @Body() body: SubmitAssessmentDto
   ) {
-    const candidateId = user?.userId || body.userId || 'demo_user_01';
+    const candidateId = user?.userId;
+    if (!candidateId) {
+      throw new Error('Authentication required');
+    }
     return this.assessmentsService.submitAssessment(id, candidateId, body.answers || []);
   }
 }

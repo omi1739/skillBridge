@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Mail, Calendar, ShieldCheck, Globe, Github, Target, Pencil, Check, ArrowLeft, AlertCircle } from 'lucide-react';
 import { useSkillBridge } from '@/lib/skillbridge-context';
 import Avatar from '@/components/ui/Avatar';
+import { safeExternalUrl } from '@/lib/safe-url';
 import { CURRENT_STATUS_OPTIONS } from '@/lib/constants';
 
 export default function ProfileView() {
@@ -119,7 +120,7 @@ export default function ProfileView() {
               <div>
                 <div className="profile-label">GitHub</div>
                 {currentProfile.githubUrl ? (
-                  <a className="profile-link" href={currentProfile.githubUrl} target="_blank" rel="noopener noreferrer">
+                  <a className="profile-link" href={safeExternalUrl(currentProfile.githubUrl)} target="_blank" rel="noopener noreferrer">
                     <Github size={14} /> {currentProfile.githubUrl.replace(/^https?:\/\//, '')}
                   </a>
                 ) : (
@@ -129,7 +130,7 @@ export default function ProfileView() {
               <div>
                 <div className="profile-label">Portfolio</div>
                 {currentProfile.portfolioUrl ? (
-                  <a className="profile-link" href={currentProfile.portfolioUrl} target="_blank" rel="noopener noreferrer">
+                  <a className="profile-link" href={safeExternalUrl(currentProfile.portfolioUrl)} target="_blank" rel="noopener noreferrer">
                     <Globe size={14} /> {currentProfile.portfolioUrl.replace(/^https?:\/\//, '')}
                   </a>
                 ) : (

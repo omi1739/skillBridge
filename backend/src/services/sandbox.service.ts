@@ -218,29 +218,55 @@ export class SandboxService {
     };
   }
 
+  /** Bootstrap a minimal in-context `console` (context-realm closures only). */
+  private static readonly CONSOLE_BOOTSTRAP =
+    `(() => {
+      const logs = [];
+      const fmt = (v) => { try { return JSON.stringify(v); } catch { return String(v); } };
+      const make = (level) => (...a) => logs.push(level + ': ' + a.map(fmt).join(' '));
+      globalThis.console = { log: make('LOG'), warn: make('WARN'), error: make('ERROR'), info: make('INFO') };
+    })();`;
+
+  /**
+   * Static pre-scan for known VM-escape primitives. Defense-in-depth: the
+   * context below is created with a null-prototype global and NO host-realm
+   * functions, so these classic chains cannot reach the real `process`/`require`.
+   */
+  private static readonly ESCAPE_PATTERNS: RegExp[] = [
+    /__proto__/,
+    /constructor\s*\.\s*constructor/,
+    /\brequire\s*\(/,
+    /\bimport\s*\(/,
+    /\bprocess\b/,
+    /\bglobalThis\b/,
+    /\bBuffer\b/,
+    /\bmodule\b/,
+    /\beval\s*\(/,
+    /\bFunction\s*\(/
+  ];
+
   /**
    * Evaluate generic user code inside a VM, returning the first function it
    * defines (by name) so it can be invoked against test cases.
+   *
+   * The context receives no host-realm objects (no `setTimeout`, `Object`,
+   * `console`, etc.). V8 supplies the standard ECMAScript built-ins inside the
+   * context itself, so user code has Math/Array/JSON/etc. but any attempt to
+   * reach `process`/`require`/`Function` resolves to the context realm where
+   * those do not exist.
    */
   private getDynamicFunction(code: string, timeoutMs: number): ((...args: any[]) => any) | undefined {
-    const sandboxGlobals = {
-      Promise,
-      setTimeout,
-      clearTimeout,
-      console,
-      Math,
-      Number,
-      String,
-      Array,
-      Object,
-      Boolean,
-      JSON,
-      Symbol,
-      Error,
-      Date,
-      RegExp
-    };
-    const context = vm.createContext(Object.assign(Object.create(null), sandboxGlobals));
+    if (code.length > 50_000 || SandboxService.ESCAPE_PATTERNS.some(re => re.test(code))) {
+      return undefined;
+    }
+
+    const context = vm.createContext(Object.create(null));
+    try {
+      new vm.Script(SandboxService.CONSOLE_BOOTSTRAP).runInContext(context, { timeout: 1000 });
+    } catch {
+      // Bootstrap must never fail on a standard engine; carry on regardless.
+    }
+
     const script = new vm.Script(code);
     script.runInContext(context, { timeout: timeoutMs });
 

@@ -702,7 +702,7 @@ function useSkillBridgeValue() {
         localStorage.setItem('skillbridge_profile', JSON.stringify(data.profile));
         setShowAuthModal(false);
         navigate('market');
-        refreshUserData('demo_user_01', data.user.role, token);
+        refreshUserData('demo_user_01', data.user.role, token, data.profile.targetRoleId);
       }
     } catch (err) {
       console.error(err);
@@ -802,7 +802,7 @@ function useSkillBridgeValue() {
     setShowAuthModal(false);
     setAuthForm({ email: '', password: '', confirmPassword: '', fullName: '', currentStatus: '', targetRoleId: '' });
     navigate('market');
-    refreshUserData(data.user.id, data.user.role, data.token);
+    refreshUserData(data.user.id, data.user.role, data.token, data.profile.targetRoleId);
   };
 
   const handleGoogleCredential = async (credential: string) => {
@@ -922,7 +922,6 @@ function useSkillBridgeValue() {
         method: 'POST',
         headers: authHeaders(),
         body: JSON.stringify({
-          userId: activeUserId,
           answers: answersPayload
         })
       });
@@ -1049,8 +1048,8 @@ function useSkillBridgeValue() {
 
     const endpoint = challenge.type === 'SQL' ? `${API_BASE}/sandbox/run-sql` : `${API_BASE}/sandbox/run-code`;
     const payload = challenge.type === 'SQL'
-      ? { challengeId: challenge.id, query: sandboxCode, userId: activeUserId }
-      : { challengeId: challenge.id, code: sandboxCode, userId: activeUserId };
+      ? { challengeId: challenge.id, query: sandboxCode }
+      : { challengeId: challenge.id, code: sandboxCode };
 
     try {
       const res = await fetch(endpoint, {
@@ -1083,7 +1082,6 @@ function useSkillBridgeValue() {
         method: 'POST',
         headers: authHeaders(),
         body: JSON.stringify({
-          userId: activeUserId,
           title: projectForm.title.trim(),
           repoUrl: projectForm.repoUrl.trim(),
           description: projectForm.description,

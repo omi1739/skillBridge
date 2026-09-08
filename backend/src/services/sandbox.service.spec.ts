@@ -134,5 +134,45 @@ describe('SandboxService', () => {
       expect(result.passed).toBe(false);
       expect(mockedStore.saveEvidence).not.toHaveBeenCalled();
     });
+
+    it('blocks constructor-chain VM escape attempts via the static pre-scan', async () => {
+      const dyn: GeneratedChallenge = {
+        id: 'gen_js_escape_1',
+        title: 'Escape probe',
+        type: 'JAVASCRIPT',
+        skillId: 'skill_javascript',
+        difficulty: 'Beginner',
+        description: 'Escape probe',
+        starterCode: '',
+        referenceSolution: '',
+        testCases: [{ name: 'T1', input: '[]', expected: '[]' }]
+      };
+      registerDynamicChallenge(dyn);
+
+      const payload = 'async function pwn() { Object.constructor("return process")().exit(); }';
+      const result = await service.executeJavaScript('gen_js_escape_1', payload, 'user_1');
+      expect(result.passed).toBe(false);
+      expect(mockedStore.saveEvidence).not.toHaveBeenCalled();
+    });
+
+    it('blocks process/require access even inside a single-function payload', async () => {
+      const dyn: GeneratedChallenge = {
+        id: 'gen_js_escape_2',
+        title: 'Escape probe 2',
+        type: 'JAVASCRIPT',
+        skillId: 'skill_javascript',
+        difficulty: 'Beginner',
+        description: 'Escape probe 2',
+        starterCode: '',
+        referenceSolution: '',
+        testCases: [{ name: 'T1', input: '[]', expected: '[]' }]
+      };
+      registerDynamicChallenge(dyn);
+
+      const payload = 'async function pwn() { globalThis.process.exit(); }';
+      const result = await service.executeJavaScript('gen_js_escape_2', payload, 'user_1');
+      expect(result.passed).toBe(false);
+      expect(mockedStore.saveEvidence).not.toHaveBeenCalled();
+    });
   });
 });

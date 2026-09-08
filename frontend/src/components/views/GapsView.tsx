@@ -5,6 +5,7 @@ import { RolePromptView, SignInPromptView, NoEvidenceView } from './prompts';
 import { BarChart3, BookOpen } from 'lucide-react';
 import Link from 'next/link';
 import { resolveResources } from '@/lib/learning-resources';
+import { safeExternalUrl } from '@/lib/safe-url';
 
 export default function GapsView() {
   const { currentUser, activeTargetRoleId, gaps, allRoles, handleRoleSelect, personalDataError } = useSkillBridge();
@@ -104,7 +105,7 @@ export default function GapsView() {
                     <BookOpen size={13} style={{ color: 'var(--accent-text)', flexShrink: 0 }} />
                     <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Improve with:</span>
                     {topic.resources.slice(0, 2).map((res, i) => (
-                      <a key={i} href={res.url} target="_blank" rel="noreferrer" className="badge" style={{ fontSize: '0.7rem', padding: '0.2rem 0.55rem', color: 'var(--accent-text)', textDecoration: 'none' }}>
+                      <a key={i} href={safeExternalUrl(res.url)} target="_blank" rel="noreferrer" className="badge" style={{ fontSize: '0.7rem', padding: '0.2rem 0.55rem', color: 'var(--accent-text)', textDecoration: 'none' }}>
                         {res.source}
                       </a>
                     ))}

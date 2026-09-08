@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty } from 'class-validator';
 
 export class RunSqlDto {
   @IsString()
@@ -8,10 +8,6 @@ export class RunSqlDto {
   @IsString()
   @IsNotEmpty()
   query!: string;
-
-  @IsOptional()
-  @IsString()
-  userId?: string;
 }
 
 export class RunCodeDto {
@@ -22,8 +18,4 @@ export class RunCodeDto {
   @IsString()
   @IsNotEmpty()
   code!: string;
-
-  @IsOptional()
-  @IsString()
-  userId?: string;
 }

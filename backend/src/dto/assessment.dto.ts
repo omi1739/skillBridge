@@ -25,10 +25,6 @@ export class AssessmentAnswerDto {
 
 export class SubmitAssessmentDto {
   @IsOptional()
-  @IsString()
-  userId?: string;
-
-  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => AssessmentAnswerDto)

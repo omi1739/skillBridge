@@ -16,12 +16,17 @@ import { JwtAuthGuard, OptionalJwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { AuthPayload } from '../../services/auth.service';
 import { RegisterDto, LoginDto, DeclareSkillDto, UpdateProfileDto, GoogleAuthDto } from '../../dto/auth.dto';
+import { RateLimitGuard } from '../../common/rate-limit.guard';
+import { RateLimit, RateWindow } from '../../common/rate-limit.decorators';
 
 @Controller()
 export class AuthController {
   constructor(@Inject(NestAuthService) private readonly authService: NestAuthService) {}
 
   @Post('auth/register')
+  @UseGuards(RateLimitGuard)
+  @RateLimit(10)
+  @RateWindow(60_000)
   async register(@Body() body: RegisterDto) {
     if (body.password !== body.confirmPassword) {
       throw new BadRequestException('Passwords do not match.');
@@ -31,20 +36,28 @@ export class AuthController {
 
   @Post('auth/login')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(RateLimitGuard)
+  @RateLimit(20)
+  @RateWindow(60_000)
   async login(@Body() body: LoginDto) {
     return this.authService.login(body.email, body.password);
   }
 
   @Post('auth/google')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(RateLimitGuard)
+  @RateLimit(20)
+  @RateWindow(60_000)
   async google(@Body() body: GoogleAuthDto) {
     return this.authService.googleAuth(body.idToken, body.currentStatus);
   }
 
   @Get('me')
   @UseGuards(OptionalJwtAuthGuard)
-  async getMe(@CurrentUser() user: AuthPayload | undefined, @Query('userId') queryUserId?: string) {
-    const userId = user?.userId || queryUserId || 'demo_user_01';
+  async getMe(@CurrentUser() user: AuthPayload | undefined) {
+    // Identity comes exclusively from the JWT. Unauthenticated callers get the
+    // public demo profile only — a supplied userId can never impersonate another user.
+    const userId = user?.userId || 'demo_user_01';
     return this.authService.getCurrentUser(userId);
   }
 

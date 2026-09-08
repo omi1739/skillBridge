@@ -11,6 +11,7 @@ import {
   TOPIC_RESOURCES, TOPIC_CATEGORIES, TopicResources, ResourceLink,
   getTopicsByCategory
 } from '@/lib/learning-resources';
+import { safeExternalUrl } from '@/lib/safe-url';
 
 const DIFFICULTY_COLORS: Record<string, string> = {
   Beginner: 'badge-strength',
@@ -21,7 +22,7 @@ const DIFFICULTY_COLORS: Record<string, string> = {
 function ResourceRow({ res }: { res: ResourceLink }) {
   const Icon = res.kind === 'Video' ? Youtube : res.kind === 'Practice' ? Code2 : FileText;
   return (
-    <a href={res.url} target="_blank" rel="noreferrer" className="learn-resource-link">
+    <a href={safeExternalUrl(res.url)} target="_blank" rel="noreferrer" className="learn-resource-link">
       <Icon size={14} />
       <span style={{ flex: 1 }}>{res.name}</span>
       <span className="badge" style={{ fontSize: '0.6rem' }}>{res.source}</span>

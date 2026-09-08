@@ -1,6 +1,7 @@
 'use client';
 
 import { useSkillBridge } from '@/lib/skillbridge-context';
+import { safeExternalUrl } from '@/lib/safe-url';
 import { RolePromptView } from './prompts';
 import { VerificationBadge } from '@/components/ui/badges';
 import {
@@ -237,7 +238,7 @@ export default function MarketView() {
                           <span className="market-posting-source">{j.sourceName || 'Manual'}</span>
                           <VerificationBadge status={j.verificationStatus} />
                           {j.sourceUrl ? (
-                            <a href={j.sourceUrl} target="_blank" rel="noopener noreferrer" className="btn btn-secondary market-posting-open">
+                            <a href={safeExternalUrl(j.sourceUrl)} target="_blank" rel="noopener noreferrer" className="btn btn-secondary market-posting-open">
                               Open <ExternalLink size={11} />
                             </a>
                           ) : null}

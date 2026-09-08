@@ -2,6 +2,7 @@
 
 import { PlusCircle, FolderGit2, Github, ExternalLink, AlertCircle } from 'lucide-react';
 import { useSkillBridge } from '@/lib/skillbridge-context';
+import { safeExternalUrl } from '@/lib/safe-url';
 import { RolePromptView, SignInPromptView, NoEvidenceView } from './prompts';
 
 export default function ActionsView() {
@@ -93,7 +94,7 @@ export default function ActionsView() {
           {userProjects.map(proj => (
             <div key={proj.id} style={{ background: 'var(--bg-inset-panel)', padding: '1rem', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <a href={proj.repoUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--info)', fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.4rem', textDecoration: 'none' }}>
+                <a href={safeExternalUrl(proj.repoUrl)} target="_blank" rel="noreferrer" style={{ color: 'var(--info)', fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.4rem', textDecoration: 'none' }}>
                   <Github size={14} /> {proj.title} <ExternalLink size={12} />
                 </a>
                 <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>
