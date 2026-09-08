@@ -235,7 +235,7 @@ export class AppDataStore {
   /** Resolve the user's chosen target role id, falling back to the catalog default. */
   async getTargetRoleId(userId: string): Promise<string> {
     const profile = await this.getProfile(userId);
-    return profile?.targetRoleId || 'role_junior_backend';
+    return profile?.targetRoleId || 'role_full_stack';
   }
 
   async saveProfile(userId: string, patch: Partial<Profile>): Promise<Profile | undefined> {

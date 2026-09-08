@@ -78,20 +78,21 @@ export class NestAuthService {
     };
 
     await store.saveEvidence(userId, [newEvidence]);
-    const gaps = await gapService.calculateGaps(userId, 'role_junior_backend');
+    const targetRole = (await store.getProfile(userId))?.targetRoleId || 'role_full_stack';
+    const gaps = await gapService.calculateGaps(userId, targetRole);
 
     return { evidence: newEvidence, gaps };
   }
 
-  async getGaps(userId: string, roleId: string = 'role_junior_backend') {
+  async getGaps(userId: string, roleId: string = 'role_full_stack') {
     return gapService.calculateGaps(userId, roleId);
   }
 
-  async getRecommendations(userId: string, roleId: string = 'role_junior_backend') {
+  async getRecommendations(userId: string, roleId: string = 'role_full_stack') {
     return recommendationService.refreshRecommendations(userId, roleId);
   }
 
-  async getCareerReport(userId: string, roleId: string = 'role_junior_backend') {
+  async getCareerReport(userId: string, roleId: string = 'role_full_stack') {
     const [user, profile, role, evidence, gaps, projects] = await Promise.all([
       store.getUser(userId),
       store.getProfile(userId),

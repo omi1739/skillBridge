@@ -207,7 +207,7 @@ function useSkillBridgeValue() {
 
   // Target-role resolution: null when the user has not picked a role yet.
   const activeTargetRoleId = currentProfile?.targetRoleId || null;
-  const effectiveRoleId = activeTargetRoleId || 'role_junior_backend';
+  const effectiveRoleId = activeTargetRoleId || 'role_full_stack';
 
   const authHeaders = () => {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -618,7 +618,7 @@ function useSkillBridgeValue() {
       }
     }
 
-    const initialRoleId = restoredProfile?.targetRoleId || 'role_junior_backend';
+    const initialRoleId = restoredProfile?.targetRoleId || 'role_full_stack';
     fetchRoleAndSkills(initialRoleId);
     fetchAllRoles();
 

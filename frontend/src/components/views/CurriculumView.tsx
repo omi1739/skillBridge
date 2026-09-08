@@ -17,7 +17,7 @@ export default function CurriculumView() {
         <div>
           <h1 className="page-title">University Syllabi vs. Market Reality</h1>
           <p className="page-subtitle">
-            Benchmarking academic computer science courses against modern backend production expectations.
+            Benchmarking academic computer science courses against modern software engineering production expectations.
           </p>
         </div>
       </div>
@@ -43,7 +43,7 @@ export default function CurriculumView() {
               <div className="stat-value" style={{ color: curriculumAnalysis.marketAlignmentScore >= 65 ? 'var(--success)' : 'var(--warning)' }}>
                 {curriculumAnalysis.marketAlignmentScore}%
               </div>
-              <div className="stat-sub">Coverage of Junior Backend Skills</div>
+              <div className="stat-sub">Coverage of {curriculumAnalysis.targetRole || 'Target'} Skills</div>
             </div>
             <div className="stat-card" style={{ gridColumn: 'span 2' }}>
               <div className="stat-label">Analysis Summary</div>

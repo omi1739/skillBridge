@@ -15,7 +15,7 @@ export class RecommendationService {
   /**
    * Compute the user's current gaps and rebuild their recommendation list.
    */
-  public async refreshRecommendations(userId: string, roleId = 'role_junior_backend'): Promise<ActionRecommendation[]> {
+  public async refreshRecommendations(userId: string, roleId = 'role_full_stack'): Promise<ActionRecommendation[]> {
     const gaps = await gapService.calculateGaps(userId, roleId);
     return this.buildFromGapsAndPersist(userId, gaps);
   }

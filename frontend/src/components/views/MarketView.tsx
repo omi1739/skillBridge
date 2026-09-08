@@ -36,7 +36,7 @@ export default function MarketView() {
         </div>
         <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 0.6rem' }}>Loading Job Market Demand…</h2>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: '0 auto', maxWidth: '420px' }}>
-          Fetching live market requirement data for the junior backend track.
+          Fetching live market requirement data for the selected IT track.
         </p>
       </div>
     );
@@ -83,9 +83,9 @@ export default function MarketView() {
       <div className="page-header">
         <div>
           <div className="market-kicker">Live Market Intelligence</div>
-          <h1 className="page-title">Junior Backend Job Market Demand</h1>
+          <h1 className="page-title">{role.title} Job Market Demand</h1>
           <p className="page-subtitle">
-            Empirical requirements derived from {totalJobsCount} verified junior backend postings — remote and onsite — across the {role.marketContext.region} market.
+            Empirical requirements derived from {totalJobsCount} verified engineering postings — remote and onsite — across the {role.marketContext.region} market.
           </p>
         </div>
       </div>
@@ -131,9 +131,9 @@ export default function MarketView() {
         <div className="card-header market-section-header">
           <div>
             <div className="market-section-eyebrow">Demand by Technology</div>
-            <h2 className="card-title">Required Backend Technologies by Frequency</h2>
+            <h2 className="card-title">Required Technologies by Frequency</h2>
             <p className="card-subtitle">
-              How often each technology appears in actual job requirements for junior backend roles.
+              How often each technology appears in actual job requirements for {role.title.toLowerCase()} roles.
             </p>
           </div>
           {currentUser && (

@@ -96,7 +96,7 @@ export default function JobsView() {
       <div className="page-header">
         <div>
           <div className="jobs-kicker">Verified Compatibility</div>
-          <h1 className="page-title">Matching Backend Jobs</h1>
+          <h1 className="page-title">Matching Engineering Jobs</h1>
           <p className="page-subtitle">
             Bangladesh-first: on-site roles in Bangladesh are shown first, then remote, then other on-site postings. Scores are computed against your verified skill evidence with full requirement traceability.
           </p>
@@ -173,7 +173,7 @@ export default function JobsView() {
           {filteredMatches.length === 0 && (
             <div className="card jobs-empty">
               {jobMatches.length === 0
-                ? 'No matching jobs yet — sign in and take the diagnostic to see tailored backend postings.'
+                ? 'No matching jobs yet — sign in and take the diagnostic to see tailored engineering postings.'
                 : 'No jobs match the selected filter.'}
             </div>
           )}

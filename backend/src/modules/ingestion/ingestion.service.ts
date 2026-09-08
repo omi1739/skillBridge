@@ -5,15 +5,18 @@ import { Skill, JobListing, MarketDemandResponse, MarketDemandStat } from '@skil
 import { CacheService } from '../../common/cache.service';
 import { bdJobsScraper, BdJobItem } from '../../services/bdjobs-scraper.service';
 
-const TARGET_ROLE = 'role_junior_backend';
+const TARGET_ROLE = 'role_full_stack';
 
-// Keywords that indicate a posting is a backend engineering role. A job is
-// classified as backend when its title/description matches one of these OR it
-// matches at least one canonical backend skill from the ontology.
-const BACKEND_HINTS = [
-  'backend', 'back-end', 'back end', 'node.js', 'nodejs', 'node ', 'express',
-  'nest', 'postgres', 'sql', 'api', 'microservice', 'distributed system',
-  'server', 'server-side', 'cloud', 'devops', 'docker', 'redis'
+// Keywords that hint at an IT/engineering role. A job is classified as a
+// software engineering role when its title/description matches one of these OR
+// it matches at least one canonical engineering skill from the ontology.
+const ENGINEERING_HINTS = [
+  'frontend', 'front-end', 'front end', 'backend', 'back-end', 'back end',
+  'fullstack', 'full-stack', 'full stack', 'react', 'angular', 'vue', 'typescript',
+  'node.js', 'nodejs', 'node ', 'express', 'nest', 'postgres', 'sql', 'mongodb',
+  'api', 'microservice', 'distributed system', 'server', 'server-side',
+  'web developer', 'software engineer', 'software developer', 'cloud',
+  'devops', 'docker', 'redis', 'python', 'java', 'php'
 ];
 
 // Job families that are clearly NOT software engineering roles — reject even
@@ -307,7 +310,7 @@ export class IngestionService {
     preferredSkills: string[];
   } | null {
     const haystack = `${item.title} ${item.description}`.toLowerCase();
-    const isBackendByHint = BACKEND_HINTS.some(h => haystack.includes(h));
+    const isEngineeringByHint = ENGINEERING_HINTS.some(h => haystack.includes(h));
 
     const matched: { skill: Skill; confidence: number }[] = [];
     for (const s of skills) {
@@ -319,10 +322,10 @@ export class IngestionService {
       }
     }
 
-    // A backend hint alone is a weak signal; require the min skill matches
-    // unless a strong backend title keyword was present.
+    // A hint alone is a weak signal; require the min skill matches unless a
+    // strong engineering title keyword was present.
     const titleLower = item.title.toLowerCase();
-    const strongTitleHint = /backend|back-end|back end|node|express|nest|devops|api|software|engineer|developer/.test(titleLower);
+    const strongTitleHint = /frontend|front-end|front end|backend|back-end|back end|full.?stack|node|express|nest|react|angular|devops|api|software|engineer|developer/.test(titleLower);
 
     // Reject obvious non-engineering job families even if the description
     // contains a dev skill keyword (e.g. a sales role mentioning "SQL").
@@ -331,14 +334,18 @@ export class IngestionService {
     // Every ingested job must actually reference at least one real skill.
     if (matched.length < Math.max(1, minMatches)) return null;
 
-    // Require a backend/dev signal. A title hint is a strong signal; a body
-    // hint alone still needs at least one matched skill (guaranteed above).
-    if (!strongTitleHint && !isBackendByHint) return null;
+    // Require an engineering/dev signal. A title hint is a strong signal; a
+    // body hint alone still needs at least one matched skill (guaranteed above).
+    if (!strongTitleHint && !isEngineeringByHint) return null;
 
     const required = matched.map(m => m.skill.id);
-    // Jobs that reference a backend skill almost always REQUIRE it; anything
-    // matched beyond the core "must-have" set is treated as preferred.
-    const coreRequired = ['skill_nodejs', 'skill_sql', 'skill_rest_api', 'skill_postgresql', 'skill_javascript'];
+    // Jobs that reference a core engineering skill almost always REQUIRE it;
+    // anything matched beyond the core "must-have" set is treated as preferred.
+    const coreRequired = [
+      'skill_javascript', 'skill_typescript', 'skill_react', 'skill_html_css',
+      'skill_nodejs', 'skill_sql', 'skill_rest_api', 'skill_postgresql',
+      'skill_python', 'skill_java', 'skill_mongodb'
+    ];
     const requiredSkills = required.filter(id => coreRequired.includes(id));
     const preferredSkills = required.filter(id => !coreRequired.includes(id));
 

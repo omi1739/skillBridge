@@ -142,10 +142,10 @@ export async function seedAll(): Promise<void> {
       id: 'profile_01',
       userId: 'demo_user_01',
       fullName: 'Ayman Rahman',
-      targetRoleId: 'role_junior_backend',
+      targetRoleId: 'role_full_stack',
       githubUrl: 'https://github.com/ayman-rahman',
       portfolioUrl: '',
-      bio: 'Aspiring backend engineer eager to master Node.js and distributed systems.',
+      bio: 'Aspiring software engineer eager to master web development across frontend and backend.',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -170,7 +170,7 @@ export async function seedAll(): Promise<void> {
         user: { id: 'admin_user_01', email: 'admin@skillbridge.org', role: 'ADMIN', createdAt: new Date().toISOString() } as User,
         profile: {
           id: 'profile_admin_01', userId: 'admin_user_01', fullName: 'SkillBridge Admin',
-          targetRoleId: 'role_junior_backend', githubUrl: '', portfolioUrl: '',
+          targetRoleId: 'role_full_stack', githubUrl: '', portfolioUrl: '',
           bio: 'Platform administrator responsible for the skill ontology and role weight tuning.',
           createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
         } as Profile,
@@ -180,7 +180,7 @@ export async function seedAll(): Promise<void> {
         user: { id: 'owner_user_01', email: 'seyam.islam020@gmail.com', role: 'ADMIN', currentStatus: 'STUDENT', provider: 'EMAIL', createdAt: new Date().toISOString() } as User,
         profile: {
           id: 'profile_owner_01', userId: 'owner_user_01', fullName: 'Seyam Islam',
-          targetRoleId: 'role_junior_backend', githubUrl: '', portfolioUrl: '',
+          targetRoleId: 'role_full_stack', githubUrl: '', portfolioUrl: '',
           bio: 'SkillBridge platform owner and administrator.',
           createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
         } as Profile,
@@ -190,7 +190,7 @@ export async function seedAll(): Promise<void> {
         user: { id: 'recruiter_user_01', email: 'recruiter@skillbridge.org', role: 'RECRUITER', createdAt: new Date().toISOString() } as User,
         profile: {
           id: 'profile_recruiter_01', userId: 'recruiter_user_01', fullName: 'Talent Acquisition Partner',
-          targetRoleId: 'role_junior_backend', githubUrl: '', portfolioUrl: '',
+          targetRoleId: 'role_full_stack', githubUrl: '', portfolioUrl: '',
           bio: 'Recruiter reviewing candidate skill passports and job matches.',
           createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
         } as Profile,

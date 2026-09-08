@@ -7,7 +7,7 @@ export class NestCurriculumService {
     return curriculumService.getCurricula();
   }
 
-  async analyzeCurriculum(institutionId: string = 'curr_bsc_cse', roleId: string = 'role_junior_backend') {
+  async analyzeCurriculum(institutionId: string = 'curr_bsc_cse', roleId: string = 'role_full_stack') {
     return curriculumService.analyzeCurriculum(institutionId, roleId);
   }
 }

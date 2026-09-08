@@ -17,7 +17,7 @@ export class CurriculumController {
   ) {
     return this.curriculumService.analyzeCurriculum(
       institutionId || 'curr_bsc_cse',
-      roleId || 'role_junior_backend'
+      roleId || 'role_full_stack'
     );
   }
 }

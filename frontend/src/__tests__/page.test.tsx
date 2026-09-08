@@ -18,7 +18,7 @@ import JobsPage from '../app/(app)/jobs/page';
 import AdminPage from '../app/(app)/admin/page';
 
 const USER = { id: 'demo_user_01', fullName: 'Demo Candidate', email: 'demo@skillbridge.dev' };
-const PROFILE = { userId: 'demo_user_01', targetRoleId: 'role_junior_backend' };
+const PROFILE = { userId: 'demo_user_01', targetRoleId: 'role_full_stack' };
 
 const ASSESSMENT = {
   id: 'assessment_backend_diagnostic',
@@ -93,10 +93,26 @@ function setupFetch() {
     if (url.includes('/sandbox/run-code')) {
       return response({ passed: true });
     }
+    if (url.includes('/roles/role_full_stack')) {
+      return response({
+        id: 'role_full_stack',
+        slug: 'full-stack-engineer',
+        title: 'Full-Stack Engineer',
+        category: 'Software Engineering',
+        description: '',
+        roleSkills: [],
+        marketContext: { region: 'Bangladesh', experienceLevel: 'Junior', typicalTitles: [] }
+      });
+    }
     if (url.includes('/roles/role_junior_backend')) {
       return response({
+        id: 'role_junior_backend',
+        slug: 'junior-backend-engineer',
+        title: 'Junior Backend Engineer',
+        category: 'Software Engineering',
+        description: '',
         roleSkills: [],
-        marketContext: { region: 'Bangladesh', experienceLevel: 'Junior' }
+        marketContext: { region: 'Bangladesh', experienceLevel: 'Junior', typicalTitles: [] }
       });
     }
     if (url.includes('/skills')) {
@@ -184,7 +200,7 @@ function renderApp(initialPath = '/') {
 async function loginAsDemo(user: ReturnType<typeof userEvent.setup>) {
   const demo = await screen.findByRole('button', { name: /try demo/i });
   await user.click(demo);
-  await screen.findByRole('heading', { name: /Junior Backend Job Market Demand/i });
+  await screen.findByRole('heading', { name: /Full-Stack Engineer Job Market Demand/i });
   await screen.findByText(/matching jobs/i);
 }
 

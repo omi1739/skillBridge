@@ -8,7 +8,7 @@ export class CurriculumService {
     return this.curricula;
   }
 
-  public async analyzeCurriculum(curriculumId: string, roleId: string = 'role_junior_backend'): Promise<CurriculumComparisonResult> {
+  public async analyzeCurriculum(curriculumId: string, roleId: string = 'role_full_stack'): Promise<CurriculumComparisonResult> {
     const curriculum = this.curricula.find(c => c.id === curriculumId) || this.curricula[0];
     if (!curriculum) {
       throw new Error(`Curriculum ${curriculumId} not found`);

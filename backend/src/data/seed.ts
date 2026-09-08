@@ -72,6 +72,54 @@ export const INITIAL_SKILLS: Skill[] = [
     description: 'In-memory key-value cache, TTL expiration, and caching strategies.',
     aliases: ['caching', 'redis cache'],
     prerequisites: []
+  },
+  {
+    id: 'skill_typescript',
+    canonicalName: 'TypeScript',
+    category: 'Programming Languages',
+    description: 'Typed superset of JavaScript: interfaces, generics, type narrowing, and compile-time safety.',
+    aliases: ['typescript', 'ts', 'typed javascript'],
+    prerequisites: ['skill_javascript']
+  },
+  {
+    id: 'skill_react',
+    canonicalName: 'React',
+    category: 'Runtimes & Frameworks',
+    description: 'Component-based UI library: hooks, state management, rendering, and frontend architecture.',
+    aliases: ['reactjs', 'react.js', 'react hooks'],
+    prerequisites: ['skill_javascript', 'skill_typescript']
+  },
+  {
+    id: 'skill_html_css',
+    canonicalName: 'HTML & CSS',
+    category: 'Programming Languages',
+    description: 'Semantic markup, responsive layout, Flexbox/Grid, accessibility, and modern CSS.',
+    aliases: ['html', 'html5', 'css', 'css3', 'tailwind'],
+    prerequisites: []
+  },
+  {
+    id: 'skill_python',
+    canonicalName: 'Python',
+    category: 'Programming Languages',
+    description: 'General-purpose language: scripting, backend APIs, data pipelines, and automation.',
+    aliases: ['python', 'django', 'flask', 'fastapi'],
+    prerequisites: []
+  },
+  {
+    id: 'skill_java',
+    canonicalName: 'Java',
+    category: 'Programming Languages',
+    description: 'Enterprise language running on the JVM: OOP, Spring Boot, and large-scale backends.',
+    aliases: ['java', 'java se', 'spring', 'spring boot'],
+    prerequisites: []
+  },
+  {
+    id: 'skill_mongodb',
+    canonicalName: 'MongoDB',
+    category: 'Databases',
+    description: 'Document-oriented NoSQL database: schemas, indexes, aggregation pipelines.',
+    aliases: ['mongo', 'mongodb', 'nosql'],
+    prerequisites: []
   }
 ];
 
@@ -143,6 +191,168 @@ export const INITIAL_ROLES: Role[] = [
       },
       {
         skillId: 'skill_redis',
+        required: false,
+        roleWeight: 0.50,
+        marketDemandFrequency: 0,
+        proficiencyTarget: 'Beginner'
+      }
+    ]
+  },
+  {
+    id: 'role_frontend',
+    slug: 'frontend-engineer',
+    title: 'Frontend Engineer',
+    category: 'Software Engineering',
+    description: 'Responsible for modern UI development with React, TypeScript, responsive layout, accessibility, and clean component architecture.',
+    marketContext: {
+      region: 'Bangladesh / Emerging Tech Hubs',
+      experienceLevel: '0 - 2 years',
+      typicalTitles: [
+        'Frontend Developer',
+        'UI Engineer',
+        'React Developer'
+      ]
+    },
+    roleSkills: [
+      {
+        skillId: 'skill_javascript',
+        required: true,
+        roleWeight: 0.90,
+        marketDemandFrequency: 0,
+        proficiencyTarget: 'Intermediate'
+      },
+      {
+        skillId: 'skill_typescript',
+        required: true,
+        roleWeight: 0.90,
+        marketDemandFrequency: 0,
+        proficiencyTarget: 'Intermediate'
+      },
+      {
+        skillId: 'skill_react',
+        required: true,
+        roleWeight: 0.95,
+        marketDemandFrequency: 0,
+        proficiencyTarget: 'Intermediate'
+      },
+      {
+        skillId: 'skill_html_css',
+        required: true,
+        roleWeight: 0.85,
+        marketDemandFrequency: 0,
+        proficiencyTarget: 'Intermediate'
+      },
+      {
+        skillId: 'skill_rest_api',
+        required: true,
+        roleWeight: 0.80,
+        marketDemandFrequency: 0,
+        proficiencyTarget: 'Intermediate'
+      },
+      {
+        skillId: 'skill_git',
+        required: true,
+        roleWeight: 0.80,
+        marketDemandFrequency: 0,
+        proficiencyTarget: 'Intermediate'
+      }
+    ]
+  },
+  {
+    id: 'role_full_stack',
+    slug: 'full-stack-engineer',
+    title: 'Full-Stack Engineer',
+    category: 'Software Engineering',
+    description: 'Responsible for end-to-end product delivery across frontend, backend, databases, APIs, and deployment.',
+    marketContext: {
+      region: 'Bangladesh / Emerging Tech Hubs',
+      experienceLevel: '0 - 3 years',
+      typicalTitles: [
+        'Full Stack Developer',
+        'MERN Stack Developer',
+        'Software Engineer (Full Stack)'
+      ]
+    },
+    roleSkills: [
+      {
+        skillId: 'skill_javascript',
+        required: true,
+        roleWeight: 0.90,
+        marketDemandFrequency: 0,
+        proficiencyTarget: 'Intermediate'
+      },
+      {
+        skillId: 'skill_typescript',
+        required: true,
+        roleWeight: 0.85,
+        marketDemandFrequency: 0,
+        proficiencyTarget: 'Intermediate'
+      },
+      {
+        skillId: 'skill_react',
+        required: true,
+        roleWeight: 0.90,
+        marketDemandFrequency: 0,
+        proficiencyTarget: 'Intermediate'
+      },
+      {
+        skillId: 'skill_html_css',
+        required: true,
+        roleWeight: 0.70,
+        marketDemandFrequency: 0,
+        proficiencyTarget: 'Intermediate'
+      },
+      {
+        skillId: 'skill_nodejs',
+        required: true,
+        roleWeight: 0.85,
+        marketDemandFrequency: 0,
+        proficiencyTarget: 'Intermediate'
+      },
+      {
+        skillId: 'skill_express',
+        required: true,
+        roleWeight: 0.70,
+        marketDemandFrequency: 0,
+        proficiencyTarget: 'Intermediate'
+      },
+      {
+        skillId: 'skill_sql',
+        required: true,
+        roleWeight: 0.80,
+        marketDemandFrequency: 0,
+        proficiencyTarget: 'Intermediate'
+      },
+      {
+        skillId: 'skill_mongodb',
+        required: false,
+        roleWeight: 0.60,
+        marketDemandFrequency: 0,
+        proficiencyTarget: 'Beginner'
+      },
+      {
+        skillId: 'skill_postgresql',
+        required: false,
+        roleWeight: 0.60,
+        marketDemandFrequency: 0,
+        proficiencyTarget: 'Intermediate'
+      },
+      {
+        skillId: 'skill_rest_api',
+        required: true,
+        roleWeight: 0.85,
+        marketDemandFrequency: 0,
+        proficiencyTarget: 'Intermediate'
+      },
+      {
+        skillId: 'skill_git',
+        required: true,
+        roleWeight: 0.80,
+        marketDemandFrequency: 0,
+        proficiencyTarget: 'Intermediate'
+      },
+      {
+        skillId: 'skill_docker',
         required: false,
         roleWeight: 0.50,
         marketDemandFrequency: 0,

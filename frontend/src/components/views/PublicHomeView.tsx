@@ -30,8 +30,8 @@ export default function PublicHomeView() {
     {
       icon: Briefcase,
       kicker: 'Job Seekers',
-      title: 'Job seekers chasing backend roles',
-      desc: 'Match against verified junior postings and prove your skills with evidence.',
+      title: 'Job seekers targeting IT engineering roles',
+      desc: 'Match against verified postings and prove your skills with evidence.',
       cta: 'Browse Matching Jobs',
       onClick: () => router.push('/jobs')
     },
@@ -49,13 +49,13 @@ export default function PublicHomeView() {
     <div>
       <div className="dev-hero">
         <div className="dev-hero-tag">
-          <Database size={13} /> {totalJobsCount} Junior Backend Jobs Analyzed
+          <Database size={13} /> {totalJobsCount} Engineering Jobs Analyzed
         </div>
         <h1 className="dev-hero-title">
           Real job requirements, measured against real skills.
         </h1>
         <p className="dev-hero-desc">
-          SkillBridge ingests live junior backend postings, benchmarks your SQL &amp; Node.js in a real sandbox, and shows exactly what to learn next.
+          SkillBridge ingests live IT job postings, benchmarks your skills in a real sandbox, and shows exactly what to learn next for frontend, backend, or full-stack roles.
         </p>
 
         <div className="landing-actions">
@@ -129,7 +129,7 @@ export default function PublicHomeView() {
                     </span>
                   </div>
                   <div className="skill-card-name">{rs.skill?.canonicalName || rs.skillId}</div>
-                  <div className="skill-card-category">{rs.skill?.category || 'Backend'}</div>
+                  <div className="skill-card-category">{rs.skill?.category || 'Engineering'}</div>
                   <div className="skill-card-demand">
                     <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Demand in postings</span>
                     <strong style={{ fontFamily: 'var(--font-mono)', fontSize: '1.05rem' }}>{pct}%</strong>
@@ -148,7 +148,7 @@ export default function PublicHomeView() {
         <div className="about-section">
           <div className="about-heading">
             <span className="about-kicker">About SkillBridge</span>
-            <h2 className="about-title">Built for developers ready for real backend work.</h2>
+            <h2 className="about-title">Built for developers ready for real software engineering work.</h2>
           </div>
           <div className="about-grid">
             <div className="about-card">
@@ -196,7 +196,7 @@ export default function PublicHomeView() {
           </div>
           <div className="steps-grid">
             {[
-              { step: '01', title: 'Market Intelligence', desc: 'See exactly what junior backend employers ask for, updated live.' },
+              { step: '01', title: 'Market Intelligence', desc: 'See exactly what IT employers ask for, updated live.' },
               { step: '02', title: 'Diagnostic Benchmarks', desc: 'Practical timed challenges with test-asserted grading in a real sandbox.' },
               { step: '03', title: 'Gap Prioritization', desc: 'Know the highest-leverage missing skills and what to build next.' },
               { step: '04', title: 'Matching Applications', desc: 'Browse matched roles with explainable scores and verified evidence.' }
