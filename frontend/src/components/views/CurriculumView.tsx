@@ -23,7 +23,8 @@ export default function CurriculumView() {
       </div>
 
       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-        {curricula.map(c => (
+        {curricula.length === 0 && <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>No institution syllabi loaded yet.</span>}
+        {(curricula || []).map(c => (
           <button
             key={c.id}
             className={`btn ${selectedCurriculumId === c.id ? 'btn-primary' : 'btn-secondary'}`}
@@ -40,15 +41,15 @@ export default function CurriculumView() {
           <div className="stat-grid-3">
             <div className="stat-card">
               <div className="stat-label">Syllabus Alignment Score</div>
-              <div className="stat-value" style={{ color: curriculumAnalysis.marketAlignmentScore >= 65 ? 'var(--success)' : 'var(--warning)' }}>
-                {curriculumAnalysis.marketAlignmentScore}%
+              <div className="stat-value" style={{ color: (curriculumAnalysis.marketAlignmentScore ?? 0) >= 65 ? 'var(--success)' : 'var(--warning)' }}>
+                {curriculumAnalysis.marketAlignmentScore ?? 0}%
               </div>
               <div className="stat-sub">Coverage of {curriculumAnalysis.targetRole || 'Target'} Skills</div>
             </div>
             <div className="stat-card" style={{ gridColumn: 'span 2' }}>
               <div className="stat-label">Analysis Summary</div>
               <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.4rem', lineHeight: 1.5 }}>
-                {curriculumAnalysis.summaryAnalysis}
+                {curriculumAnalysis.summaryAnalysis || 'No curriculum analysis available.'}
               </p>
             </div>
           </div>
@@ -59,7 +60,10 @@ export default function CurriculumView() {
                 <CheckCircle2 size={18} /> Strong Academic Foundation
               </h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {curriculumAnalysis.strongAcademicAreas.map((item, idx) => (
+                {(curriculumAnalysis.strongAcademicAreas || []).length === 0 && (
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>No strong academic coverage identified yet.</p>
+                )}
+                {(curriculumAnalysis.strongAcademicAreas || []).map((item, idx) => (
                   <div key={idx} style={{ background: 'var(--bg-row)', border: '1px solid var(--border-faint)', padding: '0.85rem', borderRadius: '6px' }}>
                     <strong style={{ color: 'var(--success-text)', fontSize: '0.9rem' }}>{item.skill}</strong>
                     <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
@@ -75,7 +79,12 @@ export default function CurriculumView() {
                 <AlertCircle size={18} /> Critical Market Omissions
               </h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {curriculumAnalysis.criticalMarketOmissions.map((item, idx) => (
+                {(curriculumAnalysis.criticalMarketOmissions || []).length === 0 && (
+                  <p style={{ fontSize: '0.8rem', color: 'var(--danger)', fontWeight: 600 }}>
+                    No market-critical omissions found — curriculum coverage is well aligned.
+                  </p>
+                )}
+                {(curriculumAnalysis.criticalMarketOmissions || []).map((item, idx) => (
                   <div key={idx} style={{ background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', padding: '0.85rem', borderRadius: '6px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <strong style={{ color: 'var(--danger-text)', fontSize: '0.9rem' }}>{item.skill}</strong>

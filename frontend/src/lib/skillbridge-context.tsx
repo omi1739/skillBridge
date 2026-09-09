@@ -31,6 +31,15 @@ const TAB_PATH: Record<AppTab, string> = {
   admin: '/admin'
 };
 
+function fetchJSON<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
+  return fetch(input, init).then(res => {
+    if (!res.ok) {
+      throw new Error(`Request failed (${res.status})`);
+    }
+    return res.json();
+  });
+}
+
 function useSkillBridgeValue() {
   const router = useRouter();
 
@@ -400,18 +409,15 @@ function useSkillBridgeValue() {
     setPersonalDataError(false);
 
     if (targetRole) {
-      fetch(`${API_BASE}/me/gaps?userId=${userId}&roleId=${targetRole}`, { headers: headersFor(token) })
-        .then(res => res.json())
+      fetchJSON<SkillGap[]>(`${API_BASE}/me/gaps?userId=${userId}&roleId=${targetRole}`, { headers: headersFor(token) })
         .then(data => { if (Array.isArray(data)) setGaps(data); })
         .catch((err) => { console.error('[SkillBridge] Data load failed:', err); setPersonalDataError(true); });
 
-      fetch(`${API_BASE}/me/recommendations?userId=${userId}&roleId=${targetRole}`, { headers: headersFor(token) })
-        .then(res => res.json())
+      fetchJSON<ActionRecommendation[]>(`${API_BASE}/me/recommendations?userId=${userId}&roleId=${targetRole}`, { headers: headersFor(token) })
         .then(data => { if (Array.isArray(data)) setRecommendations(data); })
         .catch((err) => { console.error('[SkillBridge] Data load failed:', err); setPersonalDataError(true); });
 
-      fetch(`${API_BASE}/jobs/matches?userId=${userId}&roleId=${targetRole}`, { headers: headersFor(token) })
-        .then(res => res.json())
+      fetchJSON<JobMatchResult[]>(`${API_BASE}/jobs/matches?userId=${userId}&roleId=${targetRole}`, { headers: headersFor(token) })
         .then(data => { if (Array.isArray(data)) setJobMatches(data); })
         .catch((err) => { console.error('[SkillBridge] Data load failed:', err); setPersonalDataError(true); });
 
@@ -423,21 +429,18 @@ function useSkillBridgeValue() {
       setAllJobs([]);
     }
 
-    fetch(`${API_BASE}/me/projects?userId=${userId}`, { headers: headersFor(token) })
-      .then(res => res.json())
-      .then(data => setUserProjects(data))
+    fetchJSON<ProjectEvidence[]>(`${API_BASE}/me/projects?userId=${userId}`, { headers: headersFor(token) })
+      .then(data => setUserProjects(Array.isArray(data) ? data : []))
       .catch((err) => { console.error('[SkillBridge] Data load failed:', err); setPersonalDataError(true); });
 
     if (role === 'ADMIN') {
-      fetch(`${API_BASE}/admin/overview`, { headers: headersFor(token) })
-        .then(res => (res.ok ? res.json() : Promise.reject(res)))
+      fetchJSON<any>(`${API_BASE}/admin/overview`, { headers: headersFor(token) })
         .then(data => setAdminOverview(data))
         .catch((err) => {
           console.error('[SkillBridge] Admin overview load failed:', err);
           setAdminOverview(null);
         });
-      fetch(`${API_BASE}/admin/dashboard`, { headers: headersFor(token) })
-        .then(res => (res.ok ? res.json() : Promise.reject(res)))
+      fetchJSON<any>(`${API_BASE}/admin/dashboard`, { headers: headersFor(token) })
         .then(data => setAdminDashboard(data))
         .catch((err) => {
           console.error('[SkillBridge] Admin dashboard load failed:', err);
@@ -523,15 +526,13 @@ function useSkillBridgeValue() {
   };
 
   const fetchAllRoles = () => {
-    fetch(`${API_BASE}/roles`)
-      .then(res => res.json())
+    fetchJSON<Role[]>(`${API_BASE}/roles`)
       .then(data => setAllRoles(Array.isArray(data) ? data : []))
       .catch((err) => console.error('[SkillBridge] Roles load failed:', err));
   };
 
   const fetchRoleAndSkills = (roleId = effectiveRoleId) => {
-    fetch(`${API_BASE}/roles/${roleId}`)
-      .then(res => res.json())
+    fetchJSON<Role>(`${API_BASE}/roles/${roleId}`)
       .then(data => {
         setRole(data);
         if (data.roleSkills && data.roleSkills.length > 0 && !editingSkillWeight) {
@@ -544,9 +545,8 @@ function useSkillBridgeValue() {
       })
       .catch((err) => console.error('[SkillBridge] Data load failed:', err));
 
-    fetch(`${API_BASE}/skills`)
-      .then(res => res.json())
-      .then(data => setSkills(data))
+    fetchJSON<Skill[]>(`${API_BASE}/skills`)
+      .then(data => setSkills(Array.isArray(data) ? data : []))
       .catch((err) => console.error('[SkillBridge] Data load failed:', err));
   };
 
@@ -624,33 +624,32 @@ function useSkillBridgeValue() {
 
     loadDiagnostic(12);
 
-    fetch(`${API_BASE}/sandbox/challenges`)
-      .then(res => res.json())
+    fetchJSON<any[]>(`${API_BASE}/sandbox/challenges`)
       .then(data => {
-        setChallenges(data);
-        if (data.length > 0) {
-          setSandboxCode(data[0].starterCode);
+        const list = Array.isArray(data) ? data : [];
+        setChallenges(list);
+        if (list.length > 0) {
+          setSandboxCode(list[0].starterCode);
         }
       })
       .catch((err) => console.error('[SkillBridge] Data load failed:', err));
 
-    fetch(`${API_BASE}/curriculum/institutions`)
-      .then(res => res.json())
-      .then(data => setCurricula(data))
+    fetchJSON<CurriculumProfile[]>(`${API_BASE}/curriculum/institutions`)
+      .then(data => setCurricula(Array.isArray(data) ? data : []))
       .catch((err) => console.error('[SkillBridge] Data load failed:', err));
 
-    fetch(`${API_BASE}/curriculum/analyze?institutionId=curr_bsc_cse&roleId=${initialRoleId}`)
-      .then(res => res.json())
+    fetchJSON<CurriculumComparisonResult>(`${API_BASE}/curriculum/analyze?institutionId=curr_bsc_cse&roleId=${initialRoleId}`)
       .then(data => setCurriculumAnalysis(data))
-      .catch((err) => console.error('[SkillBridge] Data load failed:', err));
+      .catch((err) => {
+        console.error('[SkillBridge] Curriculum analysis load failed:', err);
+        setCurriculumAnalysis(null);
+      });
 
-    fetch(`${API_BASE}/stats`)
-      .then(res => res.json())
+    fetchJSON<any>(`${API_BASE}/stats`)
       .then(data => setLandingStats(data))
       .catch((err) => console.error('[SkillBridge] Data load failed:', err));
 
-    fetch(`${API_BASE}/market/demand?roleId=${initialRoleId}`)
-      .then(res => res.json())
+    fetchJSON<any>(`${API_BASE}/market/demand?roleId=${initialRoleId}`)
       .then(data => {
         if (data && typeof data.totalJobs === 'number') {
           setMarketProvenance({
@@ -858,10 +857,12 @@ function useSkillBridgeValue() {
 
   const handleCurriculumChange = (currId: string) => {
     setSelectedCurriculumId(currId);
-    fetch(`${API_BASE}/curriculum/analyze?institutionId=${currId}&roleId=${effectiveRoleId}`)
-      .then(res => res.json())
+    fetchJSON<CurriculumComparisonResult>(`${API_BASE}/curriculum/analyze?institutionId=${currId}&roleId=${effectiveRoleId}`)
       .then(data => setCurriculumAnalysis(data))
-      .catch((err) => console.error('[SkillBridge] Data load failed:', err));
+      .catch((err) => {
+        console.error('[SkillBridge] Curriculum analysis load failed:', err);
+        setCurriculumAnalysis(null);
+      });
   };
 
   const handleOpenPassport = async () => {

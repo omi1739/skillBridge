@@ -10,13 +10,7 @@ export class CurriculumService {
 
   public async analyzeCurriculum(curriculumId: string, roleId: string = 'role_full_stack'): Promise<CurriculumComparisonResult> {
     const curriculum = this.curricula.find(c => c.id === curriculumId) || this.curricula[0];
-    if (!curriculum) {
-      throw new Error(`Curriculum ${curriculumId} not found`);
-    }
     const role: Role | undefined = await store.getRole(roleId);
-    if (!role) {
-      throw new Error(`Role ${roleId} not found`);
-    }
 
     const strongAcademicAreas: Array<{ skill: string; reason: string }> = [];
     const criticalMarketOmissions: Array<{
@@ -26,12 +20,27 @@ export class CurriculumService {
       recommendation: string;
     }> = [];
 
+    if (!curriculum || !role || !role.roleSkills || role.roleSkills.length === 0) {
+      return {
+        institution: curriculum?.institutionName || 'No curriculum loaded',
+        targetRole: role?.title || roleId,
+        marketAlignmentScore: 0,
+        strongAcademicAreas,
+        criticalMarketOmissions,
+        summaryAnalysis: curriculum
+          ? 'Curriculum and role prerequisites are still being prepared.'
+          : 'No curriculum data is loaded yet. Once a syllabus is ingested, this analysis will benchmark it against live market demand.'
+      };
+    }
+    const availableRole = role;
+    const availableCurriculum = curriculum;
+
     let totalWeight = 0;
     let alignedWeight = 0;
 
-    for (const rs of role.roleSkills) {
+    for (const rs of availableRole.roleSkills) {
       const skillName = rs.skill?.canonicalName || rs.skillId;
-      const coverage = curriculum.coverageAreas.find(c => c.skillId === rs.skillId);
+      const coverage = availableCurriculum.coverageAreas.find(c => c.skillId === rs.skillId);
       totalWeight += rs.roleWeight * rs.marketDemandFrequency;
 
       if (coverage) {
@@ -78,15 +87,15 @@ export class CurriculumService {
     const alignmentScore = totalWeight > 0 ? Math.round((alignedWeight / totalWeight) * 100) : 50;
 
     let summaryAnalysis = '';
-    if (curriculum.type === 'UNIVERSITY_DEGREE') {
+    if (availableCurriculum.type === 'UNIVERSITY_DEGREE') {
       summaryAnalysis = `The B.Sc. CSE syllabus builds formidable foundations in database theory, algorithmic problem solving, and software engineering principles. However, modern industry backend requirements (Node.js runtime, Docker containerization, REST API contracts, and Git workflows) have a ${100 - alignmentScore}% practical gap that students must bridge through hands-on capstones.`;
     } else {
       summaryAnalysis = `The Bootcamp curriculum strongly emphasizes practical web technologies (JavaScript, Node.js, REST APIs) with a high initial alignment (${alignmentScore}%). To advance, candidates should deepen database optimization (indexing, transactions) and containerization.`;
     }
 
     return {
-      institution: curriculum.institutionName,
-      targetRole: role.title,
+      institution: availableCurriculum.institutionName,
+      targetRole: availableRole.title,
       marketAlignmentScore: alignmentScore,
       strongAcademicAreas,
       criticalMarketOmissions,
