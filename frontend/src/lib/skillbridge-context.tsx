@@ -215,27 +215,31 @@ function useSkillBridgeValue() {
 
       let timeLimitMinutes = data?.timeLimitMinutes || 15;
 
-      // Best-effort server start. A 404/405 means the running backend predates
-      // the `/start` route (deploy lag between the frontend and API hosts), in
-      // which case we fall back to the client-sided timer — the old backend
-      // cannot enforce a server window anyway, so nothing regresses. Any other
-      // non-2xx (401, 400 on expired attempts, …) stays a hard error so real
-      // auth/expiry problems are never masked.
-      const startRes = await fetch(`${API_BASE}/assessments/assessment_backend_diagnostic/start`, {
-        method: 'POST',
-        headers: authHeaders()
-      });
-      if (startRes.ok) {
-        const start = await startRes.json().catch(() => null);
-        if (start?.attemptId) {
-          timeLimitMinutes = start.timeLimitMinutes || timeLimitMinutes;
+      // Server-sided `/start`: only meaningful once there's an account to hold
+      // the attempt window against. Anonymous demo visitors have no token, so
+      // the JWT guard would 401 them — a server attempt is impossible anyway,
+      // so skip straight to the client timer in that case (matches the legacy
+      // demo behaviour). For signed-in users, a 404/405 means the deployed
+      // backend predates the route (deploy lag) → graceful client timer. Any
+      // other non-2xx (real 401 on expired tokens, 400 on expired attempts, …)
+      // stays a hard error so auth/expiry problems are never masked.
+      if (authToken) {
+        const startRes = await fetch(`${API_BASE}/assessments/assessment_backend_diagnostic/start`, {
+          method: 'POST',
+          headers: authHeaders()
+        });
+        if (startRes.ok) {
+          const start = await startRes.json().catch(() => null);
+          if (start?.attemptId) {
+            timeLimitMinutes = start.timeLimitMinutes || timeLimitMinutes;
+          }
+        } else if (startRes.status !== 404 && startRes.status !== 405) {
+          const start = await startRes.json().catch(() => null);
+          throw new Error(start?.message || start?.error || 'Could not start the assessment. Please sign in first.');
+        } else {
+          // 404/405 — backend not re-deployed yet; keep the client timer (legacy mode).
+          console.warn('[SkillBridge] /assessments/:id/start unavailable on the API host; using the client-sided timer (legacy backend).');
         }
-      } else if (startRes.status !== 404 && startRes.status !== 405) {
-        const start = await startRes.json().catch(() => null);
-        throw new Error(start?.message || start?.error || 'Could not start the assessment. Please sign in first.');
-      } else {
-        // 404/405 — backend not re-deployed yet; keep the client timer (legacy mode).
-        console.warn('[SkillBridge] /assessments/:id/start unavailable on the API host; using the client-sided timer (legacy backend).');
       }
 
       setAssessment(data);
