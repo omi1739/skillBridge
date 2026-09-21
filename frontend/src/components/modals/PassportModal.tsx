@@ -22,10 +22,10 @@ export default function PassportModal() {
             <button className="btn btn-secondary" onClick={() => window.print()} title="Print or Save as PDF" style={{ padding: '0.4rem 0.6rem' }}>
               <Printer size={15} /> Print
             </button>
-            <button className="btn btn-secondary" onClick={handleCopyPassportMarkdown} title="Copy Markdown" style={{ padding: '0.4rem 0.6rem' }}>
+            <button className="btn btn-secondary" onClick={handleCopyPassportMarkdown} title="Copy Markdown" aria-label="Copy Markdown" style={{ padding: '0.4rem 0.6rem' }}>
               {copySuccess ? <Check size={15} color="var(--success)" /> : <Copy size={15} />}
             </button>
-            <button className="btn btn-ghost" onClick={() => setShowPassportModal(false)} style={{ padding: '0.4rem' }}>
+            <button className="btn btn-ghost" onClick={() => setShowPassportModal(false)} style={{ padding: '0.4rem' }} aria-label="Close">
               <X size={18} />
             </button>
           </div>

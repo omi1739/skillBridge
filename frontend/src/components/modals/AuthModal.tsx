@@ -14,6 +14,7 @@ export default function AuthModal() {
     authError, setAuthError,
     isAuthLoading,
     handleAuthSubmit, handleDemoLogin,
+    isDemoAccessEnabled,
     googleBtnHiddenRef,
     allRoles
   } = useSkillBridge();
@@ -208,7 +209,7 @@ export default function AuthModal() {
             )}
           </button>
 
-          {authMode === 'LOGIN' && (
+          {authMode === 'LOGIN' && isDemoAccessEnabled && (
             <button
               type="button"
               className="auth-demo-btn"

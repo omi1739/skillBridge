@@ -28,16 +28,27 @@ export class StatsService {
       return cached;
     }
 
-    const [jobs, skills, curricula] = await Promise.all([
+    const [jobs, skills, curricula, assessments] = await Promise.all([
       store.getJobs(),
       store.getSkills(),
-      curriculumService.getCurricula()
+      curriculumService.getCurricula(),
+      store.getAssessments()
     ]);
     const uniqueCompanies = new Set(jobs.map((j: JobListing) => j.company)).size;
+    // "Validation" = how much of the canonical skill set is underpinned by
+    // assessment content. Compute it from real coverage instead of a hardcoded
+    // constant so the landing figure cannot overstate the platform's maturity.
+    const assessedSkillIds = new Set(
+      assessments.map(a => a.skillId).filter((id): id is string => Boolean(id))
+    );
+    const skillsWithCoverage = skills.filter(s => assessedSkillIds.has(s.id)).length;
+    const validationPercent = skills.length > 0
+      ? Math.round((skillsWithCoverage / skills.length) * 100)
+      : 0;
     const stats: LandingStats = {
       jobPostings: jobs.length,
       canonicalSkills: skills.length,
-      validationPercent: 100,
+      validationPercent,
       curriculaCount: curricula.length,
       activeCompanies: uniqueCompanies
     };

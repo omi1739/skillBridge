@@ -3,6 +3,7 @@ import {
   AssessmentResult,
   AssessmentSession,
   BankQuestion,
+  Question,
   QuestionResult,
   SkillLevel,
   SkillEvidence,
@@ -42,14 +43,34 @@ export class AssessmentEngine {
   // cannot be resumed or submitted. Overridable via env, default 24h.
   private static readonly SESSION_TTL_MS = Number(process.env.ASSESSMENT_TTL_MS || 24 * 60 * 60 * 1000);
 
+  // Per-question time budget used to derive a session's hard time limit.
+  private static readonly MINUTES_PER_QUESTION = Number(process.env.ASSESSMENT_MINUTES_PER_QUESTION || 2);
+  private static readonly MIN_TIME_LIMIT_MIN = 15;
+  private static readonly MAX_TIME_LIMIT_MIN = 60;
+  private static readonly MAX_QUESTIONS_PER_ASSESSMENT = 30;
+
   private nextAttemptId(): string {
     return `att_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   }
 
-  private async markExpiredIfStale(session: { id: string; status: string; started_at: string }): Promise<boolean> {
+  private sessionTimeLimitMinutes(questionCount: number): number {
+    return Math.min(
+      AssessmentEngine.MAX_TIME_LIMIT_MIN,
+      Math.max(
+        AssessmentEngine.MIN_TIME_LIMIT_MIN,
+        Math.round(questionCount * AssessmentEngine.MINUTES_PER_QUESTION)
+      )
+    );
+  }
+
+  private async markExpiredIfStale(session: { id: string; status: string; started_at: string; question_count: string | number }): Promise<boolean> {
     if (session.status === 'in_progress' && session.started_at) {
       const age = Date.now() - new Date(session.started_at).getTime();
-      if (age > AssessmentEngine.SESSION_TTL_MS) {
+      const limitMs = Math.min(
+        AssessmentEngine.SESSION_TTL_MS,
+        this.sessionTimeLimitMinutes(Number(session.question_count)) * 60_000
+      );
+      if (age > limitMs) {
         await expireSession(session.id);
         return true;
       }
@@ -105,6 +126,7 @@ export class AssessmentEngine {
       difficulty: 'mixed',
       questionCount: questions.length,
       status: 'in_progress',
+      timeLimitMinutes: this.sessionTimeLimitMinutes(questions.length),
       startedAt: new Date().toISOString(),
       questions: questions.map((q, i) => this.toQuestionView(q, allocation, i))
     };
@@ -127,6 +149,7 @@ export class AssessmentEngine {
       difficulty: session.difficulty || 'mixed',
       questionCount: Number(session.question_count || questions.length),
       status: (status as any) || 'in_progress',
+      timeLimitMinutes: this.sessionTimeLimitMinutes(Number(session.question_count || questions.length)),
       startedAt: session.started_at,
       completedAt: session.completed_at || undefined,
       score: session.score != null ? Number(session.score) : undefined,
@@ -195,25 +218,28 @@ export class AssessmentEngine {
         byTopic[q.topic].earned += weight * credit;
       }
 
-      detailedResults.push({
-        question: {
-          id: q.id,
-          assessmentId: '',
-          prompt: q.questionText,
-          codeSnippet: q.codeSnippet,
-          questionType: this.mapQuestionType(q.questionType),
-          options: q.options ? [...q.options] : undefined,
-          subSkill: q.topic,
-          difficulty: q.difficulty === 'easy' ? 'Beginner' : q.difficulty === 'hard' ? 'Advanced' : 'Intermediate',
-          points: weight,
-          correctAnswer: Array.isArray(q.correctAnswer) ? q.correctAnswer.join(', ') : q.correctAnswer,
-          explanation: q.explanation
-        },
-        userAnswer: Array.isArray(submitted) ? submitted.join(', ') : (submitted as any) || null,
-        correct,
-        correctAnswer: Array.isArray(q.correctAnswer) ? q.correctAnswer.join(', ') : q.correctAnswer,
-        explanation: q.explanation
-      });
+      const baseQuestion: Question = {
+        id: q.id,
+        assessmentId: '',
+        prompt: q.questionText,
+        codeSnippet: q.codeSnippet,
+        questionType: this.mapQuestionType(q.questionType),
+        options: q.options ? [...q.options] : undefined,
+        subSkill: q.topic,
+        difficulty: q.difficulty === 'easy' ? 'Beginner' : q.difficulty === 'hard' ? 'Advanced' : 'Intermediate',
+        points: weight
+      };
+
+      // Never reveal correct answers/explanations for questions the candidate
+      // did not answer — that would let them farm the fixed question bank.
+      const review: QuestionResult = { question: baseQuestion, userAnswer: null, correct: false };
+      if (stored) {
+        review.userAnswer = Array.isArray(submitted) ? submitted.join(', ') : (submitted as any) || null;
+        review.correct = correct;
+        review.correctAnswer = Array.isArray(q.correctAnswer) ? q.correctAnswer.join(', ') : q.correctAnswer;
+        review.explanation = q.explanation;
+      }
+      detailedResults.push(review);
     }
 
     const score = scoringService.calculateScore(earnedWeighted, maxWeighted);
@@ -276,27 +302,28 @@ export class AssessmentEngine {
       const a = answers.find(x => x.questionId === view.id);
       const correct = a ? a.isCorrect : false;
       if (correct) correctCount++;
-      if (q) {
-        detailedResults.push({
-          question: {
-            id: q.id,
-            assessmentId: '',
-            prompt: q.questionText,
-            codeSnippet: q.codeSnippet,
-            questionType: this.mapQuestionType(q.questionType),
-            options: q.options ? [...q.options] : undefined,
-            subSkill: q.topic,
-            difficulty: q.difficulty === 'easy' ? 'Beginner' : q.difficulty === 'hard' ? 'Advanced' : 'Intermediate',
-            points: questionPoints(q.difficulty),
-            correctAnswer: Array.isArray(q.correctAnswer) ? q.correctAnswer.join(', ') : q.correctAnswer,
-            explanation: q.explanation
-          },
-          userAnswer: a ? (Array.isArray(a.answer) ? a.answer.join(', ') : (a.answer as any)) : null,
-          correct,
-          correctAnswer: Array.isArray(q.correctAnswer) ? q.correctAnswer.join(', ') : q.correctAnswer,
-          explanation: q.explanation
-        });
+      if (!q) continue;
+
+      const baseQuestion: Question = {
+        id: q.id,
+        assessmentId: '',
+        prompt: q.questionText,
+        codeSnippet: q.codeSnippet,
+        questionType: this.mapQuestionType(q.questionType),
+        options: q.options ? [...q.options] : undefined,
+        subSkill: q.topic,
+        difficulty: q.difficulty === 'easy' ? 'Beginner' : q.difficulty === 'hard' ? 'Advanced' : 'Intermediate',
+        points: questionPoints(q.difficulty)
+      };
+
+      const review: QuestionResult = { question: baseQuestion, userAnswer: null, correct: false };
+      if (a) {
+        review.userAnswer = Array.isArray(a.answer) ? a.answer.join(', ') : (a.answer as any);
+        review.correct = correct;
+        review.correctAnswer = Array.isArray(q.correctAnswer) ? q.correctAnswer.join(', ') : q.correctAnswer;
+        review.explanation = q.explanation;
       }
+      detailedResults.push(review);
     }
     const skills = await getSkills();
     const skillName = skills.find(s => s.id === session.skill_id)?.canonicalName || session.skill_id;
@@ -364,12 +391,23 @@ export class AssessmentEngine {
   }
 
   private normalizeAllocation(cfg: AssessmentConfig): AssessmentConfig {
-    const total = cfg.easyCount + cfg.mediumCount + cfg.hardCount;
+    const easy = Math.max(0, Math.min(AssessmentEngine.MAX_QUESTIONS_PER_ASSESSMENT, cfg.easyCount || 0));
+    const medium = Math.max(0, Math.min(AssessmentEngine.MAX_QUESTIONS_PER_ASSESSMENT, cfg.mediumCount || 0));
+    const hard = Math.max(0, Math.min(AssessmentEngine.MAX_QUESTIONS_PER_ASSESSMENT, cfg.hardCount || 0));
+    const total = easy + medium + hard;
     if (total <= 0) {
       throw new BadRequestException('Assessment must include at least one question');
     }
+    if (total > AssessmentEngine.MAX_QUESTIONS_PER_ASSESSMENT) {
+      throw new BadRequestException(
+        `Assessment cannot exceed ${AssessmentEngine.MAX_QUESTIONS_PER_ASSESSMENT} questions per session.`
+      );
+    }
     return {
       ...cfg,
+      easyCount: easy,
+      mediumCount: medium,
+      hardCount: hard,
       totalQuestions: total,
       title: cfg.title
     };

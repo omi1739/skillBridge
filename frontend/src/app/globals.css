@@ -16,6 +16,7 @@
   --bg-topbar: rgba(255, 255, 255, 0.92);
   --bg-card: #ffffff;
   --bg-card-hover: #fbfcfd;
+  --bg-hover: #eef2f5;
   --bg-surface: #edf1f5;
   --bg-input: #ffffff;
   --bg-inset: #e9edf2;
@@ -54,6 +55,7 @@
   --danger-text: #b91c1c;
   --danger-bg: rgba(220, 38, 38, 0.08);
   --danger-border: rgba(220, 38, 38, 0.24);
+  --danger-shadow: rgba(220, 38, 38, 0.14);
 
   --warning: #d97706;
   --warning-text: #b45309;
@@ -102,6 +104,7 @@
   --bg-topbar: rgba(13, 17, 23, 0.92);
   --bg-card: #161d26;
   --bg-card-hover: #1a222d;
+  --bg-hover: #202a36;
   --bg-surface: #1c2430;
   --bg-input: #0d1117;
   --bg-inset: #0a0e14;
@@ -136,6 +139,7 @@
   --danger-text: #fda4af;
   --danger-bg: rgba(251, 113, 133, 0.12);
   --danger-border: rgba(251, 113, 133, 0.32);
+  --danger-shadow: rgba(251, 113, 133, 0.18);
 
   --warning: #fbbf24;
   --warning-text: #fcd34d;

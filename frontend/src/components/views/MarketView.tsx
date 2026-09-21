@@ -22,6 +22,7 @@ export default function MarketView() {
     setAuthMode,
     setShowAuthModal,
     handleDemoLogin,
+    isDemoAccessEnabled,
     navigate
   } = useSkillBridge();
 
@@ -59,8 +60,7 @@ export default function MarketView() {
       accent: 'info',
       label: 'Focus Region',
       value: role.marketContext.region,
-      sub: 'Dhaka, Chittagong & remote hubs',
-      valueClass: 'tile-value'
+      sub: 'Dhaka, Chittagong & remote hubs'
     },
     {
       icon: BarChart3,
@@ -211,9 +211,11 @@ export default function MarketView() {
                         Create a free account or log in to view the real, verified postings behind each percentage.
                       </div>
                     </div>
+                    {isDemoAccessEnabled && (
                     <button className="btn btn-primary" style={{ fontSize: '0.8rem', padding: '0.4rem 0.9rem' }} onClick={handleDemoLogin}>
                       Explore Demo <ArrowRight size={13} />
                     </button>
+                  )}
                     <button className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '0.4rem 0.9rem' }} onClick={() => { setAuthMode('REGISTER'); setShowAuthModal(true); }}>
                       Register Free
                     </button>

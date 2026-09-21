@@ -74,6 +74,13 @@ function setupFetch() {
     if (url.includes('/assessments/diagnostic')) {
       return response(ASSESSMENT);
     }
+    if (url.includes('/start')) {
+      return response({
+        attemptId: 'att_test_frontend',
+        startedAt: new Date().toISOString(),
+        timeLimitMinutes: 15
+      });
+    }
     if (url.includes('/assessments/') && url.includes('/submit')) {
       return response({
         attempt: { score: 60, totalPointsEarned: 30, maxPoints: 50, passed: false, subSkillScores: [], status: 'COMPLETED' },

@@ -19,6 +19,7 @@ import {
 } from '../data/skill-bank.seed';
 import { query, withTransaction } from './client';
 import { authService } from '../services/auth.service';
+import { DEMO_USER_ID, DEMO_EMAIL } from '../common/demo-access';
 
 const SCHEMA_PATH = path.resolve(__dirname, '../../../docs/architecture/schema.sql');
 
@@ -28,7 +29,29 @@ export async function applySchema(): Promise<void> {
   console.log('[SkillBridge DB] Schema applied.');
 }
 
+/**
+ * Production never falls back to a well-known default password. In production
+ * the bootstrap passwords must come from the environment; in any other
+ * environment a documented dev default is fine. Returns a bcrypt hash, or
+ * undefined when the account should be skipped.
+ */
+async function seedPasswordHash(envVar: string, devFallback: string): Promise<string | undefined> {
+  if (process.env.NODE_ENV === 'production' && !process.env[envVar]) {
+    console.warn(`[SkillBridge DB] Skipping seed account (${envVar} not set in production).`);
+    return undefined;
+  }
+  const secret = process.env[envVar] || devFallback;
+  return authService.hashPassword(secret);
+}
+
 export async function seedAll(): Promise<void> {
+  // Demo + staff identities are a development convenience. They must never be
+  // created or re-seeded into production unless SEED_DEMO_USERS=true is set
+  // as an explicit override (default: non-production only).
+  const demoSeedEnabled =
+    process.env.SEED_DEMO_USERS !== undefined
+      ? process.env.SEED_DEMO_USERS === 'true'
+      : process.env.NODE_ENV !== 'production';
   await withTransaction(async client => {
     // --- Skills + aliases + prerequisites ---
     for (const s of INITIAL_SKILLS) {
@@ -121,26 +144,28 @@ export async function seedAll(): Promise<void> {
 
     // --- Demo user + profile ---
     // Demo login: candidate@skillbridge.org / SkillBridge@123
+    // DO NOTHING on conflict: never overwrite a real (possibly password-reset
+    // or role-changed) account that already exists.
+    if (!demoSeedEnabled) {
+      return;
+    }
     const demoPasswordHash = await authService.hashPassword('SkillBridge@123');
     const demoUser: User = {
-      id: 'demo_user_01',
-      email: 'candidate@skillbridge.org',
+      id: DEMO_USER_ID,
+      email: DEMO_EMAIL,
       role: 'USER',
       createdAt: new Date().toISOString()
     };
     await client.query(
       `INSERT INTO users (id, email, password_hash, role, created_at, updated_at)
        VALUES ($1,$2,$3,$4,$5::timestamptz,$5::timestamptz)
-       ON CONFLICT (id) DO UPDATE SET
-         email = EXCLUDED.email,
-         password_hash = EXCLUDED.password_hash,
-         role = EXCLUDED.role`,
+       ON CONFLICT (id) DO NOTHING`,
       [demoUser.id, demoUser.email, demoPasswordHash, demoUser.role, demoUser.createdAt]
     );
 
     const demoProfile: Profile = {
       id: 'profile_01',
-      userId: 'demo_user_01',
+      userId: DEMO_USER_ID,
       fullName: 'Ayman Rahman',
       targetRoleId: 'role_full_stack',
       githubUrl: 'https://github.com/ayman-rahman',
@@ -159,12 +184,15 @@ export async function seedAll(): Promise<void> {
        demoProfile.createdAt, demoProfile.updatedAt]
     );
 
-    // --- Admin + Recruiter users (real role separation, login-testable) ---
-    //   Admin:    admin@skillbridge.org    / AdminBridge@123    (role ADMIN)
-    //   Recruiter: recruiter@skillbridge.org / RecruitBridge@123 (role RECRUITER)
-    const adminPasswordHash = await authService.hashPassword('AdminBridge@123');
-    const recruiterPasswordHash = await authService.hashPassword('RecruitBridge@123');
-    const ownerPasswordHash = await authService.hashPassword('318485#New');
+    // --- Admin + Recruiter + Owner (real role separation, login-testable) ---
+    //   Admin:      admin@skillbridge.org        (role ADMIN)     password via SEED_ADMIN_PASSWORD
+    //   Recruiter:  recruiter@skillbridge.org    (role RECRUITER) password via SEED_RECRUITER_PASSWORD
+    //   Owner:      seyam.islam020@gmail.com     (role ADMIN)     password via SEED_OWNER_PASSWORD
+    // The owner's bootstrap password is never hardcoded — provision it through
+    // SEED_OWNER_PASSWORD to seed that account.
+    const adminHash = await seedPasswordHash('SEED_ADMIN_PASSWORD', 'AdminBridge@123');
+    const recruiterHash = await seedPasswordHash('SEED_RECRUITER_PASSWORD', 'RecruitBridge@123');
+    const ownerHash = await seedPasswordHash('SEED_OWNER_PASSWORD', '');
     const staffUsers = [
       {
         user: { id: 'admin_user_01', email: 'admin@skillbridge.org', role: 'ADMIN', createdAt: new Date().toISOString() } as User,
@@ -174,7 +202,7 @@ export async function seedAll(): Promise<void> {
           bio: 'Platform administrator responsible for the skill ontology and role weight tuning.',
           createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
         } as Profile,
-        hash: adminPasswordHash
+        hash: adminHash
       },
       {
         user: { id: 'owner_user_01', email: 'seyam.islam020@gmail.com', role: 'ADMIN', currentStatus: 'STUDENT', provider: 'EMAIL', createdAt: new Date().toISOString() } as User,
@@ -184,7 +212,7 @@ export async function seedAll(): Promise<void> {
           bio: 'SkillBridge platform owner and administrator.',
           createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
         } as Profile,
-        hash: ownerPasswordHash
+        hash: ownerHash
       },
       {
         user: { id: 'recruiter_user_01', email: 'recruiter@skillbridge.org', role: 'RECRUITER', createdAt: new Date().toISOString() } as User,
@@ -194,20 +222,15 @@ export async function seedAll(): Promise<void> {
           bio: 'Recruiter reviewing candidate skill passports and job matches.',
           createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
         } as Profile,
-        hash: recruiterPasswordHash
+        hash: recruiterHash
       }
-    ];
+    ].filter(s => s.hash !== undefined);
     for (const staff of staffUsers) {
       const u = staff.user;
       await client.query(
         `INSERT INTO users (id, email, password_hash, role, current_status, provider, created_at, updated_at)
          VALUES ($1,$2,$3,$4,$5,$6,$7::timestamptz,$7::timestamptz)
-         ON CONFLICT (id) DO UPDATE SET
-           email = EXCLUDED.email,
-           password_hash = EXCLUDED.password_hash,
-           role = EXCLUDED.role,
-           current_status = EXCLUDED.current_status,
-           provider = EXCLUDED.provider`,
+         ON CONFLICT (id) DO NOTHING`,
         [u.id, u.email, staff.hash, u.role, u.currentStatus || null, u.provider || 'EMAIL', u.createdAt]
       );
       const p = staff.profile;

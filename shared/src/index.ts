@@ -68,8 +68,10 @@ export interface Question {
   codeSnippet?: string;
   questionType: QuestionType;
   options?: string[];
-  correctAnswer: string;
-  explanation: string;
+  /** Server-side only. Never sent to clients; populated internally for grading. */
+  correctAnswer?: string;
+  /** Server-side only. Never sent to clients unless reviewing an answered question. */
+  explanation?: string;
   subSkill: string;
   difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
   points: number;
@@ -103,8 +105,10 @@ export interface QuestionResult {
   question: Question;
   userAnswer: string | null;
   correct: boolean;
-  correctAnswer: string;
-  explanation: string;
+  /** Only populated for questions the user actually answered. */
+  correctAnswer?: string;
+  /** Only populated for questions the user actually answered. */
+  explanation?: string;
 }
 
 export interface AssessmentAttempt {
@@ -371,6 +375,8 @@ export interface AssessmentSession {
   difficulty: string;
   questionCount: number;
   status: 'in_progress' | 'completed' | 'abandoned' | 'expired';
+  /** Server-enforced hard time budget in minutes for this session. */
+  timeLimitMinutes?: number;
   startedAt: string;
   completedAt?: string;
   score?: number;

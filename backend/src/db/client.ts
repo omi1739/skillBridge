@@ -18,9 +18,21 @@ function resolveDatabaseUrl(): string {
   return 'postgresql://postgres:postgrespassword@localhost:5432/skillbridge';
 }
 
+function resolveSslConfig(databaseUrl: string): boolean | { rejectUnauthorized: true } {
+  const sslMode = (databaseUrl.match(/[?&]sslmode=([^&]+)/) || [])[1] || '';
+  const wantsSsl = ['require', 'verify-ca', 'verify-full', 'prefer'].includes(sslMode) || databaseUrl.includes('neon.tech');
+  if (!wantsSsl) {
+    return false;
+  }
+  // Never disable certificate verification. 'sslmode=require' is satisfied
+  // with encrypted transport while still validating the server certificate
+  // against the system trust store (node-postgres default behavior).
+  return { rejectUnauthorized: true };
+}
+
 export const pool = new Pool({
   connectionString: resolveDatabaseUrl(),
-  ssl: resolveDatabaseUrl().includes('neon.tech') ? { rejectUnauthorized: false } : false
+  ssl: resolveSslConfig(resolveDatabaseUrl())
 });
 
 pool.on('error', err => {

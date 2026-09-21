@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 import { useSkillBridge } from '@/lib/skillbridge-context';
 import { BrainCircuit, CheckCircle2, ShieldCheck, Check, X } from 'lucide-react';
 
@@ -40,6 +41,29 @@ export default function SkillAssessmentView() {
   const skillName =
     skillAssessAvailableSkills.find((s: any) => s.id === skillAssessSelectedSkill)?.canonicalName ||
     skillAssessSelectedSkill;
+
+  // Server-enforced time budget: count down from the session's hard limit and
+  // auto-submit when it runs out so the server and client stay in agreement.
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const submittedRef = useRef(false);
+
+  useEffect(() => {
+    if (!skillSession?.startedAt || skillSession.status !== 'in_progress' || !skillSession.timeLimitMinutes) return;
+    const started = new Date(skillSession.startedAt).getTime();
+    const budgetMs = skillSession.timeLimitMinutes * 60 * 1000;
+    const tick = () => {
+      const remaining = Math.max(0, Math.round((started + budgetMs - Date.now()) / 1000));
+      setTimeLeft(remaining);
+      if (remaining <= 0 && !submittedRef.current) {
+        submittedRef.current = true;
+        submitSkillAssessment();
+      }
+    };
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [skillSession?.id]);
 
   const renderConfig = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -175,6 +199,20 @@ export default function SkillAssessmentView() {
             <h2 className="card-title">Skill Assessment · {skillName}</h2>
             <p className="card-subtitle">Question {idx + 1} of {questions.length} · {q.difficulty} · {q.topic}</p>
           </div>
+          {timeLeft != null && (
+            <span
+              className="badge"
+              style={{
+                background: timeLeft <= 60 ? 'var(--danger-bg, var(--warning-bg))' : 'var(--bg-raise)',
+                color: timeLeft <= 60 ? 'var(--danger-text)' : 'var(--text-secondary)',
+                border: `1px solid ${timeLeft <= 60 ? 'var(--danger-border)' : 'var(--border-faint)'}`,
+                fontFamily: 'var(--font-mono)',
+                fontSize: '0.78rem'
+              }}
+            >
+              {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')} left
+            </span>
+          )}
           <button className="btn btn-secondary" onClick={cancelSkillAssessment} style={{ fontSize: '0.78rem' }}>Exit</button>
         </div>
 
@@ -200,7 +238,7 @@ export default function SkillAssessmentView() {
               return (
                 <button
                   key={opt}
-                  className={`option-btn ${isSel ? 'option-btn-selected' : ''}`}
+                  className={`option-btn ${isSel ? 'selected' : ''}`}
                   onClick={() => pick(opt)}
                 >
                   <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', marginRight: '0.5rem' }}>{(q.options || []).indexOf(opt) + 1}</span>
@@ -226,7 +264,7 @@ export default function SkillAssessmentView() {
           {q.questionType === 'true_false' && (
             <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem' }}>
               {['True', 'False'].map(tf => (
-                <button key={tf} className={`option-btn ${selected === tf ? 'option-btn-selected' : ''}`} onClick={() => pick(tf)}>
+                <button key={tf} className={`option-btn ${selected === tf ? 'selected' : ''}`} onClick={() => pick(tf)}>
                   {tf}
                 </button>
               ))}
@@ -352,8 +390,14 @@ export default function SkillAssessmentView() {
                           <div style={{ whiteSpace: 'pre-wrap' }}><strong>Q{i + 1}.</strong> {d.question?.prompt}</div>
                           {d.question?.codeSnippet && <pre className="code-block" style={{ marginTop: '0.4rem' }}>{d.question.codeSnippet}</pre>}
                           <div style={{ marginTop: '0.4rem', color: 'var(--text-secondary)' }}>Your answer: <span style={{ color: d.correct ? 'var(--success-text)' : 'var(--danger-text)' }}>{d.userAnswer || '(no answer)'}</span></div>
-                          <div style={{ color: 'var(--text-secondary)' }}>Correct: <span style={{ color: 'var(--success-text)' }}>{d.correctAnswer}</span></div>
-                          <div style={{ color: 'var(--text-muted)', marginTop: '0.2rem' }}>{d.explanation}</div>
+                          {d.correctAnswer ? (
+                            <>
+                              <div style={{ color: 'var(--text-secondary)' }}>Correct: <span style={{ color: 'var(--success-text)' }}>{d.correctAnswer}</span></div>
+                              {d.explanation && <div style={{ color: 'var(--text-muted)', marginTop: '0.2rem' }}>{d.explanation}</div>}
+                            </>
+                          ) : (
+                            <div style={{ color: 'var(--text-muted)' }}>Not answered — correct answer withheld.</div>
+                          )}
                         </div>
                       </div>
                     </div>

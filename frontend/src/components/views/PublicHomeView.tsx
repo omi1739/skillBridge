@@ -7,7 +7,7 @@ import { VerificationBadge } from '@/components/ui/badges';
 import { useSkillBridge } from '@/lib/skillbridge-context';
 
 export default function PublicHomeView() {
-  const { landingStats, allJobs, skills, curricula, role, marketProvenance, handleDemoLogin } = useSkillBridge();
+  const { landingStats, allJobs, skills, curricula, role, marketProvenance, handleDemoLogin, isDemoAccessEnabled } = useSkillBridge();
   const router = useRouter();
   const totalJobsCount = landingStats?.jobPostings ?? allJobs.length;
   const totalSkillsCount = landingStats?.canonicalSkills ?? skills.length;
@@ -59,9 +59,11 @@ export default function PublicHomeView() {
         </p>
 
         <div className="landing-actions">
+          {isDemoAccessEnabled && (
           <button className="btn btn-primary" onClick={handleDemoLogin} style={{ padding: '0.7rem 1.4rem', fontSize: '0.9rem' }}>
             Explore Live Demo <ArrowRight size={15} />
           </button>
+        )}
           <button className="btn btn-secondary" onClick={() => router.push('/market')} style={{ padding: '0.7rem 1.4rem', fontSize: '0.9rem' }}>
             Market Demand ({totalJobsCount})
           </button>

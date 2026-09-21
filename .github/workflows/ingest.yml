@@ -40,7 +40,14 @@ jobs:
             -H 'Content-Type: application/json' \
             -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}")
           if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
-            echo "::error::Login failed (HTTP $HTTP_CODE). Response: $(cat LOGIN_BODY)"
+            # Never echo the raw login body: it may contain a partially-issued
+            # token. Extract only the error message so secrets stay out of logs.
+            ERR=$(printf '%s' "$(cat LOGIN_BODY)" | node -e '
+              let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
+                try { const r = JSON.parse(s); console.error(r.message || r.error || "unknown error"); }
+                catch(e) { console.error("non-JSON error response"); }
+              })' 2>&1 | tail -n 1)
+            echo "::error::Login failed (HTTP $HTTP_CODE): $ERR"
             exit 1
           fi
 

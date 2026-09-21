@@ -373,3 +373,57 @@ CREATE INDEX IF NOT EXISTS idx_attempts_user_skill ON assessment_attempts(user_i
 CREATE INDEX IF NOT EXISTS idx_assessment_questions_attempt ON assessment_questions(attempt_id);
 CREATE INDEX IF NOT EXISTS idx_user_answers_attempt ON user_answers(attempt_id);
 CREATE INDEX IF NOT EXISTS idx_topic_results_attempt ON assessment_topic_results(attempt_id);
+
+-- ============================================================
+-- Integrity hardening (applied idempotently on every boot)
+-- ============================================================
+
+-- A Google account must map to at most one local user, and a local user to at
+-- most one Google identity, so cross-account merging is impossible.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_users_google_id ON users(google_id) WHERE google_id IS NOT NULL;
+
+-- A user has exactly one persisted match per job; recomputes must upsert, not
+-- accumulate duplicate rows.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_job_matches_user_job ON job_matches(user_id, job_id);
+
+-- Role weighting must stay a normalised fraction of the role's total demand.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_role_weight') THEN
+    ALTER TABLE role_skills ADD CONSTRAINT chk_role_weight CHECK (role_weight BETWEEN 0 AND 1);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_market_demand_frequency') THEN
+    ALTER TABLE role_skills ADD CONSTRAINT chk_market_demand_frequency CHECK (market_demand_frequency BETWEEN 0 AND 1);
+  END IF;
+END
+$$;
+
+-- Evidence scores and enums must stay in their documented ranges.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_evidence_proficiency') THEN
+    ALTER TABLE skill_evidence ADD CONSTRAINT chk_evidence_proficiency CHECK (proficiency_score BETWEEN 0 AND 1);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_evidence_confidence') THEN
+    ALTER TABLE skill_evidence ADD CONSTRAINT chk_evidence_confidence CHECK (confidence IN ('LOW', 'MEDIUM', 'HIGH'));
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_evidence_source_type') THEN
+    ALTER TABLE skill_evidence ADD CONSTRAINT chk_evidence_source_type CHECK (source_type IN ('SELF_REPORTED', 'ASSESSMENT', 'PROJECT', 'GITHUB'));
+  END IF;
+END
+$$;
+
+-- Match scores are percentages (0-100) and gap scores are fractions (0-1).
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_job_match_score') THEN
+    ALTER TABLE job_matches ADD CONSTRAINT chk_job_match_score CHECK (match_score BETWEEN 0 AND 100);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_gap_proficiency') THEN
+    ALTER TABLE skill_gaps ADD CONSTRAINT chk_gap_proficiency CHECK (demonstrated_proficiency BETWEEN 0 AND 1);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_gap_priority') THEN
+    ALTER TABLE skill_gaps ADD CONSTRAINT chk_gap_priority CHECK (priority_score BETWEEN 0 AND 1);
+  END IF;
+END
+$$;

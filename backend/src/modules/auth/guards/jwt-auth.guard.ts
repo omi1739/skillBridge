@@ -2,6 +2,7 @@ import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from
 import { Request } from 'express';
 import { authService, AuthPayload } from '../../../services/auth.service';
 import { store } from '../../../store';
+import { demoAccessAllowed, DEMO_USER_ID, DEMO_EMAIL } from '../../../common/demo-access';
 
 declare global {
   namespace Express {
@@ -17,7 +18,7 @@ declare global {
  * token can never reach ADMIN-only routes — real role separation is enforced.
  */
 async function resolveDemoRole(): Promise<string> {
-  const demoUser = await store.getUser('demo_user_01');
+  const demoUser = await store.getUser(DEMO_USER_ID);
   return demoUser?.role || 'USER';
 }
 
@@ -27,9 +28,7 @@ async function resolveDemoRole(): Promise<string> {
  * suffix can never be abused to claim another identity.
  */
 const DEMO_TOKEN = 'demo_token';
-const DEMO_USER = 'demo_user_01';
-const DEMO_TOKEN_FOR_USER = `${DEMO_TOKEN}_${DEMO_USER}`;
-const DEMO_EMAIL = 'candidate@skillbridge.org';
+const DEMO_TOKEN_FOR_USER = `${DEMO_TOKEN}_${DEMO_USER_ID}`;
 
 function isDemoToken(token: string): boolean {
   return token === DEMO_TOKEN || token === DEMO_TOKEN_FOR_USER;
@@ -47,8 +46,11 @@ export class JwtAuthGuard implements CanActivate {
 
     const token = header.slice('Bearer '.length).trim();
     if (isDemoToken(token)) {
+      if (!demoAccessAllowed()) {
+        throw new UnauthorizedException('Demo access is disabled in this environment.');
+      }
       const role = await resolveDemoRole();
-      request.user = { userId: DEMO_USER, email: DEMO_EMAIL, role };
+      request.user = { userId: DEMO_USER_ID, email: DEMO_EMAIL, role };
       return true;
     }
 
@@ -71,8 +73,10 @@ export class OptionalJwtAuthGuard implements CanActivate {
     if (header && header.startsWith('Bearer ')) {
       const token = header.slice('Bearer '.length).trim();
       if (isDemoToken(token)) {
-        const role = await resolveDemoRole();
-        request.user = { userId: DEMO_USER, email: DEMO_EMAIL, role };
+        if (demoAccessAllowed()) {
+          const role = await resolveDemoRole();
+          request.user = { userId: DEMO_USER_ID, email: DEMO_EMAIL, role };
+        }
         return true;
       }
       const payload = authService.verifyToken(token);

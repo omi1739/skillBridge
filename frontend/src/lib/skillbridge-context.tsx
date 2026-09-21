@@ -16,7 +16,7 @@ import {
   User,
   Profile
 } from '@skillbridge/types';
-import { API_BASE, GOOGLE_CLIENT_ID } from './config';
+import { API_BASE, GOOGLE_CLIENT_ID, DEMO_ACCESS_ENABLED } from './config';
 
 export type AppTab = 'market' | 'curriculum' | 'assessment' | 'sandbox' | 'gaps' | 'actions' | 'jobs' | 'admin';
 
@@ -32,11 +32,17 @@ const TAB_PATH: Record<AppTab, string> = {
 };
 
 function fetchJSON<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
-  return fetch(input, init).then(res => {
+  return fetch(input, init).then(async res => {
+    const body = await res.json().catch(() => null);
     if (!res.ok) {
-      throw new Error(`Request failed (${res.status})`);
+      const message =
+        (body && typeof body === 'object' && (body as any).message) ||
+        (body && typeof body === 'object' && (body as any).error) ||
+        (Array.isArray(body?.message) ? body.message.join(', ') : '') ||
+        `Request failed (${res.status})`;
+      throw new Error(typeof message === 'string' ? message : `Request failed (${res.status})`);
     }
-    return res.json();
+    return body as T;
   });
 }
 
@@ -198,19 +204,33 @@ function useSkillBridgeValue() {
   // Google sign-in refs
   const googleBtnHiddenRef = useRef<HTMLDivElement>(null);
 
-  const loadDiagnostic = (count = 12) => {
-    fetch(`${API_BASE}/assessments/diagnostic?count=${count}`)
-      .then(res => res.json())
-      .then(data => {
-        setAssessment(data);
-        setCurrentQuestionIdx(0);
-        setUserAnswers({});
-        setAttemptResult(null);
-        if (data && data.timeLimitMinutes) {
-          setTimeRemaining(data.timeLimitMinutes * 60);
-        }
-      })
-      .catch((err) => console.error('[SkillBridge] Data load failed:', err));
+  const loadDiagnostic = async (count = 12) => {
+    setAssessment(null);
+    setAttemptResult(null);
+    setTimeRemaining(0);
+    try {
+      const [diagRes, startRes] = await Promise.all([
+        fetch(`${API_BASE}/assessments/diagnostic?count=${count}`),
+        fetch(`${API_BASE}/assessments/assessment_backend_diagnostic/start`, {
+          method: 'POST',
+          headers: authHeaders()
+        })
+      ]);
+      const data = await diagRes.json();
+      const start = await startRes.json().catch(() => null);
+      if (!diagRes.ok) throw new Error(data.message || data.error || 'Could not load assessment.');
+      if (!startRes.ok || !start?.attemptId) {
+        throw new Error(start?.message || start?.error || 'Could not start the assessment. Please sign in first.');
+      }
+      setAssessment(data);
+      setCurrentQuestionIdx(0);
+      setUserAnswers({});
+      const limit = start.timeLimitMinutes || data.timeLimitMinutes || 15;
+      setTimeRemaining(limit * 60);
+    } catch (err: any) {
+      console.error('[SkillBridge] Data load failed:', err);
+      reportError(err.message || 'Could not load the assessment.');
+    }
   };
   const activeUserId = currentUser ? currentUser.id : 'demo_user_01';
 
@@ -446,7 +466,7 @@ function useSkillBridgeValue() {
           console.error('[SkillBridge] Admin dashboard load failed:', err);
           setAdminDashboard(null);
         });
-      loadUsers();
+      loadUsers({ token });
     } else {
       setAdminOverview(null);
       setAdminDashboard(null);
@@ -454,8 +474,10 @@ function useSkillBridgeValue() {
     }
   };
 
-  const loadUsers = (opts?: { page?: number; pageSize?: number; search?: string }) => {
-    const token = authToken;
+  const loadUsers = (opts?: { page?: number; pageSize?: number; search?: string; token?: string | null }) => {
+    // Accept an explicit token (fresh from auth) so a call right after
+    // login/setAuthToken never reads a stale pre-render closure value.
+    const token = opts?.token !== undefined ? opts.token : authToken;
     if (!token) {
       setAdminUsers([]);
       setAdminUsersTotal(0);
@@ -687,6 +709,10 @@ function useSkillBridgeValue() {
   }, [assessment, timeRemaining > 0]);
 
   const handleDemoLogin = async () => {
+    if (!DEMO_ACCESS_ENABLED) {
+      reportError('Demo access is disabled in this environment.');
+      return;
+    }
     setIsAuthLoading(true);
     try {
       const res = await fetch(`${API_BASE}/me?userId=demo_user_01`);
@@ -1001,9 +1027,9 @@ function useSkillBridgeValue() {
     setSandboxResult(null);
     setReferenceSolution(null);
     try {
-      const res = await fetch(`${API_BASE}/sandbox/generate`, {
+const res = await fetch(`${API_BASE}/sandbox/generate`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
         body: JSON.stringify({ type: 'SQL', skillId: 'skill_sql', difficulty: 'Intermediate' })
       });
       const data = await res.json();
@@ -1027,7 +1053,7 @@ function useSkillBridgeValue() {
     setIsLoadingSolution(true);
     setReferenceSolution(null);
     try {
-      const res = await fetch(`${API_BASE}/sandbox/reference-solution/${challenge.id}`);
+      const res = await fetch(`${API_BASE}/sandbox/reference-solution/${challenge.id}`, { headers: authHeaders() });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || data.error || 'No solution available.');
       setReferenceSolution(data.referenceSolution || '');
@@ -1246,6 +1272,7 @@ function useSkillBridgeValue() {
     authError,
     setAuthError,
     isAuthLoading,
+    isDemoAccessEnabled: DEMO_ACCESS_ENABLED,
     handleDemoLogin,
     handleAuthSubmit,
     handleGoogleCredential,

@@ -32,10 +32,13 @@ export class SandboxController {
   }
 
   @Post('generate')
+  @UseGuards(JwtAuthGuard)
   @UseGuards(RateLimitGuard)
   @RateLimit(10)
   @RateWindow(60_000)
-  async generateChallenge(@Body() body: { type?: string; skillId?: string; difficulty?: string }) {
+  async generateChallenge(
+    @Body() body: { type?: string; skillId?: string; difficulty?: string }
+  ) {
     return this.sandboxService.generateChallenge(
       (body.type || 'SQL') as 'SQL' | 'JAVASCRIPT',
       body.skillId,
@@ -44,6 +47,7 @@ export class SandboxController {
   }
 
   @Get('reference-solution/:challengeId')
+  @UseGuards(JwtAuthGuard)
   @UseGuards(RateLimitGuard)
   @RateLimit(30)
   @RateWindow(60_000)

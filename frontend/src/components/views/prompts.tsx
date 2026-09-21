@@ -42,7 +42,7 @@ export function RolePromptView() {
 }
 
 export function SignInPromptView({ title, subtitle }: { title: string; subtitle: string }) {
-  const { handleDemoLogin, setAuthMode, setShowAuthModal } = useSkillBridge();
+  const { handleDemoLogin, isDemoAccessEnabled, setAuthMode, setShowAuthModal } = useSkillBridge();
   return (
     <div className="card" style={{ textAlign: 'center', padding: '2.5rem', maxWidth: '560px', margin: '2rem auto' }}>
       <div style={{
@@ -56,9 +56,11 @@ export function SignInPromptView({ title, subtitle }: { title: string; subtitle:
         {subtitle}
       </p>
       <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+        {isDemoAccessEnabled && (
         <button className="btn btn-primary" onClick={handleDemoLogin}>
           Try Demo (1-Click)
         </button>
+      )}
         <button className="btn btn-secondary" onClick={() => { setAuthMode('LOGIN'); setShowAuthModal(true); }}>
           Sign In
         </button>

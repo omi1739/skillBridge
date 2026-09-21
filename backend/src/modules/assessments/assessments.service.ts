@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import * as crypto from 'crypto';
 import { AssessmentAttempt, SkillEvidence, SubSkillResult, Question, AssessmentConfig } from '@skillbridge/types';
 import { store } from '../../store';
+import { query } from '../../db/client';
 import { gapService } from '../../services/gap.service';
 import { getAllBankQuestions, drawDiagnosticQuestions } from '../../data/question-bank';
 import { assessmentEngine } from '../../services/assessment/assessment-engine.service';
@@ -9,8 +11,10 @@ export interface QuestionResult {
   question: Question;
   userAnswer: string | null;
   correct: boolean;
-  correctAnswer: string;
-  explanation: string;
+  /** Only populated for questions the user actually answered. */
+  correctAnswer?: string;
+  /** Only populated for questions the user actually answered. */
+  explanation?: string;
 }
 
 @Injectable()
@@ -103,10 +107,11 @@ export class AssessmentsService {
     // retakes; the DB-stored assessment is kept as a legacy fallback for any
     // non-diagnostic assessment id.
     if (assessmentId === 'assessment_backend_diagnostic') {
-      return this.grade(assessmentId, bankMap, answers, userId, 70, 'skill_javascript');
+      const timed = await this.assertLegacyStarted(userId, assessmentId, 15);
+      return this.grade(assessmentId, bankMap, answers, userId, 70, 'skill_javascript', timed);
     }
 
-    const dbAssessment = await store.getAssessment(assessmentId);
+    const dbAssessment = await store.getAssessment(assessmentId, true);
     if (!dbAssessment) {
       throw new NotFoundException(`Assessment ${assessmentId} not found`);
     }
@@ -115,7 +120,72 @@ export class AssessmentsService {
       throw new NotFoundException(`Assessment ${assessmentId} has no questions`);
     }
     const map = new Map(qs.map(q => [q.id, q]));
-    return this.grade(assessmentId, map, answers, userId, dbAssessment.passingScore, dbAssessment.skillId);
+    const timeLimitMinutes = dbAssessment.timeLimitMinutes ?? 15;
+    const timed = await this.assertLegacyStarted(userId, assessmentId, timeLimitMinutes);
+    return this.grade(assessmentId, map, answers, userId, dbAssessment.passingScore, dbAssessment.skillId, timed);
+  }
+
+  /**
+   * Server-side start record for the legacy diagnostic flow. The client timer
+   * is cosmetic; this row supplies the trusted clock used at submit time so a
+   * stalled or forged client cannot bypass the time limit.
+   */
+  async startAssessment(assessmentId: string, userId: string): Promise<{ attemptId: string; startedAt: string; timeLimitMinutes: number }> {
+    const timeLimitMinutes =
+      assessmentId === 'assessment_backend_diagnostic'
+        ? 15
+        : (await store.getAssessment(assessmentId))?.timeLimitMinutes ?? 15;
+
+    const attemptId = `att_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+    await query(
+      `INSERT INTO assessment_attempts (id, user_id, assessment_id, status, question_count, started_at, score)
+       VALUES ($1,$2,$3,'IN_PROGRESS',0, now(), 0)`,
+      [attemptId, userId, assessmentId]
+    );
+    const row = await query<{ started_at: string }>(`SELECT started_at FROM assessment_attempts WHERE id = $1`, [attemptId]);
+    return {
+      attemptId,
+      startedAt: row[0]?.started_at ? new Date(row[0].started_at).toISOString() : new Date().toISOString(),
+      timeLimitMinutes
+    };
+  }
+
+  /**
+   * Enforces the server-side time window for a legacy attempt. The user must
+   * have started the assessment and the elapsed time must not exceed the
+   * configured limit, otherwise the attempt is abandoned and rejected.
+   */
+  private async assertLegacyStarted(
+    userId: string,
+    assessmentId: string,
+    timeLimitMinutes: number
+  ): Promise<{ attemptId: string; startedAt: string }> {
+    const rows = await query<{ id: string; started_at: string; status: string }>(
+      `SELECT id, started_at, status FROM assessment_attempts
+       WHERE user_id = $1 AND assessment_id = $2
+       ORDER BY started_at DESC LIMIT 1`,
+      [userId, assessmentId]
+    );
+    const attempt = rows[0];
+    if (!attempt) {
+      throw new BadRequestException('This assessment was not started yet. Begin the assessment before submitting answers.');
+    }
+    if (attempt.status === 'COMPLETED') {
+      // Idempotent re-submit of an already-completed attempt: no extra time is
+      // granted, but a duplicate POST of the same window is harmless.
+      return { attemptId: attempt.id, startedAt: attempt.started_at };
+    }
+    if (attempt.status !== 'IN_PROGRESS') {
+      throw new BadRequestException('This assessment attempt is no longer active.');
+    }
+
+    const elapsedMs = Date.now() - new Date(attempt.started_at).getTime();
+    const limitMs = timeLimitMinutes * 60_000;
+    if (elapsedMs > limitMs) {
+      await query(`UPDATE assessment_attempts SET status = 'ABANDONED' WHERE id = $1`, [attempt.id]);
+      throw new BadRequestException('The time limit for this assessment has expired. Start a new attempt to retake it.');
+    }
+    return { attemptId: attempt.id, startedAt: attempt.started_at };
   }
 
   private async grade(
@@ -124,7 +194,8 @@ export class AssessmentsService {
     answers: Array<{ questionId: string; selectedAnswer: string }>,
     userId: string,
     passingScore: number,
-    skillId?: string
+    skillId?: string,
+    timed?: { attemptId: string; startedAt: string }
   ) {
     if (!answers || !Array.isArray(answers)) {
       throw new BadRequestException('Answers array is required');
@@ -152,7 +223,10 @@ export class AssessmentsService {
         subSkillPoints[q.subSkill].earned += q.points;
       }
 
-      questionResults.push({
+      // A candidate answers a fixed subset; never reveal correct answers /
+      // explanations for questions they did not attempt (prevents answer farming).
+      const attempted = ans !== undefined && selected != null;
+      const review: QuestionResult = {
         question: {
           id: q.id,
           assessmentId: q.assessmentId,
@@ -162,15 +236,16 @@ export class AssessmentsService {
           options: q.options ? [...q.options] : undefined,
           subSkill: q.subSkill,
           difficulty: q.difficulty,
-          points: q.points,
-          correctAnswer: q.correctAnswer,
-          explanation: q.explanation
+          points: q.points
         },
         userAnswer: selected,
-        correct,
-        correctAnswer: q.correctAnswer,
-        explanation: q.explanation
-      });
+        correct
+      };
+      if (attempted) {
+        review.correctAnswer = q.correctAnswer;
+        review.explanation = q.explanation;
+      }
+      questionResults.push(review);
     }
 
     const scorePercentage = maxPoints > 0 ? Math.round((totalPointsEarned / maxPoints) * 100) : 0;
@@ -190,10 +265,10 @@ export class AssessmentsService {
     });
 
     const attempt: AssessmentAttempt = {
-      id: `att_${Date.now()}`,
+      id: timed?.attemptId || `att_${Date.now()}`,
       userId,
       assessmentId,
-      startedAt: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
+      startedAt: timed?.startedAt || new Date().toISOString(),
       completedAt: new Date().toISOString(),
       score: scorePercentage,
       totalPointsEarned,

@@ -52,5 +52,8 @@ coverage/
 
 # Internal project notes (not part of the shipped repo)
 NEXT_STEPS.txt
+# Oversized incident/implementation reports are not source code; keep out of git
+SkillBridge_A_to_Z_Implementation_Report.docx
+*.docx
 
 .vercel

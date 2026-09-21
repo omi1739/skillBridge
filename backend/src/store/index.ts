@@ -157,18 +157,18 @@ export class AppDataStore {
   }
 
   // ---- Assessments ----
-  async getAssessment(id: string): Promise<Assessment | undefined> {
-    const assessments = await this.getAssessments();
+  async getAssessment(id: string, includeAnswers = false): Promise<Assessment | undefined> {
+    const assessments = await this.getAssessments(includeAnswers);
     return assessments.find(a => a.id === id);
   }
 
-  async getAssessments(): Promise<Assessment[]> {
+  async getAssessments(includeAnswers = false): Promise<Assessment[]> {
     const rows = await query<any>(`SELECT * FROM assessments ORDER BY id`);
     const qRows = await query<QuestionRow>(`SELECT * FROM questions ORDER BY id`);
     return rows.map((a: any) => {
       const questions = qRows
         .filter(q => q.assessment_id === a.id)
-        .map(q => this.mapQuestion(q));
+        .map(q => this.mapQuestion(q, includeAnswers));
       return {
         id: a.id,
         skillId: a.skill_id,
@@ -182,20 +182,23 @@ export class AppDataStore {
     });
   }
 
-  private mapQuestion(q: QuestionRow): Question {
-    return {
+  private mapQuestion(q: QuestionRow, includeAnswers = false): Question {
+    const question: Question = {
       id: q.id,
       assessmentId: q.assessment_id,
       prompt: q.prompt,
       codeSnippet: q.code_snippet || undefined,
       questionType: q.question_type as Question['questionType'],
       options: q.options_json || undefined,
-      correctAnswer: q.correct_answer,
-      explanation: q.explanation,
       subSkill: q.sub_skill,
       difficulty: q.difficulty as Question['difficulty'],
       points: q.points
     };
+    if (includeAnswers) {
+      question.correctAnswer = q.correct_answer;
+      question.explanation = q.explanation;
+    }
+    return question;
   }
 
   // ---- Users / Profiles ----
@@ -347,19 +350,28 @@ export class AppDataStore {
   /**
    * Replaces all recommendations for a user with the given list (used by the
    * dynamic recommendation engine that derives them from live skill gaps).
+   * Runs in a single transaction so a failed persist can never leave the user
+   * with a half-empty action plan.
    */
   async saveRecommendations(userId: string, recs: ActionRecommendation[]): Promise<void> {
-    await query(`DELETE FROM recommendations WHERE user_id = $1`, [userId]);
-    for (const rec of recs) {
-      await query(
-        `INSERT INTO recommendations
-           (id, user_id, type, title, description, target_skill_ids, target_skill_names, estimated_hours, priority_level, status)
-         VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb,$8,$9,$10)`,
-        [rec.id, userId, rec.type, rec.title, rec.description,
-         JSON.stringify(rec.targetSkillIds), JSON.stringify(rec.targetSkillNames),
-         rec.estimatedHours, rec.priorityLevel, rec.status]
-      );
-    }
+    await withTransaction(async client => {
+      await client.query(`DELETE FROM recommendations WHERE user_id = $1`, [userId]);
+      for (const rec of recs) {
+        await client.query(
+          `INSERT INTO recommendations
+             (id, user_id, type, title, description, target_skill_ids, target_skill_names, estimated_hours, priority_level, status)
+           VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb,$8,$9,$10)
+           ON CONFLICT (id) DO UPDATE SET
+             type=EXCLUDED.type, title=EXCLUDED.title, description=EXCLUDED.description,
+             target_skill_ids=EXCLUDED.target_skill_ids, target_skill_names=EXCLUDED.target_skill_names,
+             estimated_hours=EXCLUDED.estimated_hours, priority_level=EXCLUDED.priority_level,
+             status=EXCLUDED.status`,
+          [rec.id, userId, rec.type, rec.title, rec.description,
+           JSON.stringify(rec.targetSkillIds), JSON.stringify(rec.targetSkillNames),
+           rec.estimatedHours, rec.priorityLevel, rec.status]
+        );
+      }
+    });
   }
 
   // ---- Projects (portfolio evidence) ----
@@ -868,7 +880,11 @@ export class AppDataStore {
     let updated = 0;
     await withTransaction(async client => {
       for (const j of jobs) {
-        const id = `job_src_${this.effectiveCompanyKey(j)}_${this.hashExternal(j.externalId)}`;
+        // The id is derived from (source, company, external id) so two sources
+        // can never produce the same primary key while the (source_id,
+        // external_id) upsert target still dedupes within a source.
+        const sourceTag = j.sourceId ? j.sourceId.slice(0, 8) : 'nosrc';
+        const id = `job_src_${sourceTag}_${this.effectiveCompanyKey(j)}_${this.hashExternal(j.externalId)}`;
         const upsert = await client.query(
           `INSERT INTO jobs
              (id, source_id, external_id, title, company, location, experience_level, role_id, description, posting_url, posted_at, is_remote, verification_status, last_verified_at)
@@ -937,7 +953,13 @@ export class AppDataStore {
         await client.query(
           `INSERT INTO job_matches
              (user_id, job_id, match_score, matched_skills, missing_skills, explanation, calculated_at)
-           VALUES ($1,$2,$3,$4::jsonb,$5::jsonb,$6,$7::timestamptz)`,
+           VALUES ($1,$2,$3,$4::jsonb,$5::jsonb,$6,$7::timestamptz)
+           ON CONFLICT (user_id, job_id) DO UPDATE SET
+             match_score = EXCLUDED.match_score,
+             matched_skills = EXCLUDED.matched_skills,
+             missing_skills = EXCLUDED.missing_skills,
+             explanation = EXCLUDED.explanation,
+             calculated_at = EXCLUDED.calculated_at`,
           [userId, r.job.id, r.matchScore,
            JSON.stringify(r.matchedSkills), JSON.stringify(r.missingSkills),
            r.explanation, new Date().toISOString()]

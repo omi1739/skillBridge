@@ -112,18 +112,27 @@ export class AuthService {
       updatedAt: now
     };
 
-    await withTransaction(async client => {
-      await client.query(
-        `INSERT INTO users (id, email, password_hash, role, current_status, provider, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5::varchar, $6, $7::timestamptz, $8::timestamptz)`,
-        [userId, cleanEmail, passwordHash, 'USER', status || null, 'EMAIL', now, now]
-      );
-      await client.query(
-        `INSERT INTO profiles (id, user_id, full_name, target_role_id, created_at, updated_at)
-         VALUES ($1, $2, $3, $4::varchar, $5::timestamptz, $6::timestamptz)`,
-        [profileId, userId, profile.fullName, targetRoleId || null, now, now]
-      );
-    });
+    try {
+      await withTransaction(async client => {
+        await client.query(
+          `INSERT INTO users (id, email, password_hash, role, current_status, provider, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5::varchar, $6, $7::timestamptz, $8::timestamptz)`,
+          [userId, cleanEmail, passwordHash, 'USER', status || null, 'EMAIL', now, now]
+        );
+        await client.query(
+          `INSERT INTO profiles (id, user_id, full_name, target_role_id, created_at, updated_at)
+           VALUES ($1, $2, $3, $4::varchar, $5::timestamptz, $6::timestamptz)`,
+          [profileId, userId, profile.fullName, targetRoleId || null, now, now]
+        );
+      });
+    } catch (err: any) {
+      // Two registrations racing on the same email: the pre-check above is not
+      // atomic, so the DB unique constraint is the source of truth.
+      if (err && err.code === '23505') {
+        throw new Error('An account with this email address already exists.');
+      }
+      throw err;
+    }
 
     const token = this.signToken({ userId, email: cleanEmail, role: 'USER' });
     return { token, user, profile };
@@ -188,22 +197,30 @@ export class AuthService {
       updatedAt: now
     };
 
-    await withTransaction(async client => {
-      // Cast nullable params explicitly so Postgres can infer their type even
-      // when the value is NULL (e.g. no currentStatus / no avatar picture).
-      // Without this, an untyped NULL in a multi-column VALUES insert raises
-      // "42P18: could not determine data type of parameter" and aborts sign-in.
-      await client.query(
-        `INSERT INTO users (id, email, role, current_status, google_id, provider, avatar_url, created_at, updated_at)
-         VALUES ($1, $2, $3, $4::varchar, $5, $6, $7::varchar, $8::timestamptz, $9::timestamptz)`,
-        [userId, cleanEmail, 'USER', status || null, profileInfo.googleId, 'GOOGLE', user.avatarUrl || null, now, now]
-      );
-      await client.query(
-        `INSERT INTO profiles (id, user_id, full_name, target_role_id, created_at, updated_at)
-         VALUES ($1, $2, $3, NULL, $5::timestamptz, $6::timestamptz)`,
-        [profileId, userId, profile.fullName, now, now]
-      );
-    });
+    try {
+      await withTransaction(async client => {
+        // Cast nullable params explicitly so Postgres can infer their type even
+        // when the value is NULL (e.g. no currentStatus / no avatar picture).
+        // Without this, an untyped NULL in a multi-column VALUES insert raises
+        // "42P18: could not determine data type of parameter" and aborts sign-in.
+        await client.query(
+          `INSERT INTO users (id, email, role, current_status, google_id, provider, avatar_url, created_at, updated_at)
+           VALUES ($1, $2, $3, $4::varchar, $5, $6, $7::varchar, $8::timestamptz, $9::timestamptz)`,
+          [userId, cleanEmail, 'USER', status || null, profileInfo.googleId, 'GOOGLE', user.avatarUrl || null, now, now]
+        );
+        await client.query(
+          `INSERT INTO profiles (id, user_id, full_name, target_role_id, created_at, updated_at)
+           VALUES ($1, $2, $3, NULL, $5::timestamptz, $6::timestamptz)`,
+          [profileId, userId, profile.fullName, now, now]
+        );
+      });
+    } catch (err: any) {
+      // The email / google_id uniqueness race; surface a clean message.
+      if (err && err.code === '23505') {
+        throw new Error('An account with this identity already exists. Sign in instead.');
+      }
+      throw err;
+    }
 
     const token = this.signToken({ userId, email: cleanEmail, role: 'USER' });
     return { token, user, profile, isNewUser: true };

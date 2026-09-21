@@ -228,9 +228,11 @@ export class SandboxService {
     })();`;
 
   /**
-   * Static pre-scan for known VM-escape primitives. Defense-in-depth: the
-   * context below is created with a null-prototype global and NO host-realm
-   * functions, so these classic chains cannot reach the real `process`/`require`.
+   * Static pre-scan for known VM-escape primitives. This is defense-in-depth
+   * only — the VM context is resource-isolated (no host `require`/`process`/
+   * `Buffer` globals, null-prototype global, hard timeouts) and is NOT a
+   * security boundary. Untrusted code should ideally run in a sandboxed
+   * process; local resource isolation is a mitigation, not a guarantee.
    */
   private static readonly ESCAPE_PATTERNS: RegExp[] = [
     /__proto__/,
@@ -281,15 +283,20 @@ export class SandboxService {
     const userEvidence = await store.getEvidence(userId);
     const existingIdx = userEvidence.findIndex(e => e.skillId === skillId && e.sourceType === 'ASSESSMENT');
 
+    // A practical sandbox pass is credible evidence, but it must never erase a
+    // higher score from a real assessment — keep the best demonstrated score.
+    const existingAssessment = existingIdx >= 0 ? userEvidence[existingIdx].proficiencyScore : 0;
+    const score = Math.max(existingAssessment, proficiency);
+
     const newEv: SkillEvidence = {
       id: `ev_sandbox_${Date.now()}_${skillId}`,
       userId,
       skillId,
       sourceType: 'ASSESSMENT',
       sourceId: 'sandbox_practical_execution',
-      proficiencyScore: proficiency,
+      proficiencyScore: score,
       confidence: 'HIGH',
-      metadata: { practicalTaskVerified: true },
+      metadata: { practicalTaskVerified: true, sourceProficiency: proficiency },
       createdAt: new Date().toISOString()
     };
 

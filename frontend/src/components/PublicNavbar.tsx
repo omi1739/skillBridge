@@ -9,7 +9,7 @@ import BrandMark from '@/components/ui/BrandMark';
 
 export default function PublicNavbar() {
   const pathname = usePathname();
-  const { landingStats, allJobs, curricula, setAuthMode, setShowAuthModal, handleDemoLogin } = useSkillBridge();
+  const { landingStats, allJobs, curricula, setAuthMode, setShowAuthModal, handleDemoLogin, isDemoAccessEnabled } = useSkillBridge();
   const totalJobsCount = landingStats?.jobPostings ?? allJobs.length;
   const totalCurriculaCount = landingStats?.curriculaCount ?? curricula.length;
 
@@ -43,12 +43,14 @@ export default function PublicNavbar() {
           >
             <LogIn size={15} /> Sign In
           </button>
-          <button
-            className="btn btn-primary"
-            onClick={handleDemoLogin}
-          >
-            Try Demo (1-Click)
-          </button>
+          {isDemoAccessEnabled && (
+            <button
+              className="btn btn-primary"
+              onClick={handleDemoLogin}
+            >
+              Try Demo (1-Click)
+            </button>
+          )}
         </div>
       </div>
     </header>

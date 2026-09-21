@@ -139,6 +139,23 @@ export class AssessmentsController {
     return this.assessmentsService.getAssessmentById(id);
   }
 
+  @Post(':id/start')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @UseGuards(RateLimitGuard)
+  @RateLimit(30)
+  @RateWindow(60_000)
+  async startAssessment(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthPayload | undefined
+  ) {
+    const candidateId = user?.userId;
+    if (!candidateId) {
+      throw new Error('Authentication required');
+    }
+    return this.assessmentsService.startAssessment(id, candidateId);
+  }
+
   @Post(':id/submit')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)

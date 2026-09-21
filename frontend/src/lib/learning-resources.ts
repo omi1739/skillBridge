@@ -496,11 +496,23 @@ export const TOPIC_RESOURCES: TopicResources[] = [
   }
 ];
 
+function keywordMatches(text: string, rawKeyword: string): boolean {
+  const keyword = rawKeyword.trim();
+  if (!keyword) return false;
+  // Word-boundary matching so single-letter keywords like 'c' or 'ts' cannot
+  // match every word that merely contains those letters.
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // Only require a trailing boundary when the keyword ends in a word
+  // character; ending punctuation (e.g. 'c++', 'node.js') has none.
+  const lastChar = keyword[keyword.length - 1];
+  const trailing = /[A-Za-z0-9_]/.test(lastChar) ? '\\b' : '';
+  return new RegExp(`\\b${escaped}${trailing}`, 'i').test(text);
+}
+
 export function resolveResources(text: string | null | undefined): TopicResources[] {
   if (!text) return [];
-  const lower = text.toLowerCase();
   return TOPIC_RESOURCES.filter(topic =>
-    topic.keywords.some(keyword => lower.includes(keyword.trim()))
+    topic.keywords.some(keyword => keywordMatches(text, keyword))
   );
 }
 
