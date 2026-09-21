@@ -209,24 +209,39 @@ function useSkillBridgeValue() {
     setAttemptResult(null);
     setTimeRemaining(0);
     try {
-      const [diagRes, startRes] = await Promise.all([
-        fetch(`${API_BASE}/assessments/diagnostic?count=${count}`),
-        fetch(`${API_BASE}/assessments/assessment_backend_diagnostic/start`, {
-          method: 'POST',
-          headers: authHeaders()
-        })
-      ]);
-      const data = await diagRes.json();
-      const start = await startRes.json().catch(() => null);
-      if (!diagRes.ok) throw new Error(data.message || data.error || 'Could not load assessment.');
-      if (!startRes.ok || !start?.attemptId) {
+      const diagRes = await fetch(`${API_BASE}/assessments/diagnostic?count=${count}`);
+      const data = await diagRes.json().catch(() => null);
+      if (!diagRes.ok) throw new Error(data?.message || data?.error || 'Could not load the assessment.');
+
+      let timeLimitMinutes = data?.timeLimitMinutes || 15;
+
+      // Best-effort server start. A 404/405 means the running backend predates
+      // the `/start` route (deploy lag between the frontend and API hosts), in
+      // which case we fall back to the client-sided timer — the old backend
+      // cannot enforce a server window anyway, so nothing regresses. Any other
+      // non-2xx (401, 400 on expired attempts, …) stays a hard error so real
+      // auth/expiry problems are never masked.
+      const startRes = await fetch(`${API_BASE}/assessments/assessment_backend_diagnostic/start`, {
+        method: 'POST',
+        headers: authHeaders()
+      });
+      if (startRes.ok) {
+        const start = await startRes.json().catch(() => null);
+        if (start?.attemptId) {
+          timeLimitMinutes = start.timeLimitMinutes || timeLimitMinutes;
+        }
+      } else if (startRes.status !== 404 && startRes.status !== 405) {
+        const start = await startRes.json().catch(() => null);
         throw new Error(start?.message || start?.error || 'Could not start the assessment. Please sign in first.');
+      } else {
+        // 404/405 — backend not re-deployed yet; keep the client timer (legacy mode).
+        console.warn('[SkillBridge] /assessments/:id/start unavailable on the API host; using the client-sided timer (legacy backend).');
       }
+
       setAssessment(data);
       setCurrentQuestionIdx(0);
       setUserAnswers({});
-      const limit = start.timeLimitMinutes || data.timeLimitMinutes || 15;
-      setTimeRemaining(limit * 60);
+      setTimeRemaining(timeLimitMinutes * 60);
     } catch (err: any) {
       console.error('[SkillBridge] Data load failed:', err);
       reportError(err.message || 'Could not load the assessment.');
