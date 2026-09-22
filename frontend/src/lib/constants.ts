@@ -26,10 +26,10 @@ export const AUTH_LABEL_STYLE: React.CSSProperties = {
 };
 
 export const VERIFICATION_BADGES: Record<VerificationStatus, { label: string; color: string; bg: string; border: string }> = {
-  EMPLOYER_VERIFIED: { label: 'Employer Verified', color: '#34d399', bg: 'rgba(16, 185, 129, 0.1)', border: 'rgba(16, 185, 129, 0.25)' },
-  SOURCE_VERIFIED:   { label: 'Source Verified',   color: '#5eead4', bg: 'rgba(45, 212, 191, 0.1)', border: 'rgba(45, 212, 191, 0.25)' },
-  RECENTLY_CHECKED:  { label: 'Recently Checked',  color: '#38bdf8', bg: 'rgba(56, 189, 248, 0.1)', border: 'rgba(56, 189, 248, 0.25)' },
-  EXTERNAL_SOURCE:   { label: 'External Source',   color: '#a78bfa', bg: 'rgba(167, 139, 250, 0.1)', border: 'rgba(167, 139, 250, 0.25)' },
-  EXPIRED:           { label: 'Expired',           color: '#f87171', bg: 'rgba(248, 113, 113, 0.1)', border: 'rgba(248, 113, 113, 0.25)' },
-  UNVERIFIED:        { label: 'Unverified',        color: '#94a3b8', bg: 'rgba(255, 255, 255, 0.05)', border: 'rgba(255, 255, 255, 0.08)' },
+  EMPLOYER_VERIFIED: { label: 'Employer Verified', color: 'var(--verify-employer)', bg: 'var(--verify-employer-bg)', border: 'var(--verify-employer-border)' },
+  SOURCE_VERIFIED:   { label: 'Source Verified',   color: 'var(--verify-source)', bg: 'var(--verify-source-bg)', border: 'var(--verify-source-border)' },
+  RECENTLY_CHECKED:  { label: 'Recently Checked',  color: 'var(--verify-recent)', bg: 'var(--verify-recent-bg)', border: 'var(--verify-recent-border)' },
+  EXTERNAL_SOURCE:   { label: 'External Source',   color: 'var(--verify-external)', bg: 'var(--verify-external-bg)', border: 'var(--verify-external-border)' },
+  EXPIRED:           { label: 'Expired',           color: 'var(--verify-expired)', bg: 'var(--verify-expired-bg)', border: 'var(--verify-expired-border)' },
+  UNVERIFIED:        { label: 'Unverified',        color: 'var(--verify-unverified)', bg: 'var(--verify-unverified-bg)', border: 'var(--verify-unverified-border)' },
 };

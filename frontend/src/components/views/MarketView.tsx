@@ -4,6 +4,7 @@ import { useSkillBridge } from '@/lib/skillbridge-context';
 import { safeExternalUrl } from '@/lib/safe-url';
 import { RolePromptView } from './prompts';
 import { VerificationBadge } from '@/components/ui/badges';
+import { EmptyState } from '@/components/ui/primitives';
 import {
   ArrowRight, MapPin, TrendingUp, Database, Lock, ExternalLink,
   BarChart3, Clock, CheckCircle2
@@ -29,18 +30,12 @@ export default function MarketView() {
   if (currentUser && !activeTargetRoleId) return <RolePromptView />;
   if (!role) {
     return (
-      <div className="card" style={{ textAlign: 'center', padding: '2.5rem', maxWidth: '560px', margin: '2rem auto' }}>
-        <div style={{
-          width: '52px', height: '52px', borderRadius: '50%', margin: '0 auto 1rem',
-          background: 'var(--info-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center'
-        }}>
-          <TrendingUp size={22} style={{ color: 'var(--info)' }} />
-        </div>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 0.6rem' }}>Loading Job Market Demand…</h2>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: '0 auto', maxWidth: '420px' }}>
-          Fetching live market requirement data for the selected IT track.
-        </p>
-      </div>
+      <EmptyState
+        icon={TrendingUp}
+        tone="info"
+        title="Loading Job Market Demand…"
+        subtitle="Fetching live market requirement data for the selected IT track."
+      />
     );
   }
 
@@ -144,7 +139,7 @@ export default function MarketView() {
           )}
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <div className="stack stack-sm">
           {role?.roleSkills ? role.roleSkills.map(rs => {
             const pct = Math.round(rs.marketDemandFrequency * 100);
             const isRequired = rs.required;

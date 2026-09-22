@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useSkillBridge } from '@/lib/skillbridge-context';
 import { RolePromptView } from './prompts';
+import { PageHeader } from '@/components/ui/primitives';
 
 export default function HomeView() {
   const router = useRouter();
@@ -56,7 +57,7 @@ export default function HomeView() {
       title: 'Matching Jobs',
       desc: 'Roles ranked by explainable match to your verified skills.',
       href: '/jobs',
-      color: 'var(--danger-shadow, var(--danger))'
+      color: 'var(--danger)'
     }
   ];
 
@@ -69,32 +70,26 @@ export default function HomeView() {
   if (!activeTargetRoleId) {
     return (
       <div>
-        <div className="page-header">
-          <div>
-            <h1 className="page-title">Welcome back</h1>
-            <p className="page-subtitle">Set up your target role to unlock your personalized roadmap.</p>
-          </div>
-        </div>
+        <PageHeader
+          title="Welcome back"
+          subtitle="Set up your target role to unlock your personalized roadmap."
+        />
         <RolePromptView />
       </div>
     );
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Welcome back{currentProfile?.fullName ? `, ${currentProfile.fullName.split(' ')[0]}` : ''}</h1>
-          <p className="page-subtitle">
-            Target role: <strong>{role?.title || 'Selected role'}</strong>. Here&apos;s your personalized roadmap.
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+    <div className="stack stack-lg">
+      <PageHeader
+        title={`Welcome back${currentProfile?.fullName ? `, ${currentProfile.fullName.split(' ')[0]}` : ''}`}
+        subtitle={<>Target role: <strong>{role?.title || 'Selected role'}</strong>. Here&apos;s your personalized roadmap.</>}
+        actions={
           <button className="btn btn-secondary" onClick={() => go('/market')}>
             <GraduationCap size={14} /> Market Demand
           </button>
-        </div>
-      </div>
+        }
+      />
 
       <div className="stat-grid-3">
         {learnerCounts.map(stat => (
@@ -102,7 +97,7 @@ export default function HomeView() {
             key={stat.label}
             className="stat-card"
             onClick={() => go(stat.href)}
-            style={{ textAlign: 'left', cursor: 'pointer', border: '1px solid var(--border-color)', background: 'var(--bg-card)', borderRadius: 'var(--radius-md)', padding: '1.25rem 1.5rem', transition: 'border-color 0.14s ease' }}
+            style={{ textAlign: 'left', cursor: 'pointer' }}
           >
             <div className="stat-label">{stat.label}</div>
             <div className="stat-value">{stat.value}</div>
@@ -128,10 +123,10 @@ export default function HomeView() {
               <span className="home-action-icon" style={{ background: action.color }}>
                 <action.icon size={18} color="#fff" />
               </span>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', minWidth: 0 }}>
+              <span className="flex-1 stack-sm" style={{ gap: '0.2rem' }}>
                 <span className="home-action-title">{action.title}</span>
                 <span className="home-action-desc">{action.desc}</span>
-              </div>
+              </span>
               <ArrowRight size={16} className="home-action-arrow" />
             </button>
           ))}
@@ -139,17 +134,19 @@ export default function HomeView() {
       </section>
 
       {skillProgress && (
-        <section className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <Compass size={20} style={{ color: 'var(--accent-text)' }} />
-            <div>
-              <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>Keep building evidence</div>
-              <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>Continue your assessments to strengthen your Skill Passport.</div>
+        <section className="card">
+          <div className="row-between" style={{ flexWrap: 'wrap' }}>
+            <div className="row">
+              <Compass size={20} style={{ color: 'var(--accent-text)', flexShrink: 0 }} />
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>Keep building evidence</div>
+                <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>Continue your assessments to strengthen your Skill Passport.</div>
+              </div>
             </div>
+            <button className="btn btn-primary" onClick={() => go('/assessment')} style={{ fontSize: '0.82rem' }}>
+              Continue Assessment <ArrowRight size={14} />
+            </button>
           </div>
-          <button className="btn btn-primary" onClick={() => go('/assessment')} style={{ fontSize: '0.82rem' }}>
-            Continue Assessment <ArrowRight size={14} />
-          </button>
         </section>
       )}
     </div>

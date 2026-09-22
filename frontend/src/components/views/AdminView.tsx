@@ -2,6 +2,7 @@
 
 import { useSkillBridge } from '@/lib/skillbridge-context';
 import { ShieldAlert } from 'lucide-react';
+import { SectionCard, Field, Chip, Alert, EmptyState, Toolbar } from '@/components/ui/primitives';
 
 export default function AdminView() {
   const {
@@ -62,23 +63,17 @@ export default function AdminView() {
 
   if (currentUser?.role !== 'ADMIN') {
     return (
-      <div className="card" style={{ textAlign: 'center', padding: '2.5rem', maxWidth: '560px', margin: '2rem auto' }}>
-        <div style={{
-          width: '52px', height: '52px', borderRadius: '50%', margin: '0 auto 1rem',
-          background: 'var(--danger-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center'
-        }}>
-          <ShieldAlert size={22} style={{ color: 'var(--danger)' }} />
-        </div>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 0.6rem' }}>Access Restricted</h2>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: '0 auto', maxWidth: '420px' }}>
-          The Admin & Ontology Console is limited to administrator accounts. Your account does not have the required role.
-        </p>
-      </div>
+      <EmptyState
+        icon={ShieldAlert}
+        tone="danger"
+        title="Access Restricted"
+        subtitle="The Admin & Ontology Console is limited to administrator accounts. Your account does not have the required role."
+      />
     );
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <div className="stack stack-lg">
       <div className="page-header">
         <div>
           <h1 className="page-title">Admin & Ontology Console</h1>
@@ -90,63 +85,38 @@ export default function AdminView() {
 
       {adminOverview && (
         <div className="stat-grid-3">
-          <div className="stat-card">
-            <div className="stat-label">Total Jobs Ingested</div>
-            <div className="stat-value">{adminOverview.totalJobsCount}</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-label">Canonical Skills</div>
-            <div className="stat-value">{adminOverview.canonicalSkillsCount}</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-label">Recognized Aliases</div>
-            <div className="stat-value">{adminOverview.totalAliasesCount}</div>
-          </div>
+          <div className="stat-card"><div className="stat-label">Total Jobs Ingested</div><div className="stat-value">{adminOverview.totalJobsCount}</div></div>
+          <div className="stat-card"><div className="stat-label">Canonical Skills</div><div className="stat-value">{adminOverview.canonicalSkillsCount}</div></div>
+          <div className="stat-card"><div className="stat-label">Recognized Aliases</div><div className="stat-value">{adminOverview.totalAliasesCount}</div></div>
         </div>
       )}
 
-      {/* ---- User Dashboard ---- */}
       {(dash || !adminUsers.length) && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <h2 className="card-title" style={{ marginBottom: 0 }}>User Dashboard</h2>
+        <div className="stack stack-lg">
+          <h2 className="card-title mb-0">User Dashboard</h2>
 
           <div className="stat-grid-4">
-            <div className="stat-card">
-              <div className="stat-label">Total Users</div>
-              <div className="stat-value">{dash?.totalUsers ?? '—'}</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-label">Admins</div>
-              <div className="stat-value" style={{ color: 'var(--warning)' }}>{dash ? roleCount('ADMIN') : '—'}</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-label">Recruiters</div>
-              <div className="stat-value" style={{ color: 'var(--info)' }}>{dash ? roleCount('RECRUITER') : '—'}</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-label">Regular Users</div>
-              <div className="stat-value" style={{ color: 'var(--teal)' }}>{dash ? roleCount('USER') : '—'}</div>
-            </div>
+            <div className="stat-card"><div className="stat-label">Total Users</div><div className="stat-value">{dash?.totalUsers ?? '—'}</div></div>
+            <div className="stat-card"><div className="stat-label">Admins</div><div className="stat-value" style={{ color: 'var(--warning)' }}>{dash ? roleCount('ADMIN') : '—'}</div></div>
+            <div className="stat-card"><div className="stat-label">Recruiters</div><div className="stat-value" style={{ color: 'var(--info)' }}>{dash ? roleCount('RECRUITER') : '—'}</div></div>
+            <div className="stat-card"><div className="stat-label">Regular Users</div><div className="stat-value" style={{ color: 'var(--teal)' }}>{dash ? roleCount('USER') : '—'}</div></div>
           </div>
 
           <div className="grid-2">
             <div className="card">
-              <h3 className="card-title" style={{ marginBottom: '1rem' }}>Users by role</h3>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
-                <div
-                  className="admin-donut"
-                  style={{ background: donutBg }}
-                >
+              <h3 className="card-title mb-4">Users by role</h3>
+              <div className="row" style={{ alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
+                <div className="admin-donut" style={{ background: donutBg }}>
                   <div className="admin-donut-hole">
                     <div className="admin-donut-value">{dash?.totalUsers ?? 0}</div>
                     <div className="admin-donut-label">users</div>
                   </div>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: 140 }}>
+                <div className="stack stack-sm" style={{ flex: 1, minWidth: 140 }}>
                   {(dash?.byRole || []).map((x: any) => (
-                    <div key={x.role} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem' }}>
-                      <span style={{ width: 10, height: 10, borderRadius: 3, background: roleColor[x.role] || 'var(--text-muted)' }} />
-                      <span style={{ color: 'var(--text-secondary)' }}>{x.role}</span>
+                    <div key={x.role} className="row" style={{ gap: '0.5rem', fontSize: '0.82rem' }}>
+                      <span style={{ width: 10, height: 10, borderRadius: 3, background: roleColor[x.role] || 'var(--text-muted)', flexShrink: 0 }} />
+                      <span className="text-secondary">{x.role}</span>
                       <strong style={{ color: 'var(--text-primary)', marginLeft: 'auto' }}>{x.count}</strong>
                     </div>
                   ))}
@@ -155,19 +125,16 @@ export default function AdminView() {
             </div>
 
             <div className="card">
-              <h3 className="card-title" style={{ marginBottom: '1rem' }}>New users · last 14 days</h3>
+              <h3 className="card-title mb-4">New users · last 14 days</h3>
               {signupData.length === 0 ? (
-                <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>No signups recorded in this window.</div>
+                <div className="text-muted small">No signups recorded in this window.</div>
               ) : (
-                <div style={{ display: 'flex', alignItems: 'flex-end', gap: '3px', height: 130 }}>
+                <div className="row" style={{ alignItems: 'flex-end', gap: '3px', height: 130 }}>
                   {signupData.map((s: any) => (
-                    <div key={s.day} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem', flex: 1 }}>
-                      <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{s.count}</span>
-                      <div
-                        className="admin-bar"
-                        style={{ height: `${Math.max(4, (s.count / maxSignups) * 86)}px` }}
-                      />
-                      <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>{dayLabel(s.day)}</span>
+                    <div key={s.day} className="stack stack-sm" style={{ alignItems: 'center', gap: '0.25rem', flex: 1 }}>
+                      <span className="tiny text-muted">{s.count}</span>
+                      <div className="admin-bar" style={{ height: `${Math.max(4, (s.count / maxSignups) * 86)}px` }} />
+                      <span className="tiny text-muted">{dayLabel(s.day)}</span>
                     </div>
                   ))}
                 </div>
@@ -177,11 +144,11 @@ export default function AdminView() {
 
           <div className="grid-2">
             <div className="card">
-              <h3 className="card-title" style={{ marginBottom: '1rem' }}>By provider</h3>
+              <h3 className="card-title mb-4">By provider</h3>
               {(dash?.byProvider || []).map((x: any) => {
                 const pct = donutTotal ? Math.round((x.count / donutTotal) * 100) : 0;
                 return (
-                  <div key={x.provider} style={{ marginBottom: '0.85rem' }}>
+                  <div key={x.provider} className="mb-4">
                     <div className="demand-row-label">
                       <span className="demand-skill">
                         <span style={{ textTransform: 'capitalize' }}>{x.provider}</span>
@@ -197,11 +164,11 @@ export default function AdminView() {
             </div>
 
             <div className="card">
-              <h3 className="card-title" style={{ marginBottom: '1rem' }}>By status</h3>
+              <h3 className="card-title mb-4">By status</h3>
               {(dash?.byStatus || []).map((x: any) => {
                 const pct = donutTotal ? Math.round((x.count / donutTotal) * 100) : 0;
                 return (
-                  <div key={x.status} style={{ marginBottom: '0.85rem' }}>
+                  <div key={x.status} className="mb-4">
                     <div className="demand-row-label">
                       <span className="demand-skill">
                         <span style={{ textTransform: 'capitalize' }}>{x.status.toLowerCase()}</span>
@@ -220,57 +187,30 @@ export default function AdminView() {
       )}
 
       <div className="grid-2">
-        <div className="card">
-          <h2 className="card-title" style={{ marginBottom: '1rem' }}>Add Skill Alias Mapping</h2>
-          <form onSubmit={handleCreateAlias} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>
-                Raw Job Alias / Synonym
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. Postgres, PSQL, Node"
-                value={aliasForm.rawAlias}
-                onChange={e => setAliasForm({ ...aliasForm, rawAlias: e.target.value })}
-                style={{ width: '100%', padding: '0.65rem', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '0.85rem' }}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>
-                Maps To Canonical Skill
-              </label>
-              <select
-                value={aliasForm.canonicalSkillId}
-                onChange={e => setAliasForm({ ...aliasForm, canonicalSkillId: e.target.value })}
-                style={{ width: '100%', padding: '0.65rem', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '0.85rem' }}
-              >
+        <SectionCard title="Add Skill Alias Mapping">
+          <form onSubmit={handleCreateAlias} className="stack stack-sm">
+            <Field label="Raw Job Alias / Synonym">
+              <input type="text" className="input" placeholder="e.g. Postgres, PSQL, Node" value={aliasForm.rawAlias} onChange={e => setAliasForm({ ...aliasForm, rawAlias: e.target.value })} />
+            </Field>
+            <Field label="Maps To Canonical Skill">
+              <select className="select" value={aliasForm.canonicalSkillId} onChange={e => setAliasForm({ ...aliasForm, canonicalSkillId: e.target.value })}>
                 <option value="">Select canonical skill...</option>
                 {skills.map(s => (
                   <option key={s.id} value={s.id}>{s.canonicalName}</option>
                 ))}
               </select>
-            </div>
-
-            <button type="submit" className="btn btn-primary" style={{ marginTop: '0.5rem' }}>
-              Add Synonym Mapping
-            </button>
-
-            {aliasSaveSuccess && (
-              <div style={{ color: 'var(--success-text)', fontSize: '0.8rem' }}>✓ Alias mapping registered.</div>
-            )}
+            </Field>
+            <button type="submit" className="btn btn-primary">Add Synonym Mapping</button>
+            {aliasSaveSuccess && <Alert tone="success">✓ Alias mapping registered.</Alert>}
           </form>
-        </div>
+        </SectionCard>
 
-        <div className="card">
-          <h2 className="card-title" style={{ marginBottom: '1rem' }}>Role Skill Importance Tuner</h2>
-          {role && editingSkillWeight && (
-            <form onSubmit={handleUpdateRoleWeight} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>
-                  Select Role Skill
-                </label>
+        <SectionCard title="Role Skill Importance Tuner">
+          {role && editingSkillWeight ? (
+            <form onSubmit={handleUpdateRoleWeight} className="stack stack-sm">
+              <Field label="Select Role Skill">
                 <select
+                  className="select"
                   value={editingSkillWeight.skillId}
                   onChange={e => {
                     const found = role.roleSkills.find(rs => rs.skillId === e.target.value);
@@ -282,7 +222,6 @@ export default function AdminView() {
                       });
                     }
                   }}
-                  style={{ width: '100%', padding: '0.65rem', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '0.85rem' }}
                 >
                   {(role?.roleSkills || []).map(rs => (
                     <option key={rs.skillId} value={rs.skillId}>
@@ -290,10 +229,10 @@ export default function AdminView() {
                     </option>
                   ))}
                 </select>
-              </div>
+              </Field>
 
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.3rem' }}>
+                <div className="row-between small" style={{ marginBottom: '0.3rem' }}>
                   <span>Role Importance Weight:</span>
                   <strong>{Math.round(editingSkillWeight.roleWeight * 100)}%</strong>
                 </div>
@@ -308,52 +247,50 @@ export default function AdminView() {
                 />
               </div>
 
-              <button type="submit" className="btn btn-primary" style={{ marginTop: '0.5rem' }}>
-                Save Updated Weight
-              </button>
-
-              {weightSaveSuccess && (
-                <div style={{ color: 'var(--success-text)', fontSize: '0.8rem' }}>✓ Role weight updated and gaps recalculated.</div>
-              )}
+              <button type="submit" className="btn btn-primary">Save Updated Weight</button>
+              {weightSaveSuccess && <Alert tone="success">✓ Role weight updated and gaps recalculated.</Alert>}
             </form>
+          ) : (
+            <p className="small text-muted">No role selected — choose a target role to tune weights.</p>
           )}
-        </div>
+        </SectionCard>
       </div>
 
-      <div className="card" style={{ padding: '1.25rem' }}>
-        <h2 className="card-title" style={{ marginBottom: '0.25rem' }}>User Management</h2>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginBottom: '1rem' }}>
+      <div className="card">
+        <h2 className="card-title mb-1">User Management</h2>
+        <p className="text-muted small mb-4">
           List, change roles, and remove registered accounts. You cannot change your own role or delete your own account.
         </p>
 
         {adminUserMsg && (
-          <div style={{ marginBottom: '0.9rem', padding: '0.6rem 0.8rem', borderRadius: '6px', fontSize: '0.82rem', background: adminUserMsg.ok ? 'var(--success-bg)' : 'var(--danger-bg)', color: adminUserMsg.ok ? 'var(--success-text)' : 'var(--danger-text)' }}>
+          <Alert tone={adminUserMsg.ok ? 'success' : 'danger'} className="mb-4">
             {adminUserMsg.text}
-          </div>
+          </Alert>
         )}
 
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.9rem' }}>
+        <div className="toolbar toolbar-between mb-4">
           <input
             type="text"
+            className="input"
             placeholder="Search by name or email…"
+            style={{ maxWidth: 260 }}
             value={adminUsersSearch}
             onChange={e => {
               setAdminUsersSearch(e.target.value);
               if (!e.target.value) loadUsers({ search: '', page: 1 });
             }}
             onKeyDown={e => { if (e.key === 'Enter') loadUsers({ search: adminUsersSearch, page: 1 }); }}
-            style={{ padding: '0.5rem 0.7rem', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '0.82rem', minWidth: 220 }}
           />
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+          <div className="row small text-secondary">
             <span>Show</span>
             <select
+              className="select select-sm"
               value={adminUsersPageSize}
               onChange={e => {
                 const size = Number(e.target.value);
                 setAdminUsersPageSize(size);
                 loadUsers({ page: 1, pageSize: size });
               }}
-              style={{ padding: '0.35rem 0.5rem', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '0.78rem' }}
             >
               <option value={5}>5</option>
               <option value={10}>10</option>
@@ -364,104 +301,83 @@ export default function AdminView() {
           </div>
         </div>
 
-        <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', minWidth: 520 }}>
-          <thead>
-            <tr style={{ textAlign: 'left', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-color)' }}>
-              <th style={{ padding: '0.5rem 0.5rem 0.5rem 0' }}>Name / Email</th>
-              <th style={{ padding: '0.5rem' }}>Provider</th>
-              <th style={{ padding: '0.5rem' }}>Status</th>
-              <th style={{ padding: '0.5rem' }}>Role</th>
-              <th style={{ padding: '0.5rem' }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {adminUsers.map(u => {
-              const isSelf = currentUser?.id === u.id;
-              return (
-                <tr key={u.id} style={{ borderBottom: '1px solid var(--border-faint)' }}>
-                  <td style={{ padding: '0.6rem 0.5rem 0.6rem 0' }}>
-                    <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                      {u.fullName || '—'} {isSelf && <span style={{ color: 'var(--accent-text)', fontSize: '0.72rem' }}>(you)</span>}
-                    </div>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{u.email}</div>
-                  </td>
-                  <td style={{ padding: '0.6rem 0.5rem' }}>
-                    <span style={{ textTransform: 'capitalize', color: 'var(--text-secondary)' }}>{u.provider || 'EMAIL'}</span>
-                  </td>
-                  <td style={{ padding: '0.6rem 0.5rem' }}>
-                    <span style={{ textTransform: 'capitalize', color: 'var(--text-secondary)' }}>{u.currentStatus ? u.currentStatus.toLowerCase() : '—'}</span>
-                  </td>
-                  <td style={{ padding: '0.6rem 0.5rem' }}>
-                    {isSelf ? (
-                      <span style={{ color: 'var(--text-secondary)' }}>{u.role}</span>
-                    ) : (
-                      <select
-                        value={u.role}
-                        onChange={e => handleChangeUserRole(u.id, e.target.value)}
-                        style={{ padding: '0.35rem 0.5rem', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '0.78rem' }}
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Name / Email</th>
+                <th>Provider</th>
+                <th>Status</th>
+                <th>Role</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {adminUsers.map(u => {
+                const isSelf = currentUser?.id === u.id;
+                return (
+                  <tr key={u.id}>
+                    <td>
+                      <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                        {u.fullName || '—'} {isSelf && <span style={{ color: 'var(--accent-text)', fontSize: '0.72rem' }}>(you)</span>}
+                      </div>
+                      <div className="text-muted small">{u.email}</div>
+                    </td>
+                    <td><span style={{ textTransform: 'capitalize', color: 'var(--text-secondary)' }}>{u.provider || 'EMAIL'}</span></td>
+                    <td><span style={{ textTransform: 'capitalize', color: 'var(--text-secondary)' }}>{u.currentStatus ? u.currentStatus.toLowerCase() : '—'}</span></td>
+                    <td>
+                      {isSelf ? (
+                        <span className="text-secondary">{u.role}</span>
+                      ) : (
+                        <select
+                          className="select select-sm"
+                          value={u.role}
+                          onChange={e => handleChangeUserRole(u.id, e.target.value)}
+                        >
+                          <option value="USER">USER</option>
+                          <option value="RECRUITER">RECRUITER</option>
+                          <option value="ADMIN">ADMIN</option>
+                        </select>
+                      )}
+                    </td>
+                    <td>
+                      <button
+                        disabled={isSelf}
+                        onClick={() => handleDeleteUser(u.id, u.email)}
+                        className="btn btn-sm"
+                        style={{ background: 'var(--danger-bg)', color: 'var(--danger-text)', border: '1px solid var(--danger-border)' }}
                       >
-                        <option value="USER">USER</option>
-                        <option value="RECRUITER">RECRUITER</option>
-                        <option value="ADMIN">ADMIN</option>
-                      </select>
-                    )}
-                  </td>
-                  <td style={{ padding: '0.6rem 0.5rem' }}>
-                    <button
-                      disabled={isSelf}
-                      onClick={() => handleDeleteUser(u.id, u.email)}
-                      className="btn"
-                      style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', background: 'var(--danger-bg)', color: 'var(--danger-text)', border: '1px solid var(--danger-border)' }}
-                    >
-                      Delete
-                    </button>
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+              {adminUsers.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="text-muted" style={{ padding: '1rem' }}>
+                    {adminUsersSearch ? `No users match "${adminUsersSearch}".` : 'No users loaded.'}
                   </td>
                 </tr>
-              );
-            })}
-            {adminUsers.length === 0 && (
-              <tr>
-                <td colSpan={5} style={{ padding: '1rem', color: 'var(--text-muted)' }}>
-                  {adminUsersSearch ? `No users match "${adminUsersSearch}".` : 'No users loaded.'}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+              )}
+            </tbody>
+          </table>
         </div>
 
-        {/* Pagination */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.9rem' }}>
-          <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+        <div className="toolbar toolbar-between" style={{ marginTop: '0.9rem' }}>
+          <span className="text-muted tiny">
             {adminUsersTotal === 0 ? '0 users' : `Page ${adminUsersPage} of ${adminUsersTotalPages} · ${adminUsersTotal} user${adminUsersTotal === 1 ? '' : 's'}`}
           </span>
-          <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', flexWrap: 'wrap' }}>
-            <button
-              className="btn"
-              disabled={adminUsersPage <= 1}
-              onClick={() => loadUsers({ page: adminUsersPage - 1 })}
-              style={{ padding: '0.4rem 0.8rem', fontSize: '0.78rem' }}
-            >
+          <div className="pagination">
+            <button className="pagination-btn" disabled={adminUsersPage <= 1} onClick={() => loadUsers({ page: adminUsersPage - 1 })}>
               ← Prev
             </button>
             {Array.from({ length: adminUsersTotalPages }, (_, i) => i + 1).map(p => (
-              <button
-                key={p}
-                className="btn"
-                disabled={p === adminUsersPage}
-                onClick={() => loadUsers({ page: p })}
-                style={{ padding: '0.4rem 0.68rem', fontSize: '0.78rem', opacity: p === adminUsersPage ? 0.6 : 1 }}
-              >
+              <button key={p} className={`pagination-btn ${p === adminUsersPage ? 'active' : ''}`} onClick={() => loadUsers({ page: p })}>
                 {p}
               </button>
             ))}
-            <button
-              className="btn"
-              disabled={adminUsersPage >= adminUsersTotalPages}
-              onClick={() => loadUsers({ page: adminUsersPage + 1 })}
-              style={{ padding: '0.4rem 0.8rem', fontSize: '0.78rem' }}
-            >
+            <button className="pagination-btn" disabled={adminUsersPage >= adminUsersTotalPages} onClick={() => loadUsers({ page: adminUsersPage + 1 })}>
               Next →
             </button>
           </div>

@@ -1,24 +1,30 @@
-import { BrainCircuit } from 'lucide-react';
+'use client';
+
+import { useState } from 'react';
+import { BrainCircuit, FileText } from 'lucide-react';
 import SkillAssessmentView from '@/components/views/SkillAssessmentView';
 import AssessmentView from '@/components/views/AssessmentView';
+import { Segmented } from '@/components/ui/primitives';
 
 export default function AssessmentPage() {
+  const [mode, setMode] = useState<'diagnostic' | 'skill'>('diagnostic');
+
   return (
-    <>
-      <div className="card" style={{ marginBottom: '1.5rem', padding: '0', overflow: 'hidden' }}>
-        <div className="card-header" style={{ alignItems: 'center', background: 'rgba(56,189,248,0.05)' }}>
-          <div>
-            <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <BrainCircuit size={18} style={{ color: '#38bdf8' }} /> Skill Assessment (New)
-            </h2>
-            <p className="card-subtitle">Difficulty-weighted, server-evaluated skill exams with per-topic results.</p>
-          </div>
-        </div>
-        <div style={{ padding: '1.25rem' }}>
-          <SkillAssessmentView />
-        </div>
+    <div className="stack stack-lg">
+      <div className="toolbar">
+        <Segmented
+          value={mode}
+          onChange={v => setMode(v as 'diagnostic' | 'skill')}
+          options={[
+            { value: 'diagnostic', label: <><FileText size={14} /> Diagnostic Test</> },
+            { value: 'skill', label: <><BrainCircuit size={14} /> Skill Assessment</> }
+          ]}
+        />
       </div>
-      <AssessmentView />
-    </>
+
+      <div key={mode}>
+        {mode === 'diagnostic' ? <AssessmentView /> : <SkillAssessmentView />}
+      </div>
+    </div>
   );
 }

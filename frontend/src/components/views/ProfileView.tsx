@@ -61,7 +61,7 @@ export default function ProfileView() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <div className="stack stack-lg">
       <button
         className="btn btn-ghost"
         onClick={() => router.push('/market')}
@@ -139,7 +139,7 @@ export default function ProfileView() {
               </div>
             </div>
           ) : (
-            <form style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }} onSubmit={e => { e.preventDefault(); save(); }}>
+            <form className="stack stack-sm" onSubmit={e => { e.preventDefault(); save(); }}>
               <div className="auth-field">
                 <label className="auth-label" htmlFor="profile-fullname">Full Name</label>
                 <div className="auth-input-wrap">

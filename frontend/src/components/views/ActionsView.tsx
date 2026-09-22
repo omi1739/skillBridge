@@ -1,9 +1,10 @@
 'use client';
 
-import { PlusCircle, FolderGit2, Github, ExternalLink, AlertCircle } from 'lucide-react';
+import { PlusCircle, FolderGit2, Github, ExternalLink, AlertTriangle } from 'lucide-react';
 import { useSkillBridge } from '@/lib/skillbridge-context';
 import { safeExternalUrl } from '@/lib/safe-url';
 import { RolePromptView, SignInPromptView, NoEvidenceView } from './prompts';
+import { EmptyState, Chip } from '@/components/ui/primitives';
 
 export default function ActionsView() {
   const { currentUser, activeTargetRoleId, recommendations, userProjects, setShowProjectModal, personalDataError } = useSkillBridge();
@@ -19,24 +20,18 @@ export default function ActionsView() {
   if (!activeTargetRoleId) return <RolePromptView />;
   if (personalDataError) {
     return (
-      <div className="card" style={{ textAlign: 'center', padding: '2.5rem', maxWidth: '560px', margin: '2rem auto' }}>
-        <div style={{
-          width: '52px', height: '52px', borderRadius: '50%', margin: '0 auto 1rem',
-          background: 'var(--danger-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center'
-        }}>
-          <AlertCircle size={22} style={{ color: 'var(--danger)' }} />
-        </div>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 0.6rem' }}>Could not load your recommendations</h2>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: '0 auto', maxWidth: '420px' }}>
-          We hit an error while fetching your project recommendations. Please try again.
-        </p>
-      </div>
+      <EmptyState
+        icon={AlertTriangle}
+        tone="danger"
+        title="Could not load your recommendations"
+        subtitle="We hit an error while fetching your project recommendations. Please try again."
+      />
     );
   }
   if (recommendations.length === 0) return <NoEvidenceView />;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
+    <div className="stack stack-lg">
       <div className="page-header">
         <div>
           <h1 className="page-title">Recommended Projects to Build</h1>
@@ -49,13 +44,13 @@ export default function ActionsView() {
         </button>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div className="stack stack-sm">
         {recommendations.map(rec => (
           <div key={rec.id} className="card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+            <div className="row-between" style={{ alignItems: 'flex-start', marginBottom: '0.5rem' }}>
               <div>
                 <h3 style={{ fontSize: '1.05rem', fontWeight: 600 }}>{rec.title}</h3>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', marginTop: '0.2rem' }}>
+                <div className="small text-muted mono" style={{ marginTop: '0.2rem' }}>
                   Type: {rec.type} • Est. Time: {rec.estimatedHours} hours
                 </div>
               </div>
@@ -64,16 +59,14 @@ export default function ActionsView() {
               </button>
             </div>
 
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '0.5rem 0' }}>
+            <p className="text-secondary" style={{ fontSize: '0.85rem', margin: '0.5rem 0' }}>
               {rec.description}
             </p>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Target Skills:</span>
+            <div className="row" style={{ gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
+              <span className="small text-muted">Target Skills:</span>
               {rec.targetSkillNames?.map((skillName, idx) => (
-                <span key={idx} className="badge badge-preferred" style={{ fontSize: '0.675rem' }}>
-                  {skillName}
-                </span>
+                <Chip key={idx} tone="accent">{skillName}</Chip>
               ))}
             </div>
           </div>
@@ -90,23 +83,21 @@ export default function ActionsView() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        <div className="stack stack-sm">
           {userProjects.map(proj => (
-            <div key={proj.id} style={{ background: 'var(--bg-inset-panel)', padding: '1rem', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div key={proj.id} className="list-item">
+              <div className="row-between">
                 <a href={safeExternalUrl(proj.repoUrl)} target="_blank" rel="noreferrer" style={{ color: 'var(--info)', fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.4rem', textDecoration: 'none' }}>
                   <Github size={14} /> {proj.title} <ExternalLink size={12} />
                 </a>
-                <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>
-                  ~{proj.commitCountEstimate} commits
-                </span>
+                <span className="small mono text-muted">~{proj.commitCountEstimate} commits</span>
               </div>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', margin: '0.5rem 0' }}>
+              <p className="text-secondary small" style={{ margin: '0.5rem 0' }}>
                 {proj.description}
               </p>
-              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+              <div className="row" style={{ gap: '0.4rem', flexWrap: 'wrap' }}>
                 {proj.detectedStack.map((tech, idx) => (
-                  <span key={idx} style={{ background: 'var(--bg-chip)', color: 'var(--info-text)', fontSize: '0.7rem', padding: '0.15rem 0.45rem', borderRadius: '4px' }}>
+                  <span key={idx} className="badge badge-chip" style={{ fontSize: '0.7rem' }}>
                     {tech}
                   </span>
                 ))}

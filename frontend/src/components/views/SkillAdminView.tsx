@@ -2,6 +2,7 @@
 
 import { useSkillBridge } from '@/lib/skillbridge-context';
 import { Database } from 'lucide-react';
+import { SectionCard, Field, Chip, Toolbar, EmptyState } from '@/components/ui/primitives';
 
 export default function SkillAdminView() {
   const {
@@ -21,47 +22,42 @@ export default function SkillAdminView() {
   } = useSkillBridge();
 
   const questions = adminSkillQuestions || [];
-  return (
-    <div className="card" style={{ marginBottom: '1.5rem', overflow: 'hidden', padding: '0' }}>
-      <div className="card-header" style={{ alignItems: 'center', background: 'var(--violet-bg)' }}>
-        <div>
-          <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Database size={18} style={{ color: 'var(--violet)' }} /> Skill Question Bank
-          </h2>
-          <p className="card-subtitle">Review AI-generated questions and manage the skill question bank.</p>
-        </div>
-      </div>
+  const statusChip = (status: string) => {
+    if (status === 'approved') return <Chip tone="success">{String(status).replace('_', ' ')}</Chip>;
+    if (status === 'rejected') return <Chip tone="danger">{String(status).replace('_', ' ')}</Chip>;
+    return <Chip tone="warning">{String(status).replace('_', ' ')}</Chip>;
+  };
 
-      <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-        <div className="card" style={{ padding: '1rem' }}>
+  return (
+    <div className="stack stack-lg">
+      <SectionCard
+        title={<><Database size={18} style={{ color: 'var(--violet)' }} /> Skill Question Bank</>}
+        subtitle="Review AI-generated questions and manage the skill question bank."
+      >
+        <div className="list-item" style={{ padding: '1rem' }}>
           <h3 style={{ fontSize: '0.9rem', fontWeight: 600, marginBottom: '0.75rem' }}>Generate Questions with AI</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 0.7fr auto', gap: '0.6rem', alignItems: 'end', flexWrap: 'wrap' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Skill</label>
-              <select value={skillAssessSelectedSkill} onChange={(e) => setSkillAssessSelectedSkill(e.target.value)} style={{ width: '100%', padding: '0.5rem 0.6rem', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '0.8rem' }}>
+          <div className="grid-5" style={{ alignItems: 'end' }}>
+            <Field label="Skill">
+              <select className="select" value={skillAssessSelectedSkill} onChange={(e) => setSkillAssessSelectedSkill(e.target.value)}>
                 {(skillAssessAvailableSkills as any[]).map((s: any) => <option key={s.id} value={s.id}>{s.canonicalName || s.id}</option>)}
               </select>
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Topic</label>
-              <input value={adminGenForm.topic} onChange={(e) => setAdminGenForm(prev => ({ ...prev, topic: e.target.value }))} placeholder="e.g. Promises & Async" style={{ width: '100%', padding: '0.5rem 0.6rem', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '0.8rem' }} />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Difficulty</label>
-              <select value={adminGenForm.difficulty} onChange={(e) => setAdminGenForm(prev => ({ ...prev, difficulty: e.target.value }))} style={{ width: '100%', padding: '0.5rem 0.6rem', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '0.8rem' }}>
+            </Field>
+            <Field label="Topic">
+              <input className="input" value={adminGenForm.topic} onChange={(e) => setAdminGenForm(prev => ({ ...prev, topic: e.target.value }))} placeholder="e.g. Promises & Async" />
+            </Field>
+            <Field label="Difficulty">
+              <select className="select" value={adminGenForm.difficulty} onChange={(e) => setAdminGenForm(prev => ({ ...prev, difficulty: e.target.value }))}>
                 <option value="easy">easy</option><option value="medium">medium</option><option value="hard">hard</option>
               </select>
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Type</label>
-              <select value={adminGenForm.questionType} onChange={(e) => setAdminGenForm(prev => ({ ...prev, questionType: e.target.value }))} style={{ width: '100%', padding: '0.5rem 0.6rem', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '0.8rem' }}>
+            </Field>
+            <Field label="Type">
+              <select className="select" value={adminGenForm.questionType} onChange={(e) => setAdminGenForm(prev => ({ ...prev, questionType: e.target.value }))}>
                 <option value="MCQ">MCQ</option><option value="code_output">Code Output</option><option value="true_false">True/False</option><option value="multiple_select">Multi-Select</option>
               </select>
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Count</label>
-              <input type="number" min={1} max={20} value={adminGenForm.count} onChange={(e) => setAdminGenForm(prev => ({ ...prev, count: Number(e.target.value) }))} style={{ width: '100%', padding: '0.5rem 0.6rem', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '0.8rem' }} />
-            </div>
+            </Field>
+            <Field label="Count">
+              <input type="number" className="input" min={1} max={20} value={adminGenForm.count} onChange={(e) => setAdminGenForm(prev => ({ ...prev, count: Number(e.target.value) }))} />
+            </Field>
             <div>
               <button className="btn btn-primary" style={{ width: '100%' }} onClick={generateAdminQuestions} disabled={isGeneratingQuestions || !adminGenForm.topic}>
                 {isGeneratingQuestions ? 'Generating…' : 'Generate'}
@@ -69,55 +65,57 @@ export default function SkillAdminView() {
             </div>
           </div>
           {adminQMsg && (
-            <div style={{ marginTop: '0.6rem', fontSize: '0.82rem', color: adminQMsg.ok ? 'var(--success-text)' : 'var(--danger-text)' }}>{adminQMsg.text}</div>
+            <div className="small mt-4" style={{ color: adminQMsg.ok ? 'var(--success-text)' : 'var(--danger-text)' }}>{adminQMsg.text}</div>
           )}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>View:</span>
-          <div className="badge-group" style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+        <div className="toolbar mt-4">
+          <span className="small text-secondary">View:</span>
+          <div className="badge-group">
             {['pending_review', 'approved', 'rejected', ''].map(st => (
-              <button key={st} className={`btn ${adminQStatusFilter === st ? 'btn-primary' : 'btn-secondary'}`} style={{ fontSize: '0.75rem', padding: '0.3rem 0.7rem' }}
+              <button key={st} className={`btn ${adminQStatusFilter === st ? 'btn-sm btn-primary' : 'btn-sm btn-secondary'}`}
                 onClick={() => { setAdminQStatusFilter(st); loadAdminSkillQuestions(st); }}>
                 {st ? st.replace('_', ' ') : 'all'}
               </button>
             ))}
           </div>
-          <button className="btn btn-secondary" style={{ marginLeft: 'auto', fontSize: '0.75rem' }} onClick={() => loadAdminSkillQuestions()}>Refresh</button>
+          <button className="btn btn-sm btn-secondary" style={{ marginLeft: 'auto' }} onClick={() => loadAdminSkillQuestions()}>Refresh</button>
         </div>
 
-        {questions.length === 0 ? (
-          <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', padding: '1rem 0' }}>No questions in this view.</div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-            {questions.map((q: any) => (
-              <div key={q.id} style={{ padding: '0.7rem 0.8rem', background: 'var(--bg-row)', border: '1px solid var(--border-faint)', borderRadius: '6px', fontSize: '0.82rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.6rem', flexWrap: 'wrap' }}>
-                  <div style={{ whiteSpace: 'pre-wrap' }}><strong>{q.questionText}</strong></div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                    <span className="badge" style={{ background: 'var(--violet-bg)', color: 'var(--violet)', border: '1px solid var(--violet-border)' }}>{q.difficulty}</span>
-                    <span className="badge badge-preferred" style={{ fontSize: '0.65rem' }}>{q.questionType}</span>
-                    <span className="badge" style={{ background: q.verificationStatus === 'pending_review' ? 'var(--warning-bg)' : 'var(--bg-row)', color: 'var(--text-muted)', border: '1px solid var(--border-color)', fontSize: '0.65rem', textTransform: 'capitalize' }}>{String(q.verificationStatus).replace('_', ' ')}</span>
+        <div style={{ marginTop: '1rem' }}>
+          {questions.length === 0 ? (
+            <EmptyState icon={Database} tone="info" compact title="No questions in this view." />
+          ) : (
+            <div className="stack stack-sm">
+              {questions.map((q: any) => (
+                <div key={q.id} className="list-item">
+                  <div className="row-between" style={{ alignItems: 'flex-start' }}>
+                    <div className="flex-1" style={{ whiteSpace: 'pre-wrap' }}><strong>{q.questionText}</strong></div>
+                    <div className="toolbar shrink-0">
+                      <Chip tone={q.difficulty === 'hard' ? 'danger' : q.difficulty === 'medium' ? 'warning' : 'info'}>{q.difficulty}</Chip>
+                      <Chip tone="accent">{q.questionType}</Chip>
+                      {statusChip(q.verificationStatus)}
+                    </div>
+                  </div>
+                  <div className="small text-muted mt-3">
+                    <span className="text-secondary">{q.skillName || q.skillId}</span> · Topic: {q.topic}
+                    {q.codeSnippet && <pre className="code-block" style={{ marginTop: '0.35rem' }}>{q.codeSnippet}</pre>}
+                  </div>
+                  <div className="toolbar mt-3">
+                    {q.verificationStatus !== 'approved' && (
+                      <button className="btn btn-sm btn-success" onClick={() => setAdminQuestionStatus(q.id, 'approved')}>Approve</button>
+                    )}
+                    {q.verificationStatus !== 'rejected' && (
+                      <button className="btn btn-sm btn-secondary" onClick={() => setAdminQuestionStatus(q.id, 'rejected')}>Reject</button>
+                    )}
+                    <span className="tiny text-muted" style={{ marginLeft: 'auto', alignSelf: 'center' }}>by {q.createdBy || 'seed'}</span>
                   </div>
                 </div>
-                <div style={{ marginTop: '0.4rem', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>{q.skillName || q.skillId}</span> · Topic: {q.topic}
-                  {q.codeSnippet && <pre className="code-block" style={{ marginTop: '0.35rem' }}>{q.codeSnippet}</pre>}
-                </div>
-                <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                  {q.verificationStatus !== 'approved' && (
-                    <button className="btn btn-success" style={{ fontSize: '0.72rem', padding: '0.3rem 0.7rem' }} onClick={() => setAdminQuestionStatus(q.id, 'approved')}>Approve</button>
-                  )}
-                  {q.verificationStatus !== 'rejected' && (
-                    <button className="btn btn-secondary" style={{ fontSize: '0.72rem', padding: '0.3rem 0.7rem' }} onClick={() => setAdminQuestionStatus(q.id, 'rejected')}>Reject</button>
-                  )}
-                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginLeft: 'auto', alignSelf: 'center' }}>by {q.createdBy || 'seed'}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </SectionCard>
     </div>
   );
 }

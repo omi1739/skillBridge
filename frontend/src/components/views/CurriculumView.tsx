@@ -2,6 +2,7 @@
 
 import { useSkillBridge } from '@/lib/skillbridge-context';
 import { BookOpen, CheckCircle2, AlertCircle } from 'lucide-react';
+import { EmptyState } from '@/components/ui/primitives';
 
 export default function CurriculumView() {
   const {
@@ -12,7 +13,7 @@ export default function CurriculumView() {
   } = useSkillBridge();
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <div className="stack stack-lg">
       <div className="page-header">
         <div>
           <h1 className="page-title">University Syllabi vs. Market Reality</h1>
@@ -22,8 +23,15 @@ export default function CurriculumView() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-        {curricula.length === 0 && <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>No institution syllabi loaded yet.</span>}
+      <div className="row" style={{ gap: '0.5rem', flexWrap: 'wrap' }}>
+        {curricula.length === 0 && (
+          <EmptyState
+            icon={BookOpen}
+            tone="info"
+            compact
+            title="No institution syllabi loaded yet."
+          />
+        )}
         {(curricula || []).map(c => (
           <button
             key={c.id}
@@ -37,7 +45,7 @@ export default function CurriculumView() {
       </div>
 
       {curriculumAnalysis && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div className="stack stack-lg">
           <div className="stat-grid-3">
             <div className="stat-card">
               <div className="stat-label">Syllabus Alignment Score</div>
@@ -48,7 +56,7 @@ export default function CurriculumView() {
             </div>
             <div className="stat-card" style={{ gridColumn: 'span 2' }}>
               <div className="stat-label">Analysis Summary</div>
-              <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.4rem', lineHeight: 1.5 }}>
+              <p className="small text-secondary" style={{ marginTop: '0.4rem', lineHeight: 1.5 }}>
                 {curriculumAnalysis.summaryAnalysis || 'No curriculum analysis available.'}
               </p>
             </div>
@@ -59,16 +67,14 @@ export default function CurriculumView() {
               <h3 className="card-title" style={{ color: 'var(--success-text)', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
                 <CheckCircle2 size={18} /> Strong Academic Foundation
               </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div className="stack stack-sm">
                 {(curriculumAnalysis.strongAcademicAreas || []).length === 0 && (
-                  <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>No strong academic coverage identified yet.</p>
+                  <p className="small text-secondary">No strong academic coverage identified yet.</p>
                 )}
                 {(curriculumAnalysis.strongAcademicAreas || []).map((item, idx) => (
-                  <div key={idx} style={{ background: 'var(--bg-row)', border: '1px solid var(--border-faint)', padding: '0.85rem', borderRadius: '6px' }}>
+                  <div key={idx} className="list-item">
                     <strong style={{ color: 'var(--success-text)', fontSize: '0.9rem' }}>{item.skill}</strong>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
-                      {item.reason}
-                    </p>
+                    <p className="small text-secondary" style={{ marginTop: '0.2rem' }}>{item.reason}</p>
                   </div>
                 ))}
               </div>
@@ -78,24 +84,24 @@ export default function CurriculumView() {
               <h3 className="card-title" style={{ color: 'var(--danger-text)', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
                 <AlertCircle size={18} /> Critical Market Omissions
               </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div className="stack stack-sm">
                 {(curriculumAnalysis.criticalMarketOmissions || []).length === 0 && (
-                  <p style={{ fontSize: '0.8rem', color: 'var(--danger)', fontWeight: 600 }}>
+                  <p className="small" style={{ color: 'var(--danger)', fontWeight: 600 }}>
                     No market-critical omissions found — curriculum coverage is well aligned.
                   </p>
                 )}
                 {(curriculumAnalysis.criticalMarketOmissions || []).map((item, idx) => (
                   <div key={idx} style={{ background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', padding: '0.85rem', borderRadius: '6px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div className="row-between">
                       <strong style={{ color: 'var(--danger-text)', fontSize: '0.9rem' }}>{item.skill}</strong>
                       <span className="badge badge-critical" style={{ fontSize: '0.675rem' }}>
                         Demanded by {item.marketDemand}% of Jobs
                       </span>
                     </div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--danger)', fontWeight: 600, marginTop: '0.25rem' }}>
+                    <div className="small" style={{ color: 'var(--danger)', fontWeight: 600, marginTop: '0.25rem' }}>
                       Academic Status: {item.academicStatus}
                     </div>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.35rem' }}>
+                    <p className="small text-secondary" style={{ marginTop: '0.35rem' }}>
                       Recommendation: {item.recommendation}
                     </p>
                   </div>
