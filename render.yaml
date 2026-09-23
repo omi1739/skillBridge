@@ -28,6 +28,10 @@ services:
         sync: false
       - key: CORS_ORIGIN
         sync: false
+      # Allow the anonymous-demo flow (frontend uses the static demo token).
+      # The token maps to a regular USER role only, so admin routes stay guarded.
+      - key: ALLOW_DEMO_TOKEN
+        value: "true"
       - key: JOB_API_URL
         sync: false
       - key: JOB_API_PAGES
