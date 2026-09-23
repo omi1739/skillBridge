@@ -25,7 +25,11 @@ const SCHEMA_PATH = path.resolve(__dirname, '../../../docs/architecture/schema.s
 
 export async function applySchema(): Promise<void> {
   const sql = fs.readFileSync(SCHEMA_PATH, 'utf8');
-  await query(sql.replace(/;/g, ';\n'));
+  // Send the file verbatim. Do NOT rewrite semicolons here: inserting a
+  // newline after every ';' would terminate `--` comments mid-line and turn
+  // trailing comment text into executable SQL (the whole multi-statement
+  // parse then fails and no tables get created on a fresh database).
+  await query(sql);
   console.log('[SkillBridge DB] Schema applied.');
 }
 
