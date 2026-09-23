@@ -383,6 +383,22 @@ export function getAllBankQuestions(): Question[] {
   return BANK.map(q => ({ ...q, options: [...(q.options || [])] }));
 }
 
+/**
+ * Rebuild the client-safe (answer-stripped) questions for a previously drawn
+ * subset, preserving the order the attempt originally served. Used when a
+ * submission is graded against the subset recorded on a server-side attempt.
+ */
+export function getDiagnosticQuestionsByIds(ids: string[]): Question[] {
+  const byId = new Map(BANK.map(q => [q.id, q]));
+  return ids
+    .map(id => byId.get(id))
+    .filter((q): q is Question => !!q)
+    .map(q => {
+      const { correctAnswer: _ca, explanation: _ex, ...safe } = q;
+      return { ...safe, options: [...(q.options || [])] } as Question;
+    });
+}
+
 /** In-place Fisher-Yates shuffle of an array. Returns the same array. */
 function shuffle<T>(arr: T[]): T[] {
   for (let i = arr.length - 1; i > 0; i--) {

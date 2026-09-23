@@ -7,7 +7,7 @@ function jsonResponse(data: any, status = 200): MockResponse {
 }
 
 function pathOf(input: any): string {
-  return String(input).replace('https://api.github.com', '').split('?')[0];
+  return String(input).replace('https://api.github.com', '');
 }
 
 function setupFetch(handler: (path: string) => MockResponse) {
@@ -104,5 +104,123 @@ describe('GitHubVerifier', () => {
     expect(res.reachable).toBe(false);
     expect(res.verified).toBe(false);
     expect(res.error).toMatch(/not found|accessible/i);
+  });
+
+  it('treats an empty repo (no tree on default branch) as reachable but not verified', async () => {
+    setupFetch(path => {
+      if (path === '/repos/user/repo') return jsonResponse({ default_branch: 'main' });
+      if (path.startsWith('/repos/user/repo/git/trees')) return jsonResponse({}, 409);
+      if (path.startsWith('/repos/user/repo/commits')) return jsonResponse([]);
+      return jsonResponse({}, 404);
+    });
+
+    const v = new GitHubVerifier();
+    const res = await v.verify('https://github.com/user/repo');
+
+    expect(res.reachable).toBe(true);
+    expect(res.verified).toBe(false);
+    expect(res.hasTests).toBe(false);
+    expect(res.commitCount).toBe(0);
+    expect(res.error).toBeUndefined();
+  });
+
+  it('surfaces repo metadata depth (language, fork, archive, push date)', async () => {
+    setupFetch(path => {
+      if (path === '/repos/user/repo') {
+        return jsonResponse({
+          default_branch: 'main',
+          language: 'TypeScript',
+          fork: true,
+          pushed_at: '2025-01-15T10:00:00Z'
+        });
+      }
+      if (path.startsWith('/repos/user/repo/git/trees')) {
+        return jsonResponse({ tree: [{ path: 'src/index.ts' }] });
+      }
+      if (path.startsWith('/repos/user/repo/commits')) return jsonResponse([]);
+      return jsonResponse({}, 404);
+    });
+
+    const v = new GitHubVerifier();
+    const res = await v.verify('https://github.com/user/repo');
+
+    expect(res.primaryLanguage).toBe('TypeScript');
+    expect(res.isFork).toBe(true);
+    expect(res.isArchived).toBe(false);
+    expect(res.lastPushedAt).toBe('2025-01-15T10:00:00Z');
+    expect(res.detectedStack).toContain('JavaScript / TypeScript');
+  });
+
+  it('detects stack from real file extensions, not just the primary language', async () => {
+    setupFetch(path => {
+      if (path === '/repos/user/repo') return jsonResponse({ default_branch: 'main' });
+      if (path.startsWith('/repos/user/repo/git/trees')) {
+        return jsonResponse({ tree: [{ path: 'main.py' }, { path: 'requirements.txt' }, { path: 'server.go' }] });
+      }
+      if (path.startsWith('/repos/user/repo/commits')) return jsonResponse([]);
+      return jsonResponse({}, 404);
+    });
+
+    const v = new GitHubVerifier();
+    const res = await v.verify('https://github.com/user/repo');
+
+    expect(res.detectedStack).toContain('Python');
+    expect(res.detectedStack).toContain('Go');
+    expect(res.detectedStack).not.toContain('JavaScript / TypeScript');
+  });
+
+  it('ignores vendored/generated paths as test or stack evidence', async () => {
+    setupFetch(path => {
+      if (path === '/repos/user/repo') return jsonResponse({ default_branch: 'main' });
+      if (path.startsWith('/repos/user/repo/git/trees')) {
+        return jsonResponse({ tree: [
+          { path: 'node_modules/foo/lib.test.js' },
+          { path: 'dist/build.spec.ts' },
+          { path: 'src/index.js' }
+        ]});
+      }
+      if (path.startsWith('/repos/user/repo/commits')) return jsonResponse([]);
+      return jsonResponse({}, 404);
+    });
+
+    const v = new GitHubVerifier();
+    const res = await v.verify('https://github.com/user/repo');
+
+    expect(res.hasTests).toBe(false);
+    expect(res.detectedStack).toContain('JavaScript / TypeScript');
+  });
+
+  it('falls back to shallow + targeted scans when the recursive tree is truncated', async () => {
+    setupFetch(path => {
+      if (path === '/repos/user/repo') return jsonResponse({ default_branch: 'main' });
+      if (path === '/repos/user/repo/git/trees/main?recursive=1') {
+        return jsonResponse({ truncated: true, tree: [{ path: 'README.md' }] });
+      }
+      if (path === '/repos/user/repo/git/trees/main?recursive=0') {
+        return jsonResponse({ tree: [{ path: 'tests', type: 'tree' }, { path: 'src', type: 'tree' }] });
+      }
+      if (path === '/repos/user/repo/git/trees/main/tests?recursive=1') {
+        return jsonResponse({ tree: [{ path: 'cases.spec.ts' }, { path: 'helpers.ts' }] });
+      }
+      if (path.startsWith('/repos/user/repo/commits')) return jsonResponse([]);
+      return jsonResponse({}, 404);
+    });
+
+    const v = new GitHubVerifier();
+    const res = await v.verify('https://github.com/user/repo');
+
+    expect(res.reachable).toBe(true);
+    expect(res.hasReadme).toBe(true);
+    expect(res.hasTests).toBe(true);
+    expect(res.treeTruncated).toBe(true);
+  });
+
+  it('maps GitHub rate-limit errors to an actionable message', async () => {
+    setupFetch(() => jsonResponse({ message: 'API rate limit exceeded' }, 403));
+    const v = new GitHubVerifier();
+    const res = await v.verify('https://github.com/user/repo');
+
+    expect(res.reachable).toBe(false);
+    expect(res.error).toMatch(/rate limit/i);
   });
 });

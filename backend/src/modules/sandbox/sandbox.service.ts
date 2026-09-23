@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { sandboxService } from '../../services/sandbox.service';
 import { challengeGenerator, registerDynamicChallenge } from '../../services/challenge-generator.service';
+import { store } from '../../store';
 
 @Injectable()
 export class NestSandboxService {
@@ -22,18 +23,15 @@ export class NestSandboxService {
       difficulty: difficulty as any
     });
     registerDynamicChallenge(challenge);
+    // Persist the freshly generated challenge so it survives restarts. This is
+    // best-effort: a DB outage must never break the generate flow itself.
+    try {
+      await store.saveSandboxChallenge(challenge);
+    } catch (err) {
+      // The in-memory registry still serves the challenge for this run.
+      console.warn(`[Sandbox] Failed to persist challenge ${challenge.id}: ${(err as Error).message}`);
+    }
     return challenge;
-  }
-
-  async getReferenceSolution(challengeId: string) {
-    if (!challengeId) {
-      throw new BadRequestException('challengeId is required');
-    }
-    const solution = await challengeGenerator.getReferenceSolution(challengeId);
-    if (!solution) {
-      throw new BadRequestException('No reference solution for this challenge');
-    }
-    return solution;
   }
 
   async runSQL(challengeId: string, query: string, userId: string = 'demo_user_01') {

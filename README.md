@@ -246,7 +246,7 @@ The core platform is fully scaffolded, functional, and deployed to production (b
 | Job ingestion (cron) | Render | runs every 8h on `main` push |
 | PostgreSQL | Neon Serverless | via `backend/.env` |
 
-> **Uptime note:** The free Render web service sleeps after ~15 min of inactivity. An external uptime monitor (e.g. UptimeRobot) pings `GET /api/health` every 5 minutes to keep it warm. `GET /api/jobs` requires a `Bearer` token (e.g. `demo_token_verify`).
+> **Uptime note:** The free Render web service sleeps after ~15 min of inactivity. An external uptime monitor (e.g. UptimeRobot) pings `GET /api/health` every 5 minutes to keep it warm. `GET /api/jobs` requires a `Bearer` token (e.g. `demo_token_demo_user_01`).
 
 > GitHub verification requires network access to `api.github.com`; set `GITHUB_TOKEN` in `backend/.env` for higher rate limits. Unverifiable repos are stored as `PENDING`/`NEEDS_REVIEW` rather than falsely marked verified.
 

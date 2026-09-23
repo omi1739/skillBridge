@@ -18,7 +18,13 @@ export interface AuthPayload {
  */
 const JWT_SECRET: string = ((): string => {
   if (process.env.JWT_SECRET) {
-    return process.env.JWT_SECRET;
+    // Weak secrets are forgeable. Enforce a minimum length so tokens are never
+    // minted with a guessable key (e.g. "secret", "changeme", "jwt_secret").
+    const configured = process.env.JWT_SECRET;
+    if (configured.length < 32) {
+      throw new Error('JWT_SECRET must be at least 32 characters.');
+    }
+    return configured;
   }
   if (process.env.NODE_ENV === 'production') {
     throw new Error('JWT_SECRET must be set with a strong value in production.');
@@ -158,6 +164,16 @@ export class AuthService {
 
     const existing = await this.findUserByEmail(cleanEmail);
     if (existing) {
+      // Account-linking guard: an email/password account must not be silently
+      // taken over by a Google credential. Require the user to sign in with the
+      // original password (or verify ownership) instead of granting access via a
+      // different identity provider.
+      if (existing.provider === 'EMAIL') {
+        throw new Error('An account with this email already uses email/password. Sign in with your password.');
+      }
+      if (existing.googleId && existing.googleId !== profileInfo.googleId) {
+        throw new Error('This email is already linked to a different Google account.');
+      }
       const profile = await this.findProfile(existing.id);
       if (!profile) {
         throw new Error('User profile record not found.');

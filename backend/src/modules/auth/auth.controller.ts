@@ -9,17 +9,15 @@ import {
   Inject,
   HttpCode,
   HttpStatus,
-  BadRequestException,
-  UnauthorizedException
+  BadRequestException
 } from '@nestjs/common';
 import { NestAuthService } from './auth.service';
-import { JwtAuthGuard, OptionalJwtAuthGuard } from './guards/jwt-auth.guard';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { AuthPayload } from '../../services/auth.service';
 import { RegisterDto, LoginDto, DeclareSkillDto, UpdateProfileDto, GoogleAuthDto } from '../../dto/auth.dto';
 import { RateLimitGuard } from '../../common/rate-limit.guard';
 import { RateLimit, RateWindow } from '../../common/rate-limit.decorators';
-import { demoAccessAllowed } from '../../common/demo-access';
 
 @Controller()
 export class AuthController {
@@ -55,16 +53,11 @@ export class AuthController {
   }
 
   @Get('me')
-  @UseGuards(OptionalJwtAuthGuard)
-  async getMe(@CurrentUser() user: AuthPayload | undefined) {
-    // Identity comes exclusively from the JWT. Unauthenticated callers are
-    // served the public demo profile ONLY while demo access is enabled; in
-    // production an anonymous caller cannot claim the demo identity.
-    const userId = user?.userId || (demoAccessAllowed() ? 'demo_user_01' : undefined);
-    if (!userId) {
-      throw new UnauthorizedException('Authentication required.');
-    }
-    return this.authService.getCurrentUser(userId);
+  @UseGuards(JwtAuthGuard)
+  async getMe(@CurrentUser() user: AuthPayload) {
+    // Identity comes exclusively from the JWT. The demo profile is only reachable
+    // by presenting the demo token — anonymous callers cannot claim it.
+    return this.authService.getCurrentUser(user.userId);
   }
 
   @Get('me/account')

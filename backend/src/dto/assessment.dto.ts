@@ -29,6 +29,20 @@ export class SubmitAssessmentDto {
   @ValidateNested({ each: true })
   @Type(() => AssessmentAnswerDto)
   answers?: AssessmentAnswerDto[];
+
+  /** The exact attempt this submission belongs to (returned by `/start`). */
+  @IsOptional()
+  @IsString()
+  attemptId?: string;
+}
+
+export class StartAssessmentDto {
+  /** Number of questions to draw from the bank (diagnostic only). */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  count?: number;
 }
 
 // ---- Skill-centric assessment DTOs ----

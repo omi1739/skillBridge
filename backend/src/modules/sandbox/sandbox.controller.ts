@@ -3,7 +3,6 @@ import {
   Get,
   Post,
   Body,
-  Param,
   Inject,
   HttpCode,
   HttpStatus,
@@ -44,15 +43,6 @@ export class SandboxController {
       body.skillId,
       body.difficulty
     );
-  }
-
-  @Get('reference-solution/:challengeId')
-  @UseGuards(JwtAuthGuard)
-  @UseGuards(RateLimitGuard)
-  @RateLimit(30)
-  @RateWindow(60_000)
-  async referenceSolution(@Param('challengeId') challengeId: string) {
-    return this.sandboxService.getReferenceSolution(challengeId);
   }
 
   @Post('run-sql')

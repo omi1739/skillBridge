@@ -2,6 +2,8 @@ import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/commo
 import { PoolClient } from 'pg';
 import { pool, query, withTransaction, testConnection } from '../db/client';
 import { applySchema, seedAll } from '../db/seed';
+import { store } from '../store';
+import { restoreDynamicChallenges } from '../services/challenge-generator.service';
 
 @Injectable()
 export class DatabaseService implements OnModuleInit, OnModuleDestroy {
@@ -26,6 +28,19 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       } catch (err) {
         this.logger.warn(`Auto database initialization skipped/warn: ${(err as Error).message}`);
       }
+    }
+
+    // Rehydrate sandbox challenges persisted in a previous run so generated
+    // challenges stay runnable across restarts. Also best-effort: a DB failure
+    // here just means this boot starts with only the in-memory + offline bank.
+    try {
+      const persisted = await store.getSandboxChallenges();
+      const restored = restoreDynamicChallenges(persisted);
+      if (restored > 0) {
+        this.logger.log(`Rehydrated ${restored} persisted sandbox challenge(s).`);
+      }
+    } catch (err) {
+      this.logger.warn(`Sandbox challenge rehydration skipped: ${(err as Error).message}`);
     }
   }
 

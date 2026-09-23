@@ -19,7 +19,8 @@ import { AuthPayload } from '../../services/auth.service';
 import {
   SubmitAssessmentDto,
   CreateAssessmentDto,
-  SubmitAnswerByIdDto
+  SubmitAnswerByIdDto,
+  StartAssessmentDto
 } from '../../dto/assessment.dto';
 
 @Controller('assessments')
@@ -147,13 +148,14 @@ export class AssessmentsController {
   @RateWindow(60_000)
   async startAssessment(
     @Param('id') id: string,
-    @CurrentUser() user: AuthPayload | undefined
+    @CurrentUser() user: AuthPayload | undefined,
+    @Body() body?: StartAssessmentDto
   ) {
     const candidateId = user?.userId;
     if (!candidateId) {
       throw new Error('Authentication required');
     }
-    return this.assessmentsService.startAssessment(id, candidateId);
+    return this.assessmentsService.startAssessment(id, candidateId, body?.count);
   }
 
   @Post(':id/submit')
@@ -168,6 +170,6 @@ export class AssessmentsController {
     if (!candidateId) {
       throw new Error('Authentication required');
     }
-    return this.assessmentsService.submitAssessment(id, candidateId, body.answers || []);
+    return this.assessmentsService.submitAssessment(id, candidateId, body.answers || [], body.attemptId);
   }
 }

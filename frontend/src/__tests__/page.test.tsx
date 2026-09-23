@@ -68,7 +68,7 @@ function setupFetch() {
     const url = String(input);
     capturedCalls.push({ method: init?.method, url, body: init?.body as string | undefined });
 
-    if (url.includes('/me?userId') || url.includes('/me?user')) {
+    if (url.includes('/me') && !url.includes('/me/profile') && !url.includes('/me/projects')) {
       return response({ user: USER, profile: PROFILE });
     }
     if (url.includes('/assessments/diagnostic')) {

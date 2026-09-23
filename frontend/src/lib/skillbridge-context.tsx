@@ -108,6 +108,7 @@ function useSkillBridgeValue() {
   const [userAnswers, setUserAnswers] = useState<Record<string, string>>({});
   const [isSubmittingAssessment, setIsSubmittingAssessment] = useState(false);
   const [attemptResult, setAttemptResult] = useState<AssessmentAttempt | null>(null);
+  const [diagnosticAttemptId, setDiagnosticAttemptId] = useState<string | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<number>(30 * 60);
 
   // Skill-centric assessment state
@@ -134,8 +135,6 @@ function useSkillBridgeValue() {
   const [sandboxResult, setSandboxResult] = useState<any | null>(null);
   const [isGeneratingChallenge, setIsGeneratingChallenge] = useState(false);
   const [generateError, setGenerateError] = useState('');
-  const [referenceSolution, setReferenceSolution] = useState<string | null>(null);
-  const [isLoadingSolution, setIsLoadingSolution] = useState(false);
 
   // Candidate personalized data
   const [gaps, setGaps] = useState<SkillGap[]>([]);
@@ -199,12 +198,14 @@ function useSkillBridgeValue() {
     validationPercent: number;
     curriculaCount?: number;
     activeCompanies?: number;
+    remoteJobs?: number;
   } | null>(null);
 
   // Google sign-in refs
   const googleBtnHiddenRef = useRef<HTMLDivElement>(null);
 
-  const loadDiagnostic = async (count = 12) => {
+  const loadDiagnostic = async (count = 12, token?: string | null) => {
+    const effectiveToken = token !== undefined ? token : authToken;
     setAssessment(null);
     setAttemptResult(null);
     setTimeRemaining(0);
@@ -214,6 +215,7 @@ function useSkillBridgeValue() {
       if (!diagRes.ok) throw new Error(data?.message || data?.error || 'Could not load the assessment.');
 
       let timeLimitMinutes = data?.timeLimitMinutes || 15;
+      let attemptId: string | null = null;
 
       // Server-sided `/start`: only meaningful once there's an account to hold
       // the attempt window against. Anonymous demo visitors have no token, so
@@ -223,15 +225,33 @@ function useSkillBridgeValue() {
       // backend predates the route (deploy lag) → graceful client timer. Any
       // other non-2xx (real 401 on expired tokens, 400 on expired attempts, …)
       // stays a hard error so auth/expiry problems are never masked.
-      if (authToken) {
+      if (effectiveToken) {
         const startRes = await fetch(`${API_BASE}/assessments/assessment_backend_diagnostic/start`, {
           method: 'POST',
-          headers: authHeaders()
+          headers: headersFor(effectiveToken),
+          body: JSON.stringify({ count })
         });
         if (startRes.ok) {
           const start = await startRes.json().catch(() => null);
           if (start?.attemptId) {
+            attemptId = start.attemptId;
             timeLimitMinutes = start.timeLimitMinutes || timeLimitMinutes;
+            // The server window is authoritative: a re-used attempt (page
+            // reload / remount within the window) still counts from its
+            // original startedAt, so the client countdown must honour the
+            // remaining time rather than resetting to a fresh full timer.
+            if (start?.startedAt) {
+              const elapsedSec = Math.floor((Date.now() - new Date(start.startedAt).getTime()) / 1000);
+              const remainingSec = Math.max(0, timeLimitMinutes * 60 - elapsedSec);
+              if (remainingSec > 0) setTimeRemaining(remainingSec);
+            }
+          }
+          // The server authoritatively decides the served subset per attempt.
+          // Use it so grading never covers questions the user wasn't shown, and
+          // so re-renders (Retry, tab remounts) present the same questions.
+          if (start?.questions && Array.isArray(start.questions) && start.questions.length > 0) {
+            data.questions = start.questions;
+            data.questionCount = start.questions.length;
           }
         } else if (startRes.status !== 404 && startRes.status !== 405) {
           const start = await startRes.json().catch(() => null);
@@ -242,6 +262,7 @@ function useSkillBridgeValue() {
         }
       }
 
+      setDiagnosticAttemptId(attemptId);
       setAssessment(data);
       setCurrentQuestionIdx(0);
       setUserAnswers({});
@@ -663,7 +684,11 @@ function useSkillBridgeValue() {
     fetchRoleAndSkills(initialRoleId);
     fetchAllRoles();
 
-    loadDiagnostic(12);
+    // Load the diagnostic immediately. A restored session must be passed
+    // explicitly: on first render `authToken` is still null, so the closure
+    // would otherwise skip the server-side `/start` and the first submission
+    // would be rejected by the backend as "not started".
+    loadDiagnostic(12, savedToken);
 
     fetchJSON<any[]>(`${API_BASE}/sandbox/challenges`)
       .then(data => {
@@ -734,10 +759,10 @@ function useSkillBridgeValue() {
     }
     setIsAuthLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/me?userId=demo_user_01`);
+      const token = 'demo_token_demo_user_01';
+      const res = await fetch(`${API_BASE}/me`, { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       if (data.user && data.profile) {
-        const token = 'demo_token_demo_user_01';
         setCurrentUser(data.user);
         setCurrentProfile(data.profile);
         setAuthToken(token);
@@ -968,7 +993,8 @@ function useSkillBridgeValue() {
         method: 'POST',
         headers: authHeaders(),
         body: JSON.stringify({
-          answers: answersPayload
+          answers: answersPayload,
+          attemptId: diagnosticAttemptId || undefined
         })
       });
 
@@ -994,7 +1020,7 @@ function useSkillBridgeValue() {
   };
 
   useEffect(() => {
-    if (assessment && timeRemaining === 0 && Object.keys(userAnswers).length > 0 && !attemptResult) {
+    if (assessment && timeRemaining === 0 && Object.keys(userAnswers).length > 0 && !attemptResult && !isSubmittingAssessment) {
       handleSubmitAssessment();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1037,14 +1063,12 @@ function useSkillBridgeValue() {
     setSelectedChallengeIdx(idx);
     setSandboxCode(challenges[idx].starterCode);
     setSandboxResult(null);
-    setReferenceSolution(null);
   };
 
   const handleGenerateChallenge = async () => {
     setIsGeneratingChallenge(true);
     setGenerateError('');
     setSandboxResult(null);
-    setReferenceSolution(null);
     try {
 const res = await fetch(`${API_BASE}/sandbox/generate`, {
         method: 'POST',
@@ -1063,25 +1087,6 @@ const res = await fetch(`${API_BASE}/sandbox/generate`, {
       setGenerateError(err.message || 'Generation failed.');
     } finally {
       setIsGeneratingChallenge(false);
-    }
-  };
-
-  const handleShowSolution = async () => {
-    const challenge = activeChallenge;
-    if (!challenge) return;
-    setIsLoadingSolution(true);
-    setReferenceSolution(null);
-    try {
-      const res = await fetch(`${API_BASE}/sandbox/reference-solution/${challenge.id}`, { headers: authHeaders() });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || data.error || 'No solution available.');
-      setReferenceSolution(data.referenceSolution || '');
-    } catch (err: any) {
-      console.error(err);
-      reportError(err.message || 'Could not load the reference solution.');
-      setReferenceSolution(null);
-    } finally {
-      setIsLoadingSolution(false);
     }
   };
 
@@ -1374,12 +1379,9 @@ const res = await fetch(`${API_BASE}/sandbox/generate`, {
     sandboxResult,
     isGeneratingChallenge,
     generateError,
-    referenceSolution,
-    isLoadingSolution,
     activeChallenge,
     handleSelectChallenge,
     handleGenerateChallenge,
-    handleShowSolution,
     handleRunSandbox,
     // personalized data
     gaps,

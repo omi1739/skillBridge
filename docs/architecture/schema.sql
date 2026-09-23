@@ -364,6 +364,7 @@ ALTER TABLE assessment_attempts ADD COLUMN IF NOT EXISTS difficulty VARCHAR(50);
 ALTER TABLE assessment_attempts ADD COLUMN IF NOT EXISTS skill_level VARCHAR(50);
 ALTER TABLE assessment_attempts ADD COLUMN IF NOT EXISTS topic_results_json JSONB DEFAULT '[]';
 ALTER TABLE assessment_attempts ADD COLUMN IF NOT EXISTS question_count INT DEFAULT 0;
+ALTER TABLE assessment_attempts ADD COLUMN IF NOT EXISTS question_ids_json JSONB DEFAULT '[]';
 
 -- Indexes for the skill assessment system.
 CREATE INDEX IF NOT EXISTS idx_questions_skill ON questions(skill_id);
@@ -373,6 +374,22 @@ CREATE INDEX IF NOT EXISTS idx_attempts_user_skill ON assessment_attempts(user_i
 CREATE INDEX IF NOT EXISTS idx_assessment_questions_attempt ON assessment_questions(attempt_id);
 CREATE INDEX IF NOT EXISTS idx_user_answers_attempt ON user_answers(attempt_id);
 CREATE INDEX IF NOT EXISTS idx_topic_results_attempt ON assessment_topic_results(attempt_id);
+
+-- ============================================================
+-- Sandbox challenges (SQL & JavaScript practice challenges)
+-- Generated challenges are persisted as JSON so they survive restarts;
+-- each one is runnable as long as it carries a valid payload.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS sandbox_challenges (
+    id VARCHAR(100) PRIMARY KEY,                -- e.g. 'gen_sql_<ts>' or 'offline_sql_01'
+    challenge_type VARCHAR(20) NOT NULL,        -- SQL, JAVASCRIPT
+    skill_id VARCHAR(100),
+    difficulty VARCHAR(20),
+    payload JSONB NOT NULL,                     -- full GeneratedChallenge object
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_sandbox_challenges_type ON sandbox_challenges(challenge_type);
 
 -- ============================================================
 -- Integrity hardening (applied idempotently on every boot)

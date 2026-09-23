@@ -40,14 +40,22 @@ export default function MarketView() {
   }
 
   const totalJobsCount = landingStats?.jobPostings ?? allJobs.length;
-  const employerCount = new Set(allJobs.map(j => j.company)).size;
+  // Anonymous visitors have no `allJobs` (it is account-scoped); `/stats` is the
+  // public source of truth for the catalog/employer/remote figures so the
+  // overview never shows bogus "0 employers • 0 remote/WFH" counts.
+  const effectiveJobs = allJobs.length > 0 ? allJobs : null;
+  const remoteCount = effectiveJobs
+    ? allJobs.filter(j => j.isRemote).length
+    : (landingStats?.remoteJobs ?? 0);
+  const employerCount = effectiveJobs
+    ? new Set(allJobs.map(j => j.company)).size
+    : (landingStats?.activeCompanies ?? 0);
   const sourceList = marketProvenance?.sources?.length
     ? marketProvenance.sources.join(' + ')
     : 'Public job APIs';
   const lastSync = marketProvenance?.lastIngestedAt
     ? new Date(marketProvenance.lastIngestedAt).toLocaleDateString()
     : 'Pending';
-  const remoteCount = allJobs.filter(j => j.isRemote).length;
 
   const statusTiles = [
     {

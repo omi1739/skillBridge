@@ -33,6 +33,20 @@ function freePort(port) {
 freePort(4000);
 freePort(3000);
 
+// @skillbridge/types is consumed by both workspaces through its compiled
+// dist/ output (gitignored), so ensure it is built before either dev server
+// boots. Do it here once instead of letting both predev hooks race on dist/.
+try {
+  execSync(`${npmCmd} run build --workspace=@skillbridge/types`, {
+    cwd: path.resolve(__dirname, '..'),
+    stdio: 'inherit',
+    shell: isWin
+  });
+} catch (err) {
+  console.error('[Dev Runner] Failed to build @skillbridge/types. Aborting.');
+  process.exit(1);
+}
+
 // 1. Start Backend API Server
 const apiProcess = spawn(npmCmd, ['run', 'dev', '--workspace=backend'], {
   cwd: path.resolve(__dirname, '..'),

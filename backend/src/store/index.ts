@@ -15,6 +15,7 @@ import {
   JobMatchResult
 } from '@skillbridge/types';
 import { query, withTransaction } from '../db/client';
+import type { GeneratedChallenge } from '../services/challenge-generator.service';
 
 interface SkillRow {
   id: string;
@@ -275,16 +276,48 @@ export class AppDataStore {
   async saveEvidence(userId: string, list: SkillEvidence[]): Promise<SkillEvidence[]> {
     await withTransaction(async client => {
       for (const ev of list) {
+        // Keep the strongest objectively-measured evidence: a weaker re-submit
+        // (e.g. a worse diagnostic run) must never regress an existing
+        // ASSESSMENT/PROJECT/GITHUB score. SELF_REPORTED stays user-editable.
+        const measured = ev.sourceType !== 'SELF_REPORTED';
         await client.query(
           `INSERT INTO skill_evidence
              (id, user_id, skill_id, source_type, source_id, proficiency_score, confidence, metadata_json, created_at)
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::timestamptz)
-           ON CONFLICT (user_id, skill_id, source_type)
-           DO UPDATE SET source_id=EXCLUDED.source_id,
-                         proficiency_score=EXCLUDED.proficiency_score,
-                         confidence=EXCLUDED.confidence,
-                         metadata_json=EXCLUDED.metadata_json,
-                         created_at=EXCLUDED.created_at`,
+           ON CONFLICT (user_id, skill_id, source_type) DO UPDATE SET
+             proficiency_score = ${
+               measured
+                 ? 'GREATEST(COALESCE(skill_evidence.proficiency_score, 0), EXCLUDED.proficiency_score)'
+                 : 'EXCLUDED.proficiency_score'
+             },
+             confidence = CASE
+               WHEN ${
+                 measured
+                   ? 'EXCLUDED.proficiency_score >= COALESCE(skill_evidence.proficiency_score, 0)'
+                   : 'true'
+               }
+               THEN EXCLUDED.confidence ELSE skill_evidence.confidence END,
+             source_id = CASE
+               WHEN ${
+                 measured
+                   ? 'EXCLUDED.proficiency_score >= COALESCE(skill_evidence.proficiency_score, 0)'
+                   : 'true'
+               }
+               THEN EXCLUDED.source_id ELSE skill_evidence.source_id END,
+             metadata_json = CASE
+               WHEN ${
+                 measured
+                   ? 'EXCLUDED.proficiency_score >= COALESCE(skill_evidence.proficiency_score, 0)'
+                   : 'true'
+               }
+               THEN EXCLUDED.metadata_json ELSE skill_evidence.metadata_json END,
+             created_at = CASE
+               WHEN ${
+                 measured
+                   ? 'EXCLUDED.proficiency_score >= COALESCE(skill_evidence.proficiency_score, 0)'
+                   : 'true'
+               }
+               THEN EXCLUDED.created_at ELSE skill_evidence.created_at END`,
           [ev.id, userId, ev.skillId, ev.sourceType, ev.sourceId || null,
            ev.proficiencyScore, ev.confidence,
            ev.metadata ? JSON.stringify(ev.metadata) : null, ev.createdAt]
@@ -434,6 +467,27 @@ export class AppDataStore {
       [attempt.id, attempt.userId, attempt.assessmentId, attempt.startedAt,
        attempt.completedAt || null, attempt.score, attempt.totalPointsEarned,
        attempt.maxPoints, attempt.passed, JSON.stringify(attempt.subSkillScores), attempt.status]
+    );
+  }
+
+  // ---- Sandbox challenges ----
+  async getSandboxChallenges(): Promise<GeneratedChallenge[]> {
+    const rows = await query<any>(`SELECT payload FROM sandbox_challenges ORDER BY created_at`);
+    return rows.map(r => r.payload as GeneratedChallenge);
+  }
+
+  async saveSandboxChallenge(challenge: GeneratedChallenge): Promise<void> {
+    await query(
+      `INSERT INTO sandbox_challenges (id, challenge_type, skill_id, difficulty, payload)
+       VALUES ($1,$2,$3,$4,$5::jsonb)
+       ON CONFLICT (id) DO UPDATE SET
+         challenge_type=EXCLUDED.challenge_type,
+         skill_id=EXCLUDED.skill_id,
+         difficulty=EXCLUDED.difficulty,
+         payload=EXCLUDED.payload,
+         updated_at=CURRENT_TIMESTAMP`,
+      [challenge.id, challenge.type, challenge.skillId || null,
+       challenge.difficulty || null, JSON.stringify(challenge)]
     );
   }
 
@@ -655,10 +709,11 @@ export class AppDataStore {
          WHERE (
            source_id IS NOT NULL AND NOT EXISTS (
              SELECT 1 FROM job_sources s WHERE s.id = jobs.source_id AND s.is_active
-           )
+)
            OR
-           (last_verified_at IS NOT NULL AND last_verified_at < CURRENT_TIMESTAMP - INTERVAL '${expireInterval}')
-         )
+           (COALESCE(last_verified_at, created_at, posted_at)
+            < CURRENT_TIMESTAMP - INTERVAL '${expireInterval}')
+          )
          AND verification_status NOT IN ('EMPLOYER_VERIFIED', 'EXPIRED')
          RETURNING id
        )
@@ -668,11 +723,14 @@ export class AppDataStore {
     // Physical purge: permanently remove listings that are EXPIRED and have been
     // stale beyond the retention window. Keeps the table bounded. Employment-
     // verified (recruiter-hosted) postings are already excluded by the status.
+    // Jobs that were never verified (last_verified_at IS NULL) fall back to
+    // their ingest timestamp so they can never dodge the retention window.
     const deleted = await query<{ c: string }>(
       `WITH purged AS (
          DELETE FROM jobs
          WHERE verification_status = 'EXPIRED'
-           AND last_verified_at < CURRENT_TIMESTAMP - INTERVAL '${retentionInterval}'
+           AND COALESCE(last_verified_at, created_at, posted_at)
+               < CURRENT_TIMESTAMP - INTERVAL '${retentionInterval}'
          RETURNING id
        )
        SELECT COUNT(*)::text AS c FROM purged`

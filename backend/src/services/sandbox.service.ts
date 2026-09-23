@@ -1,6 +1,7 @@
 import { SkillEvidence } from '@skillbridge/types';
-import * as vm from 'vm';
 import initSqlJs, { Database, SqlJsStatic } from 'sql.js';
+import { spawn } from 'child_process';
+import { tmpdir } from 'os';
 import { store } from '../store';
 import { gapService } from './gap.service';
 import {
@@ -134,8 +135,16 @@ export class SandboxService {
   }
 
   /**
-   * Deterministic JS challenge evaluation with VM isolation and a hard time limit
-   * so user code cannot touch Node globals (require/process) or run forever.
+   * Deterministic JS challenge evaluation in a hardened subprocess.
+   *
+   * The user's code runs inside a freshly spawned Node child process that has no
+   * access to the API's memory, store, env secrets, or event loop. The worker
+   * evaluates it inside a VM realm with a hard script timeout, then the parent
+   * force-kills the child if the whole job exceeds the deadline. This contains
+   * both infinite/synchronous loops (which would otherwise hang the API event
+   * loop — the old `withTimeout(fn(...))` after a `runInContext` call could not
+   * interrupt plain synchronous `while(true){}` code) and any VM escape attempts
+   * to a process without host resources.
    */
   public async executeJavaScript(challengeId: string, userCode: string, userId: string = 'demo_user_01'): Promise<ExecutionResult> {
     const startTime = Date.now();
@@ -161,7 +170,12 @@ export class SandboxService {
     };
   }
 
-  /** Evaluate a model/curated JS challenge against its generic test cases. */
+  /**
+   * Evaluate a model/curated JS challenge against its generic test cases inside
+   * a throwaway subprocess. The worker is spawned once per submission (bounding
+   * memory/cpu/time), given only the user code + test cases via stdin, and its
+   * structured result is parsed back from stdout.
+   */
   private async runDynamicJs(
     chall: GeneratedChallenge,
     userCode: string,
@@ -169,8 +183,9 @@ export class SandboxService {
     startTime: number,
     timeoutMs: number
   ): Promise<ExecutionResult> {
-    const fn = this.getDynamicFunction(userCode, timeoutMs);
-    if (!fn) {
+    // Cheap pre-scan is defense-in-depth only; real isolation comes from the OS
+    // process boundary below, so a bypassing payload still gets nothing.
+    if (userCode.length > 50_000 || SandboxService.ESCAPE_PATTERNS.some(re => re.test(userCode))) {
       return {
         passed: false,
         message:
@@ -179,31 +194,23 @@ export class SandboxService {
       };
     }
 
-    const testCases = chall.testCases || [];
-    const testResults: Array<{ testName: string; passed: boolean; expected: any; actual: any }> = [];
-    let allPassed = true;
-
-    for (const tc of testCases) {
-      try {
-        const args = safeParse(tc.input);
-        const expected = safeParse(tc.expected);
-        const actual = await withTimeout(fn(...(Array.isArray(args) ? args : [args])), timeoutMs);
-        const pass = deepEqual(actual, expected);
-        testResults.push({ testName: tc.name || 'Test', passed: pass, expected, actual });
-        if (!pass) allPassed = false;
-      } catch (err: any) {
-        testResults.push({
-          testName: tc.name || 'Test',
-          passed: false,
-          expected: safeParse(tc.expected),
-          actual: `Error: ${err?.message || 'runtime error'}`
-        });
-        allPassed = false;
-      }
+    const suite = await this.runJsWorker(userCode, chall.testCases!, timeoutMs);
+    if (suite && suite.error) {
+      const timedOut = /timed out|interrupt|did not exit|time limit/i.test(suite.error);
+      return {
+        passed: false,
+        message: timedOut
+          ? 'Execution timed out. Check for infinite loops in your solution.'
+          : `Runtime Error: ${suite.error.slice(0, 200)}`,
+        executionTimeMs: Date.now() - startTime
+      };
     }
 
+    const testResults = suite?.testResults || [];
+    const allPassed = suite ? suite.allPassed === true && testResults.length > 0 : false;
+
     let verifiedEvidence;
-    if (allPassed && testResults.length > 0) {
+    if (allPassed) {
       verifiedEvidence = await this.recordVerifiedEvidence(userId, chall.skillId, 0.9);
     }
 
@@ -211,28 +218,250 @@ export class SandboxService {
       passed: allPassed,
       message: allPassed
         ? 'All test cases passed!'
-        : `${testResults.filter(t => !t.passed).length} of ${testResults.length} test cases failed.`,
+        : `${testResults.filter((t: any) => !t.passed).length} of ${testResults.length} test cases failed.`,
       executionTimeMs: Date.now() - startTime,
-      testResults,
+      testResults: testResults.map((t: any) => ({
+        testName: t.testName,
+        passed: !!t.passed,
+        expected: t.expected,
+        actual: t.actual
+      })),
       verifiedEvidence
     };
   }
 
-  /** Bootstrap a minimal in-context `console` (context-realm closures only). */
-  private static readonly CONSOLE_BOOTSTRAP =
-    `(() => {
-      const logs = [];
-      const fmt = (v) => { try { return JSON.stringify(v); } catch { return String(v); } };
-      const make = (level) => (...a) => logs.push(level + ': ' + a.map(fmt).join(' '));
-      globalThis.console = { log: make('LOG'), warn: make('WARN'), error: make('ERROR'), info: make('INFO') };
-    })();`;
+  /**
+   * Stop user code from reaching the host at all: spawn a bare Node worker with
+   * minimal stdin/stdout only, no inherited env, no cwd access to the repo, and
+   * hard-kill it if the deadline passes. The worker itself re-runs the code in a
+   * VM realm so even a runaway script cannot touch the worker's own globals.
+   */
+  private runJsWorker(code: string, testCases: Array<{ name?: string; input: string; expected: string }>, timeoutMs: number): Promise<{
+    allPassed?: boolean;
+    testResults?: Array<{ testName: string; passed: boolean; expected: any; actual: any }>;
+    error?: string;
+  }> {
+    const stdinPayload = JSON.stringify({ code, testCases, timeoutMs: timeoutMs - 500 });
+    const durationMs = timeoutMs + 1500; // grace for spawn + vm compile + kill latency
+
+    return new Promise(resolve => {
+      let settled = false;
+      let forceKilled = false;
+      const child = spawn(process.execPath, ['-e', SandboxService.JS_WORKER], {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: { PATH: process.env.PATH || '' },
+        cwd: tmpdir(),
+        windowsHide: true
+      });
+
+      const finish = (payload: any) => {
+        if (settled) return;
+        settled = true;
+        try {
+          // eslint-disable-next-line no-caller
+          child.stdin && child.stdin.destroy();
+        } catch {
+          /* already closed */
+        }
+        resolve(payload);
+      };
+
+      const killTimer = setTimeout(() => {
+        forceKilled = true;
+        try {
+          child.kill('SIGKILL');
+        } catch {
+          /* already gone */
+        }
+      }, durationMs);
+
+      let out = '';
+      child.stdout.on('data', d => {
+        out += d.toString();
+        if (out.length > 64 * 1024) {
+          forceKilled = true;
+          try {
+            child.kill('SIGKILL');
+          } catch {
+            /* noop */
+          }
+        }
+      });
+
+      child.on('error', err => {
+        clearTimeout(killTimer);
+        finish({ error: err.message || 'Worker failed to start.' });
+      });
+
+      child.on('exit', codeExit => {
+        clearTimeout(killTimer);
+        if (forceKilled) {
+          finish({ error: 'Worker did not finish within the time limit (possible infinite loop).' });
+          return;
+        }
+        if (codeExit !== 0 && !out.trim()) {
+          finish({ error: 'Worker exited unexpectedly.' });
+          return;
+        }
+        try {
+          const parsed = JSON.parse(out.trim());
+          finish(parsed);
+        } catch {
+          finish({ error: 'Worker produced no structured result.' });
+        }
+      });
+
+      try {
+        child.stdin.write(stdinPayload);
+      } catch (err: any) {
+        clearTimeout(killTimer);
+        finish({ error: err?.message || 'Failed to send code to worker.' });
+        return;
+      }
+      child.stdin.end();
+    });
+  }
 
   /**
-   * Static pre-scan for known VM-escape primitives. This is defense-in-depth
-   * only — the VM context is resource-isolated (no host `require`/`process`/
-   * `Buffer` globals, null-prototype global, hard timeouts) and is NOT a
-   * security boundary. Untrusted code should ideally run in a sandboxed
-   * process; local resource isolation is a mitigation, not a guarantee.
+   * Self-contained worker script. Read-only: it receives { code, testCases,
+   * timeoutMs } on stdin, executes user code inside a VM realm (no host globals),
+   * and prints a single JSON object on stdout. It never touches the host
+   * filesystem, network, or environment beyond what Node itself provides.
+   */
+  private static readonly JS_WORKER = `
+    'use strict';
+    const vm = require('vm');
+    let body = '';
+    process.stdin.setEncoding('utf8');
+    const run = async () => {
+      try {
+        const payload = JSON.parse(body || '{}');
+        const result = await SandboxWorker.evaluate(payload);
+        process.stdout.write(JSON.stringify(result));
+        process.exit(0);
+      } catch (e) {
+        process.stdout.write(JSON.stringify({ error: String((e && e.message) || e) }));
+        process.exit(1);
+      }
+    };
+    process.stdin.on('data', (c) => { body += c; });
+    process.stdin.on('end', () => { run(); });
+
+    const SandboxWorker = {
+      async evaluate(payload) {
+        const code = String(payload.code || '');
+        const testCases = Array.isArray(payload.testCases) ? payload.testCases : [];
+        const timeoutMs = Number(payload.timeoutMs) || 3000;
+
+        const context = vm.createContext(Object.create(null));
+        try {
+          const logs = [];
+          const fmt = (v) => { try { return JSON.stringify(v); } catch { return String(v); } };
+          const make = (level) => (...a) => logs.push(level + ': ' + a.map(fmt).join(' '));
+          context.console = { log: make('LOG'), warn: make('WARN'), error: make('ERROR'), info: make('INFO') };
+        } catch {
+          /* console is best-effort only */
+        }
+        try {
+          new vm.Script(code).runInContext(context, { timeout: timeoutMs });
+        } catch (e) {
+          return { error: String((e && e.message) || e) };
+        }
+        const name = detectFunctionName(code);
+        if (!name) return { error: 'No function definition found.' };
+
+        let fn;
+        try {
+          const probe = new vm.Script(code + ';' + name + ';');
+          fn = probe.runInContext(context, { timeout: timeoutMs });
+        } catch (e) {
+          return { error: String((e && e.message) || e) };
+        }
+        if (typeof fn !== 'function') return { error: 'Requested function is not a function.' };
+
+        const testResults = [];
+        let allPassed = true;
+        for (const tc of testCases) {
+          try {
+            const args = safeParse(tc.input);
+            const expected = safeParse(tc.expected);
+            const actual = await callWithTimeout(fn, args, timeoutMs);
+            const passed = deepEqual(actual, expected);
+            testResults.push({ testName: tc.name || 'Test', passed, expected, actual });
+            if (!passed) allPassed = false;
+          } catch (e) {
+            testResults.push({
+              testName: tc.name || 'Test',
+              passed: false,
+              expected: safeParse(tc.expected),
+              actual: 'Error: ' + ((e && e.message) || 'runtime error')
+            });
+            allPassed = false;
+          }
+        }
+        return { allPassed, testResults };
+      }
+    };
+
+    function safeParse(raw) {
+      if (raw === undefined || raw === null || raw === '') return undefined;
+      try { return JSON.parse(raw); } catch { return raw; }
+    }
+    function deepEqual(a, b) {
+      if (a === b) return true;
+      if (typeof a !== typeof b) return false;
+      if (a === null || b === null) return a === b;
+      if (Array.isArray(a) !== Array.isArray(b)) return false;
+      if (Array.isArray(a)) {
+        if (a.length !== b.length) return false;
+        return a.every((_, i) => deepEqual(a[i], b[i]));
+      }
+      if (typeof a === 'object') {
+        const aKeys = Object.keys(a).sort();
+        const bKeys = Object.keys(b).sort();
+        if (JSON.stringify(aKeys) !== JSON.stringify(bKeys)) return false;
+        return aKeys.every(k => deepEqual(a[k], b[k]));
+      }
+      return a === b;
+    }
+    function callWithTimeout(fn, args, timeoutMs) {
+      let result;
+      let done = false;
+      const timer = setTimeout(() => {
+        if (!done) throw new Error('Execution timed out');
+      }, timeoutMs);
+      try {
+        const promise = fn.apply(null, Array.isArray(args) ? args : [args]);
+        if (promise && typeof promise.then === 'function') {
+          return Promise.race([
+            promise,
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Execution timed out')), timeoutMs))
+          ]).finally(() => { clearTimeout(timer); done = true; });
+        }
+        result = promise;
+      } finally {
+        clearTimeout(timer);
+        done = true;
+      }
+      return result;
+    }
+    function detectFunctionName(code) {
+      const decl = code.match(/(?:function|async function)\\s+([A-Za-z_$][\\w$]*)\\s*\\(/);
+      if (decl) return decl[1];
+      const arrow = code.match(/(?:const|let|var)\\s+([A-Za-z_$][\\w$]*)\\s*=\\s*(?:async\\s*)?\\(/);
+      if (arrow) return arrow[1];
+      const arrowNamed = code.match(/(?:const|let|var)\\s+([A-Za-z_$][\\w$]*)\\s*=\\s*(?:async\\s*)?([A-Za-z_$][\\w$]*)\\s*=>/);
+      if (arrowNamed) return arrowNamed[1];
+      return null;
+    }
+  `;
+
+  /**
+   * Static pre-scan for known escape/infinite-loop primitives. This is
+   * defense-in-depth ONLY — the real security boundary is the throwaway
+   * subprocess (no env secrets, no repo cwd, no API state, hard SIGKILL).
+   * The blocklist rejects the common probes early so they never even spawn a
+   * worker; anything that slips past still runs inside an expendable process.
    */
   private static readonly ESCAPE_PATTERNS: RegExp[] = [
     /__proto__/,
@@ -246,38 +475,6 @@ export class SandboxService {
     /\beval\s*\(/,
     /\bFunction\s*\(/
   ];
-
-  /**
-   * Evaluate generic user code inside a VM, returning the first function it
-   * defines (by name) so it can be invoked against test cases.
-   *
-   * The context receives no host-realm objects (no `setTimeout`, `Object`,
-   * `console`, etc.). V8 supplies the standard ECMAScript built-ins inside the
-   * context itself, so user code has Math/Array/JSON/etc. but any attempt to
-   * reach `process`/`require`/`Function` resolves to the context realm where
-   * those do not exist.
-   */
-  private getDynamicFunction(code: string, timeoutMs: number): ((...args: any[]) => any) | undefined {
-    if (code.length > 50_000 || SandboxService.ESCAPE_PATTERNS.some(re => re.test(code))) {
-      return undefined;
-    }
-
-    const context = vm.createContext(Object.create(null));
-    try {
-      new vm.Script(SandboxService.CONSOLE_BOOTSTRAP).runInContext(context, { timeout: 1000 });
-    } catch {
-      // Bootstrap must never fail on a standard engine; carry on regardless.
-    }
-
-    const script = new vm.Script(code);
-    script.runInContext(context, { timeout: timeoutMs });
-
-    const name = detectFunctionName(code);
-    if (!name) return undefined;
-    const probe = new vm.Script(`${code}\n;${name};`);
-    const candidate = probe.runInContext(context, { timeout: timeoutMs });
-    return typeof candidate === 'function' ? candidate : undefined;
-  }
 
   private async recordVerifiedEvidence(userId: string, skillId: string, proficiency: number): Promise<SkillEvidence> {
     const userEvidence = await store.getEvidence(userId);
@@ -415,43 +612,6 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 }
 
 export const sandboxService = new SandboxService();
-
-function safeParse(raw: string | undefined): any {
-  if (raw === undefined || raw === null || raw === '') return undefined;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return raw;
-  }
-}
-
-function deepEqual(a: any, b: any): boolean {
-  if (a === b) return true;
-  if (typeof a !== typeof b) return false;
-  if (a === null || b === null) return a === b;
-  if (Array.isArray(a) !== Array.isArray(b)) return false;
-  if (Array.isArray(a)) {
-    if (a.length !== b.length) return false;
-    return a.every((_, i) => deepEqual(a[i], b[i]));
-  }
-  if (typeof a === 'object') {
-    const aKeys = Object.keys(a).sort();
-    const bKeys = Object.keys(b).sort();
-    if (JSON.stringify(aKeys) !== JSON.stringify(bKeys)) return false;
-    return aKeys.every(k => deepEqual(a[k], b[k]));
-  }
-  return a === b;
-}
-
-function detectFunctionName(code: string): string | null {
-  const decl = code.match(/(?:function|async function)\s+([A-Za-z_$][\w$]*)\s*\(/);
-  if (decl) return decl[1];
-  const arrow = code.match(/(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?\(/);
-  if (arrow) return arrow[1];
-  const arrowNamed = code.match(/(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?([A-Za-z_$][\w$]*)\s*=>/);
-  if (arrowNamed) return arrowNamed[1];
-  return null;
-}
 
 function toSandboxChallenge(c: GeneratedChallenge): SandboxChallenge {
   return {

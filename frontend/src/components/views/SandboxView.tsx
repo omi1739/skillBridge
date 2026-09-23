@@ -15,12 +15,9 @@ export default function SandboxView() {
     sandboxResult,
     isGeneratingChallenge,
     generateError,
-    referenceSolution,
-    isLoadingSolution,
     activeChallenge,
     handleSelectChallenge,
     handleGenerateChallenge,
-    handleShowSolution,
     handleRunSandbox,
   } = useSkillBridge();
 
@@ -92,30 +89,6 @@ export default function SandboxView() {
                   </pre>
                 </div>
               )}
-
-              <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--border-faint)' }}>
-                <button
-                  className="btn btn-secondary"
-                  disabled={isLoadingSolution}
-                  onClick={handleShowSolution}
-                  style={{ fontSize: '0.8rem', padding: '0.4rem 0.85rem' }}
-                >
-                  {isLoadingSolution ? 'Loading...' : 'Show Reference Solution'}
-                </button>
-                {referenceSolution && (
-                  <div style={{ marginTop: '0.75rem' }}>
-                    <div className="tiny text-muted" style={{ fontWeight: 600, textTransform: 'uppercase', marginBottom: '0.35rem' }}>
-                      Reference Solution
-                    </div>
-                    <pre
-                      className="code-block"
-                      style={{ fontSize: '0.75rem', whiteSpace: 'pre-wrap', color: 'var(--success-text)' }}
-                    >
-                      <code>{referenceSolution}</code>
-                    </pre>
-                  </div>
-                )}
-              </div>
             </div>
           </div>
 

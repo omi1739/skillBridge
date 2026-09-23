@@ -5,8 +5,10 @@
   "main": "dist/main.js",
   "scripts": {
     "dev": "tsx watch src/main.ts",
+    "prebuild": "npm run build --workspace=@skillbridge/types",
     "build": "tsc",
     "start": "node dist/main.js",
+    "pretypecheck": "npm run build --workspace=@skillbridge/types",
     "typecheck": "tsc --noEmit",
     "test": "jest --maxWorkers=2",
     "test:e2e": "jest --config ./test/jest-e2e.js",

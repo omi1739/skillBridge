@@ -13,6 +13,7 @@
     "dev:backend": "npm run dev --workspace=@skillbridge/api",
     "dev:frontend": "npm run dev --workspace=@skillbridge/web",
     "build": "npm run build --workspaces",
+    "start": "npm run start --workspace=@skillbridge/api",
     "typecheck": "npm run typecheck --workspaces",
     "db:setup": "npm run db:setup --workspace=@skillbridge/api",
     "db:seed": "npm run db:seed --workspace=@skillbridge/api"

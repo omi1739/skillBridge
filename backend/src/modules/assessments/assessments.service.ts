@@ -4,7 +4,7 @@ import { AssessmentAttempt, SkillEvidence, SubSkillResult, Question, AssessmentC
 import { store } from '../../store';
 import { query } from '../../db/client';
 import { gapService } from '../../services/gap.service';
-import { getAllBankQuestions, drawDiagnosticQuestions } from '../../data/question-bank';
+import { getAllBankQuestions, drawDiagnosticQuestions, getDiagnosticQuestionsByIds } from '../../data/question-bank';
 import { assessmentEngine } from '../../services/assessment/assessment-engine.service';
 
 export interface QuestionResult {
@@ -98,7 +98,8 @@ export class AssessmentsService {
   async submitAssessment(
     assessmentId: string,
     userId: string = 'demo_user_01',
-    answers: Array<{ questionId: string; selectedAnswer: string }>
+    answers: Array<{ questionId: string; selectedAnswer: string }>,
+    attemptId?: string
   ) {
     const bank = getAllBankQuestions();
     const bankMap = new Map(bank.map(q => [q.id, q]));
@@ -107,8 +108,12 @@ export class AssessmentsService {
     // retakes; the DB-stored assessment is kept as a legacy fallback for any
     // non-diagnostic assessment id.
     if (assessmentId === 'assessment_backend_diagnostic') {
-      const timed = await this.assertLegacyStarted(userId, assessmentId, 15);
-      return this.grade(assessmentId, bankMap, answers, userId, 70, 'skill_javascript', timed);
+      const timed = await this.assertLegacyStarted(userId, assessmentId, 15, attemptId);
+      // Grade ONLY the subset this attempt actually served. Falling back to the
+      // full bank would make every run unwinnable (the denominator would
+      // include up to 16 questions while the client was given 8–12).
+      const servedMap = this.buildServedMap(bankMap, timed.questionIds);
+      return this.grade(assessmentId, servedMap, answers, userId, 70, 'skill_javascript', timed);
     }
 
     const dbAssessment = await store.getAssessment(assessmentId, true);
@@ -121,32 +126,96 @@ export class AssessmentsService {
     }
     const map = new Map(qs.map(q => [q.id, q]));
     const timeLimitMinutes = dbAssessment.timeLimitMinutes ?? 15;
-    const timed = await this.assertLegacyStarted(userId, assessmentId, timeLimitMinutes);
+    const timed = await this.assertLegacyStarted(userId, assessmentId, timeLimitMinutes, attemptId);
     return this.grade(assessmentId, map, answers, userId, dbAssessment.passingScore, dbAssessment.skillId, timed);
+  }
+
+  /**
+   * Restrict the grading map to the question ids recorded on the attempt. When
+   * no subset was recorded (legacy attempts created before the subset was
+   * persisted), fall back to the full bank so behaviour stays deterministic.
+   */
+  private buildServedMap(bankMap: Map<string, Question>, recordedIds: string[]): Map<string, Question> {
+    if (!recordedIds || recordedIds.length === 0) return bankMap;
+    const served = new Map<string, Question>();
+    for (const id of recordedIds) {
+      const q = bankMap.get(id);
+      if (q) served.set(id, q);
+    }
+    return served.size > 0 ? served : bankMap;
   }
 
   /**
    * Server-side start record for the legacy diagnostic flow. The client timer
    * is cosmetic; this row supplies the trusted clock used at submit time so a
    * stalled or forged client cannot bypass the time limit.
+   *
+   * Re-starting while an attempt is still within its window reuses the same
+   * attempt (same `started_at`), so re-calling this endpoint cannot reset the
+   * clock. The served question subset is recorded on the attempt so grading
+   * only ever runs against the questions the client was given.
    */
-  async startAssessment(assessmentId: string, userId: string): Promise<{ attemptId: string; startedAt: string; timeLimitMinutes: number }> {
-    const timeLimitMinutes =
-      assessmentId === 'assessment_backend_diagnostic'
-        ? 15
-        : (await store.getAssessment(assessmentId))?.timeLimitMinutes ?? 15;
+  async startAssessment(
+    assessmentId: string,
+    userId: string,
+    count?: number
+  ): Promise<{
+    attemptId: string;
+    startedAt: string;
+    timeLimitMinutes: number;
+    questions?: Question[];
+  }> {
+    const isDiagnostic = assessmentId === 'assessment_backend_diagnostic';
+    const timeLimitMinutes = isDiagnostic
+      ? 15
+      : (await store.getAssessment(assessmentId))?.timeLimitMinutes ?? 15;
+
+    // Reuse any IN_PROGRESS attempt that is still inside its time window. This
+    // both keeps the guaranteed subset stable across re-renders and denies the
+    // "re-call /start to reset the clock" bypass.
+    const existing = await query<{ id: string; started_at: string; question_ids_json: unknown }>(
+      `SELECT id, started_at, question_ids_json FROM assessment_attempts
+       WHERE user_id = $1 AND assessment_id = $2 AND status = 'IN_PROGRESS'
+       ORDER BY started_at DESC LIMIT 1`,
+      [userId, assessmentId]
+    );
+    const active = existing[0];
+    if (active && Date.now() - new Date(active.started_at).getTime() <= timeLimitMinutes * 60_000) {
+      const recordedIds = Array.isArray(active.question_ids_json) ? active.question_ids_json.map(String) : [];
+      return {
+        attemptId: active.id,
+        startedAt: new Date(active.started_at).toISOString(),
+        timeLimitMinutes,
+        questions: isDiagnostic && recordedIds.length > 0
+          ? getDiagnosticQuestionsByIds(recordedIds)
+          : undefined
+      };
+    }
+
+    // A stale IN_PROGRESS row (window expired) may exist from an interrupted
+    // previous run — close it out before starting fresh.
+    if (active) {
+      await query(`UPDATE assessment_attempts SET status = 'ABANDONED' WHERE id = $1`, [active.id]);
+    }
+
+    let questionIds: string[] = [];
+    if (isDiagnostic) {
+      const picked = drawDiagnosticQuestions({ count });
+      questionIds = picked.map(q => q.id);
+    }
 
     const attemptId = `att_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
     await query(
-      `INSERT INTO assessment_attempts (id, user_id, assessment_id, status, question_count, started_at, score)
-       VALUES ($1,$2,$3,'IN_PROGRESS',0, now(), 0)`,
-      [attemptId, userId, assessmentId]
+      `INSERT INTO assessment_attempts (id, user_id, assessment_id, status, question_count, started_at, score, question_ids_json)
+       VALUES ($1,$2,$3,'IN_PROGRESS',$4, now(), 0, $5::jsonb)`,
+      [attemptId, userId, assessmentId, questionIds.length, JSON.stringify(questionIds)]
     );
     const row = await query<{ started_at: string }>(`SELECT started_at FROM assessment_attempts WHERE id = $1`, [attemptId]);
     return {
       attemptId,
       startedAt: row[0]?.started_at ? new Date(row[0].started_at).toISOString() : new Date().toISOString(),
-      timeLimitMinutes
+      timeLimitMinutes,
+      questions: isDiagnostic ? getDiagnosticQuestionsByIds(questionIds) : undefined
     };
   }
 
@@ -154,26 +223,43 @@ export class AssessmentsService {
    * Enforces the server-side time window for a legacy attempt. The user must
    * have started the assessment and the elapsed time must not exceed the
    * configured limit, otherwise the attempt is abandoned and rejected.
+   *
+   * When `attemptId` is supplied, that exact attempt is validated (the attempt
+   * the client actually started) rather than blindly picking the newest row —
+   * this is what prevents a re-started timer from laundering a stale attempt.
    */
   private async assertLegacyStarted(
     userId: string,
     assessmentId: string,
-    timeLimitMinutes: number
-  ): Promise<{ attemptId: string; startedAt: string }> {
-    const rows = await query<{ id: string; started_at: string; status: string }>(
-      `SELECT id, started_at, status FROM assessment_attempts
-       WHERE user_id = $1 AND assessment_id = $2
-       ORDER BY started_at DESC LIMIT 1`,
-      [userId, assessmentId]
-    );
+    timeLimitMinutes: number,
+    attemptId?: string
+  ): Promise<{ attemptId: string; startedAt: string; questionIds: string[] }> {
+    let rows: Array<{ id: string; started_at: string; status: string; question_ids_json: unknown }>;
+    if (attemptId) {
+      rows = await query(
+        `SELECT id, started_at, status, question_ids_json FROM assessment_attempts
+         WHERE id = $1 AND user_id = $2`,
+        [attemptId, userId]
+      );
+      if (rows.length === 0) {
+        throw new BadRequestException('This assessment attempt does not belong to the current user.');
+      }
+    } else {
+      rows = await query(
+        `SELECT id, started_at, status, question_ids_json FROM assessment_attempts
+         WHERE user_id = $1 AND assessment_id = $2
+         ORDER BY started_at DESC LIMIT 1`,
+        [userId, assessmentId]
+      );
+    }
     const attempt = rows[0];
     if (!attempt) {
       throw new BadRequestException('This assessment was not started yet. Begin the assessment before submitting answers.');
     }
     if (attempt.status === 'COMPLETED') {
-      // Idempotent re-submit of an already-completed attempt: no extra time is
-      // granted, but a duplicate POST of the same window is harmless.
-      return { attemptId: attempt.id, startedAt: attempt.started_at };
+      // A completed attempt must not be re-graded: a duplicate POST would let a
+      // client farm the correct answers one submission at a time. Start a fresh attempt to retake.
+      throw new BadRequestException('This attempt has already been submitted. Start a new attempt to retake the assessment.');
     }
     if (attempt.status !== 'IN_PROGRESS') {
       throw new BadRequestException('This assessment attempt is no longer active.');
@@ -185,7 +271,10 @@ export class AssessmentsService {
       await query(`UPDATE assessment_attempts SET status = 'ABANDONED' WHERE id = $1`, [attempt.id]);
       throw new BadRequestException('The time limit for this assessment has expired. Start a new attempt to retake it.');
     }
-    return { attemptId: attempt.id, startedAt: attempt.started_at };
+    const questionIds = Array.isArray(attempt.question_ids_json)
+      ? attempt.question_ids_json.map(String)
+      : [];
+    return { attemptId: attempt.id, startedAt: attempt.started_at, questionIds };
   }
 
   private async grade(

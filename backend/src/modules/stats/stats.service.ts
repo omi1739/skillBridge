@@ -10,6 +10,7 @@ export interface LandingStats {
   validationPercent: number;
   curriculaCount: number;
   activeCompanies: number;
+  remoteJobs: number;
 }
 
 @Injectable()
@@ -50,7 +51,8 @@ export class StatsService {
       canonicalSkills: skills.length,
       validationPercent,
       curriculaCount: curricula.length,
-      activeCompanies: uniqueCompanies
+      activeCompanies: uniqueCompanies,
+      remoteJobs: jobs.filter((j: JobListing) => !!j.isRemote).length
     };
 
     await this.cacheInstance.set(this.CACHE_KEY, stats, this.CACHE_TTL);

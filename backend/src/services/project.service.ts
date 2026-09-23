@@ -38,11 +38,14 @@ export class ProjectService {
 
     const descLower = (data.description + ' ' + data.title + ' ' + data.repoUrl).toLowerCase();
 
-    const detectedStack: string[] = ['JavaScript / TypeScript'];
-    if (descLower.includes('node') || descLower.includes('express')) detectedStack.push('Node.js / Express');
-    if (descLower.includes('postgres') || descLower.includes('sql')) detectedStack.push('PostgreSQL');
-    if (descLower.includes('docker')) detectedStack.push('Docker');
-    if (descLower.includes('test') || descLower.includes('jest') || descLower.includes('mocha')) detectedStack.push('Unit & Integration Tests');
+    // Description heuristics are only a hint. When the repository is reachable
+    // the verifier's stack detection (from real files + primary language) wins,
+    // and the hints backfill only what the actual repo evidence missed.
+    const hintStack: string[] = [];
+    if (descLower.includes('node') || descLower.includes('express')) hintStack.push('Node.js / Express');
+    if (descLower.includes('postgres') || descLower.includes('sql')) hintStack.push('PostgreSQL');
+    if (descLower.includes('docker')) hintStack.push('Docker');
+    if (descLower.includes('test') || descLower.includes('jest') || descLower.includes('mocha')) hintStack.push('Unit & Integration Tests');
 
     // Verify the real repository against GitHub
     const verification = await this.verifier.verify(data.repoUrl);
@@ -54,6 +57,8 @@ export class ProjectService {
       : verification.reachable
         ? 'NEEDS_REVIEW'
         : 'PENDING';
+
+    const detectedStack = this.mergeStack(verification, hintStack);
 
     const project: ProjectEvidence = {
       id: `proj_${Date.now()}`,
@@ -127,6 +132,30 @@ export class ProjectService {
     await gapService.calculateGaps(userId, roleId);
 
     return { project, verifiedSkills, verification };
+  }
+
+  /**
+   * Merge verifier-inferred stack (real repo files + primary language) with the
+   * lightweight description hints. Real file evidence wins; hints backfill only
+   * labels the verifier could not detect (e.g. Express/PostgreSQL from a file
+   * listing). When the repo is unreachable we keep the old heuristic behavior.
+   */
+  private mergeStack(verification: RepoVerification, hintStack: string[]): string[] {
+    const detected = new Set<string>();
+    for (const label of verification.detectedStack || []) {
+      detected.add(label);
+    }
+    if (verification.hasDocker) detected.add('Docker');
+    if (verification.hasTests) detected.add('Unit & Integration Tests');
+    if (verification.reachable) {
+      for (const label of hintStack) {
+        detected.add(label);
+      }
+      return Array.from(detected).length > 0
+        ? Array.from(detected)
+        : Array.from(new Set(['JavaScript / TypeScript', ...hintStack]));
+    }
+    return Array.from(new Set(['JavaScript / TypeScript', ...hintStack]));
   }
 }
 

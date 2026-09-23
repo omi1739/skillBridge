@@ -1,6 +1,6 @@
 import { SandboxService } from './sandbox.service';
 import { store } from '../store';
-import { GeneratedChallenge, registerDynamicChallenge } from './challenge-generator.service';
+import { GeneratedChallenge, registerDynamicChallenge, getOfflineChallenges } from './challenge-generator.service';
 
 jest.mock('../store', () => ({
   store: {
@@ -26,9 +26,10 @@ describe('SandboxService', () => {
   });
 
   describe('getChallenges', () => {
-    it('returns only dynamic challenges (static challenges removed)', () => {
+    it('ships the curated offline bank and merges registered dynamic challenges', () => {
       const before = service.getChallenges();
-      expect(before.length).toBe(0);
+      // Offline bank is registered eagerly so the sandbox is usable out of the box.
+      expect(before.length).toBe(getOfflineChallenges().length);
 
       const dyn: GeneratedChallenge = {
         id: 'gen_sql_live_1',
@@ -174,5 +175,49 @@ describe('SandboxService', () => {
       expect(result.passed).toBe(false);
       expect(mockedStore.saveEvidence).not.toHaveBeenCalled();
     });
+
+    it('hard-kills a synchronous infinite loop instead of hanging the event loop', async () => {
+      registerDynamicChallenge({
+        id: 'gen_js_loop_probe',
+        title: 'Loop probe',
+        type: 'JAVASCRIPT',
+        skillId: 'skill_javascript',
+        difficulty: 'Beginner',
+        description: 'x',
+        starterCode: '',
+        referenceSolution: '',
+        testCases: [{ name: 'T', input: '[]', expected: '[]' }]
+      });
+
+      const started = Date.now();
+      const result = await service.executeJavaScript(
+        'gen_js_loop_probe',
+        'function f(){ while(true){} }',
+        'user_1'
+      );
+      const elapsed = Date.now() - started;
+
+      expect(result.passed).toBe(false);
+      expect(result.message).toMatch(/timed out/i);
+      expect(elapsed).toBeLessThan(15000);
+      expect(mockedStore.saveEvidence).not.toHaveBeenCalled();
+    }, 20000);
+
+    it('executes normally after a prior loop was killed (proc never leaks)', async () => {
+      registerDynamicChallenge({
+        id: 'gen_js_loop_probe_2',
+        title: 'Loop probe 2',
+        type: 'JAVASCRIPT',
+        skillId: 'skill_javascript',
+        difficulty: 'Beginner',
+        description: 'x',
+        starterCode: '',
+        referenceSolution: '',
+        testCases: [{ name: 'T', input: '[]', expected: '[1]' }]
+      });
+
+      const good = await service.executeJavaScript('gen_js_loop_probe_2', 'function f(){ return [1]; }', 'user_1');
+      expect(good.passed).toBe(true);
+    }, 20000);
   });
 });
