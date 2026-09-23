@@ -32,7 +32,15 @@ function resolveSslConfig(databaseUrl: string): boolean | { rejectUnauthorized: 
 
 export const pool = new Pool({
   connectionString: resolveDatabaseUrl(),
-  ssl: resolveSslConfig(resolveDatabaseUrl())
+  ssl: resolveSslConfig(resolveDatabaseUrl()),
+  // Neon (and serverless Postgres generally) enforces hard connection caps per
+  // project; a bloated default pool (10) can trip them when the API service and
+  // the scheduled ingestion cron boot together. Keep it modest, give up on a
+  // client quickly instead of stacking blocked connections, and recycle idle
+  // ones so the slot is released back to the project.
+  max: 5,
+  connectionTimeoutMillis: 10_000,
+  idleTimeoutMillis: 30_000
 });
 
 pool.on('error', err => {
