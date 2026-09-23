@@ -62,13 +62,23 @@ describe('SkillBridge API (e2e)', () => {
     await app.close();
   });
 
-  it('GET /api/health returns ok and reports DB connectivity', () => {
+  it('GET /api/health is DB-free liveness (no database field)', () => {
     return request(app.getHttpServer())
       .get('/api/health')
       .expect(200)
       .expect(res => {
         expect(res.body.status).toBe('ok');
         expect(res.body.service).toBe('skillbridge-api');
+        expect(res.body.database).toBeUndefined();
+      });
+  });
+
+  it('GET /api/health/db reports DB connectivity', () => {
+    return request(app.getHttpServer())
+      .get('/api/health/db')
+      .expect(200)
+      .expect(res => {
+        expect(res.body.status).toBe('ok');
         expect(res.body.database).toBe('connected');
       });
   });

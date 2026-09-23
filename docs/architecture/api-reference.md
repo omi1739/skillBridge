@@ -17,7 +17,8 @@ prefix `/api`. Requests are validated with a global `ValidationPipe`
 
 | Method | Route          | Description                                        |
 |--------|----------------|----------------------------------------------------|
-| GET    | `/api/health`  | Service liveness + Postgres connectivity (`database`) |
+| GET    | `/api/health`  | Service liveness (DB-free — safe for monitor polling without waking Neon compute) |
+| GET    | `/api/health/db` | Explicit Postgres connectivity probe (`database`) |
 | GET    | `/api/stats`   | Landing market counts (cached, Redis or in-memory) |
 
 ## Auth & Candidate Profile
