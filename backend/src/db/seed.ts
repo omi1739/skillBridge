@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { Pool, PoolClient } from 'pg';
 import {
   Skill,
   Role,
@@ -17,19 +18,23 @@ import {
   SKILL_BANK_TOPICS,
   SKILL_BANK_QUESTIONS
 } from '../data/skill-bank.seed';
-import { query, withTransaction } from './client';
+import { query, withTransaction, queryOn, withTransactionOn } from './client';
 import { authService } from '../services/auth.service';
 import { DEMO_USER_ID, DEMO_EMAIL } from '../common/demo-access';
 
 const SCHEMA_PATH = path.resolve(__dirname, '../../../docs/architecture/schema.sql');
 
-export async function applySchema(): Promise<void> {
+export async function applySchema(target?: Pool): Promise<void> {
   const sql = fs.readFileSync(SCHEMA_PATH, 'utf8');
   // Send the file verbatim. Do NOT rewrite semicolons here: inserting a
   // newline after every ';' would terminate `--` comments mid-line and turn
   // trailing comment text into executable SQL (the whole multi-statement
   // parse then fails and no tables get created on a fresh database).
-  await query(sql);
+  if (target) {
+    await queryOn(target, sql);
+  } else {
+    await query(sql);
+  }
   console.log('[SkillBridge DB] Schema applied.');
 }
 
@@ -48,7 +53,7 @@ async function seedPasswordHash(envVar: string, devFallback: string): Promise<st
   return authService.hashPassword(secret);
 }
 
-export async function seedAll(): Promise<void> {
+export async function seedAll(target?: Pool): Promise<void> {
   // Demo + staff identities are a development convenience. They must never be
   // created or re-seeded into production unless SEED_DEMO_USERS=true is set
   // as an explicit override (default: non-production only).
@@ -56,7 +61,7 @@ export async function seedAll(): Promise<void> {
     process.env.SEED_DEMO_USERS !== undefined
       ? process.env.SEED_DEMO_USERS === 'true'
       : process.env.NODE_ENV !== 'production';
-  await withTransaction(async client => {
+  const run = async (client: PoolClient): Promise<void> => {
     // --- Skills + aliases + prerequisites ---
     for (const s of INITIAL_SKILLS) {
       await client.query(
@@ -288,7 +293,12 @@ export async function seedAll(): Promise<void> {
     await client.query(
       `DELETE FROM skill_evidence WHERE user_id = 'demo_user_01' AND source_type = 'PROJECT'`
     );
-  });
+  };
+  if (target) {
+    await withTransactionOn(target, run);
+  } else {
+    await withTransaction(run);
+  }
 
   console.log('[SkillBridge DB] Seed data applied.');
 }

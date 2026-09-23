@@ -22,12 +22,20 @@ jest.mock('../src/db/client', () => {
   };
   return {
     pool: fakePool,
+    fallbackPool: null,
     query: fakeQuery,
+    queryOn: fakeQuery,
     withTransaction: jest.fn(async <T>(fn: (client: any) => Promise<T>): Promise<T> => {
       await fakePool.connect();
       return fn({ query: fakeQuery });
     }),
-    testConnection: jest.fn(async () => true)
+    withTransactionOn: jest.fn(async <T>(fn: (client: any) => Promise<T>): Promise<T> => fn({ query: fakeQuery })),
+    testConnection: jest.fn(async () => true),
+    isDbDownError: jest.fn(() => false),
+    getConfiguredPools: jest.fn(() => [fakePool]),
+    startFailoverProbe: jest.fn(),
+    stopFailoverProbe: jest.fn(),
+    endAllPools: jest.fn(async () => undefined)
   };
 });
 
