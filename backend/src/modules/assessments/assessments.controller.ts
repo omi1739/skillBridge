@@ -155,7 +155,7 @@ export class AssessmentsController {
     if (!candidateId) {
       throw new Error('Authentication required');
     }
-    return this.assessmentsService.startAssessment(id, candidateId, body?.count);
+    return this.assessmentsService.startAssessment(id, candidateId, body?.count, body?.questionIds);
   }
 
   @Post(':id/submit')

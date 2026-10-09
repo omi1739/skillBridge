@@ -9,8 +9,7 @@ import {
   Min,
   Max,
   IsIn,
-  IsNumber,
-  IsObject
+  ArrayMaxSize
 } from 'class-validator';
 
 export class AssessmentAnswerDto {
@@ -43,6 +42,20 @@ export class StartAssessmentDto {
   @Min(1)
   @Max(50)
   count?: number;
+
+  /**
+   * The exact subset the client is already displaying. A visitor who loaded
+   * the diagnostic while still anonymous has questions but no server-side
+   * attempt; replaying their ids lets `/start` record an attempt over the same
+   * questions instead of drawing a different random subset that their answers
+   * would not match. Validated against the bank (and the requested count) by
+   * the service, so forged ids are rejected.
+   */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @ArrayMaxSize(50)
+  questionIds?: string[];
 }
 
 // ---- Skill-centric assessment DTOs ----

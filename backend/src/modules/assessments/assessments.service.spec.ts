@@ -31,7 +31,7 @@ describe('AssessmentsService legacy time-limit enforcement', () => {
   let service: AssessmentsService;
 
   const seedQuery = () => {
-    mockQuery.mockImplementation(async (text: string, params?: unknown[]) => {
+    mockQuery.mockImplementation(async (text: string, _params?: unknown[]) => {
       const sql = String(text);
       if (sql.includes('assessment_attempts') && sql.trimStart().toUpperCase().startsWith('SELECT')) {
         return [

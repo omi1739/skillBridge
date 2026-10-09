@@ -17,6 +17,9 @@ export interface QuestionResult {
   explanation?: string;
 }
 
+/** Smallest diagnostic subset a client may ask to be graded against. */
+const MIN_DIAGNOSTIC_SUBSET = 8;
+
 @Injectable()
 export class AssessmentsService {
   async getAssessments() {
@@ -158,7 +161,8 @@ export class AssessmentsService {
   async startAssessment(
     assessmentId: string,
     userId: string,
-    count?: number
+    count?: number,
+    requestedIds?: string[]
   ): Promise<{
     attemptId: string;
     startedAt: string;
@@ -200,8 +204,8 @@ export class AssessmentsService {
 
     let questionIds: string[] = [];
     if (isDiagnostic) {
-      const picked = drawDiagnosticQuestions({ count });
-      questionIds = picked.map(q => q.id);
+      questionIds = this.resolveRequestedSubset(count, requestedIds)
+        ?? drawDiagnosticQuestions({ count }).map(q => q.id);
     }
 
     const attemptId = `att_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
@@ -217,6 +221,43 @@ export class AssessmentsService {
       timeLimitMinutes,
       questions: isDiagnostic ? getDiagnosticQuestionsByIds(questionIds) : undefined
     };
+  }
+
+  /**
+   * Validate the subset a client says it is already displaying, so an attempt
+   * can be opened over exactly those questions (the anonymous-visitor →
+   * signed-in handoff: `GET /diagnostic` cannot create an attempt because it
+   * has no user to attach one to).
+   *
+   * Returns `null` when nothing was requested, meaning "draw server-side".
+   * A present-but-mismatched list is rejected outright rather than trimmed:
+   * silently accepting a shorter subset would let a client shrink the graded
+   * set (every served question contributes to `maxPoints`, so grading one
+   * known question would score 100%).
+   */
+  private resolveRequestedSubset(count: number | undefined, requestedIds?: string[]): string[] | null {
+    if (!Array.isArray(requestedIds) || requestedIds.length === 0) return null;
+
+    const bankSize = getAllBankQuestions().length;
+    // Never grade fewer questions than a normal draw would serve, regardless
+    // of what the client asks for.
+    const floor = Math.min(MIN_DIAGNOSTIC_SUBSET, bankSize);
+    const expected = Math.max(floor, Math.min(bankSize, count ?? bankSize));
+
+    const seen = new Set<string>();
+    const deduped: string[] = [];
+    for (const raw of requestedIds) {
+      const id = String(raw ?? '').trim();
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      deduped.push(id);
+    }
+
+    const valid = getDiagnosticQuestionsByIds(deduped).map(q => q.id);
+    if (valid.length !== deduped.length || valid.length !== expected) {
+      throw new BadRequestException('Invalid question selection for this assessment.');
+    }
+    return valid;
   }
 
   /**
