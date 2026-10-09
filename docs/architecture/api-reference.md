@@ -36,6 +36,11 @@ prefix `/api`. Requests are validated with a global `ValidationPipe`
 | GET    | `/api/me/recommendations`      | Recommended projects/tasks     |
 | GET    | `/api/me/report`               | Printable evidence passport     |
 
+Auth failures carry accurate status codes: `400` invalid input, `401` invalid
+credentials, `409` duplicate account / email already bound to another provider.
+Error bodies follow the Nest shape `{ statusCode, message, error }`, where
+`message` is the actionable text (an array for class-validator failures).
+
 ## Catalog
 
 | Method | Route              | Notes          |
@@ -50,8 +55,10 @@ prefix `/api`. Requests are validated with a global `ValidationPipe`
 | Method | Route                          | Notes                  |
 |--------|--------------------------------|------------------------|
 | GET    | `/api/assessments`             | All assessments        |
+| GET    | `/api/assessments/diagnostic?count=` | Anonymous-safe diagnostic draw (answer-stripped) |
 | GET    | `/api/assessments/:id`         | Single assessment      |
-| POST   | `/api/assessments/:id/submit`  | `SubmitAssessmentDto`  |
+| POST   | `/api/assessments/:id/start`   | Opens/reuses an attempt. `StartAssessmentDto` (`count?`, `questionIds?`) — `questionIds` lets a visitor who loaded the diagnostic anonymously submit the exact subset they were shown |
+| POST   | `/api/assessments/:id/submit`  | `SubmitAssessmentDto` (`answers`, `attemptId?`) — graded server-side |
 | GET    | `/api/sandbox/challenges`      | Sandbox challenges     |
 | POST   | `/api/sandbox/run-sql`         | `RunSqlDto` (real SQL) |
 | POST   | `/api/sandbox/run-code`        | `RunCodeDto` (isolated JS) |
