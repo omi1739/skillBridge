@@ -756,6 +756,30 @@ function useSkillBridgeValue() {
     }
   };
 
+  // Request a self-service password-reset email. Resolves with `devResetUrl`
+  // only when the API is running without an email provider in non-production.
+  const requestPasswordReset = async (email: string): Promise<{ devResetUrl?: string }> => {
+    const res = await apiFetch(`${API_BASE}/auth/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.trim() })
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(apiErrorMessage(data, 'Could not send the reset email.'));
+    return { devResetUrl: data?.devResetUrl };
+  };
+
+  // Complete a password reset using the token from the emailed link.
+  const resetPassword = async (token: string, newPassword: string, confirmPassword: string): Promise<void> => {
+    const res = await apiFetch(`${API_BASE}/auth/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, newPassword, confirmPassword })
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(apiErrorMessage(data, 'Could not reset your password.'));
+  };
+
   useEffect(() => {
     // Restore saved session first so the target role is known before data loads.
     const savedToken = localStorage.getItem('skillbridge_token');
@@ -1614,6 +1638,8 @@ function useSkillBridgeValue() {
     setProfileError,
     handleUpdateProfile,
     handleChangePassword,
+    requestPasswordReset,
+    resetPassword,
     // admin
     adminOverview,
     adminDashboard,

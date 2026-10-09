@@ -3150,6 +3150,45 @@ button:focus-visible {
   text-decoration: underline;
 }
 
+.auth-success {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  color: var(--success-text);
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
+  padding: 0.7rem 0.8rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  margin-bottom: 1rem;
+}
+
+.auth-link {
+  background: transparent;
+  border: none;
+  color: var(--accent-text);
+  font-weight: 600;
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0;
+}
+
+.auth-link:hover {
+  text-decoration: underline;
+}
+
+.auth-dev-link {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-bottom: 1rem;
+  word-break: break-all;
+}
+
+.auth-dev-link a {
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
 @media (min-width: 769px) and (max-width: 1024px) {
   .app-sidebar,
   .app-sidebar.collapsed {

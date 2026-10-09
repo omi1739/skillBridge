@@ -43,6 +43,14 @@ jest.mock('../src/db/client', () => {
         }
       ];
     }
+    if (key.includes('password_reset_tokens')) {
+      // A consume (UPDATE ... RETURNING user_id) succeeds; all other token
+      // statements are no-ops in the in-memory fake.
+      if (key.includes('returning user_id')) {
+        return [{ user_id: 'user_existing' }];
+      }
+      return [];
+    }
     return [];
   });
   const fakePool = {
@@ -250,5 +258,51 @@ describe('SkillBridge API (e2e)', () => {
       .get('/api/admin/overview')
       .set('Authorization', 'Bearer demo_token_demo_user_01')
       .expect(403);
+  });
+
+  it('POST /api/auth/forgot-password returns 200 and a reset link for a known email', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/api/auth/forgot-password')
+      .send({ email: 'existing@example.com' })
+      .expect(200);
+    expect(res.body.success).toBe(true);
+    // No email provider is configured under test, so the dev link is returned.
+    const token = res.body.devResetUrl
+      ? new URL(res.body.devResetUrl).searchParams.get('token')
+      : null;
+    expect(token).toBeTruthy();
+  });
+
+  it('POST /api/auth/forgot-password never reveals whether an email exists', () => {
+    return request(app.getHttpServer())
+      .post('/api/auth/forgot-password')
+      .send({ email: 'nobody@example.com' })
+      .expect(200)
+      .expect(res => {
+        expect(res.body.success).toBe(true);
+        expect(res.body.devResetUrl).toBeUndefined();
+      });
+  });
+
+  it('POST /api/auth/reset-password accepts a valid token', () => {
+    return request(app.getHttpServer())
+      .post('/api/auth/reset-password')
+      .send({ token: 'a'.repeat(64), newPassword: 'NewPassword123', confirmPassword: 'NewPassword123' })
+      .expect(200)
+      .expect(res => expect(res.body.success).toBe(true));
+  });
+
+  it('POST /api/auth/reset-password rejects mismatched passwords', () => {
+    return request(app.getHttpServer())
+      .post('/api/auth/reset-password')
+      .send({ token: 'a'.repeat(64), newPassword: 'NewPassword123', confirmPassword: 'Different123' })
+      .expect(400);
+  });
+
+  it('POST /api/auth/reset-password rejects a weak new password via DTO validation', () => {
+    return request(app.getHttpServer())
+      .post('/api/auth/reset-password')
+      .send({ token: 'a'.repeat(64), newPassword: 'short', confirmPassword: 'short' })
+      .expect(400);
   });
 });

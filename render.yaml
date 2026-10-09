@@ -41,6 +41,14 @@ services:
       # Optional alert webhook: 5xx errors and zero-yield ingestion runs are POSTed here.
       - key: ALERT_WEBHOOK_URL
         sync: false
+      # Public frontend origin used to build password-reset links.
+      - key: FRONTEND_URL
+        value: https://skillbridge-dev-1739.vercel.app
+      # Resend API key + From address for self-service password reset emails.
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
       # Allow the anonymous-demo flow (frontend uses the static demo token).
       # The token maps to a regular USER role only, so admin routes stay guarded.
       - key: ALLOW_DEMO_TOKEN

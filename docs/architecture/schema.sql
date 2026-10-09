@@ -468,3 +468,19 @@ CREATE TABLE IF NOT EXISTS job_ingest_runs (
 );
 CREATE INDEX IF NOT EXISTS idx_job_ingest_runs_started ON job_ingest_runs(started_at DESC);
 
+-- ============================================================
+-- Self-service password reset tokens
+-- Only the SHA-256 hash of the emailed token is stored, so a database leak
+-- cannot be used to reset accounts. Tokens are single-use and expire.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id VARCHAR(100) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash VARCHAR(64) NOT NULL UNIQUE,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    used_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_password_reset_user ON password_reset_tokens(user_id);
+
+

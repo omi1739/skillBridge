@@ -5,6 +5,7 @@ import { store } from '../../store';
 import { gapService } from '../../services/gap.service';
 import { recommendationService } from '../../services/recommendation.service';
 import { googleVerifier } from '../../services/google-verifier.service';
+import { emailService } from '../../services/email.service';
 
 @Injectable()
 export class NestAuthService {
@@ -59,6 +60,48 @@ export class NestAuthService {
       return { success: true };
     } catch (err: any) {
       this.rethrow(err, 'Password change');
+    }
+  }
+
+  /**
+   * Start a self-service password reset. Always resolves with the same shape so
+   * callers cannot tell whether the email exists. In non-production, when no
+   * email provider is configured, the reset link is returned so the flow can be
+   * exercised locally.
+   */
+  async requestPasswordReset(email: string): Promise<{ success: true; message: string; devResetUrl?: string }> {
+    const message = 'If an account exists for that email, a password reset link has been sent.';
+
+    let created: Awaited<ReturnType<typeof authService.createPasswordReset>>;
+    try {
+      created = await authService.createPasswordReset(email);
+    } catch (err: any) {
+      // Never surface internal failures (or the absence of an account) here.
+      console.error('[SkillBridge] Password reset request failed:', err?.message || err);
+      return { success: true, message };
+    }
+
+    if (!created) {
+      return { success: true, message };
+    }
+
+    const baseUrl = (process.env.FRONTEND_URL || process.env.APP_BASE_URL || 'http://localhost:3000').replace(/\/$/, '');
+    const resetUrl = `${baseUrl}/reset-password?token=${encodeURIComponent(created.token)}`;
+    const delivered = await emailService.sendPasswordReset(created.user.email, resetUrl);
+
+    const response: { success: true; message: string; devResetUrl?: string } = { success: true, message };
+    if (!delivered && process.env.NODE_ENV !== 'production') {
+      response.devResetUrl = resetUrl;
+    }
+    return response;
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    try {
+      await authService.resetPassword(token, newPassword);
+      return { success: true };
+    } catch (err: any) {
+      this.rethrow(err, 'Password reset');
     }
   }
 

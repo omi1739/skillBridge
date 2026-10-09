@@ -190,4 +190,49 @@ describe('AuthService domain errors carry HTTP statuses', () => {
     const err = await capture(() => authService.setPassword('missing', 'NewPassword1'));
     expect(err.status).toBe(404);
   });
+
+  it('createPasswordReset for an unknown email → undefined (no enumeration)', async () => {
+    getDb().query.mockResolvedValueOnce([]);
+    await expect(authService.createPasswordReset('nobody@example.com')).resolves.toBeUndefined();
+    expect(getDb().query.mock.calls.some(c => /INSERT INTO password_reset_tokens/i.test(String(c[0])))).toBe(false);
+  });
+
+  it('createPasswordReset stores a hashed single-use token for a known email', async () => {
+    getDb().query.mockResolvedValueOnce([userRow()]);
+    const result = await authService.createPasswordReset('person@example.com');
+    expect(result?.user.id).toBe('user_1');
+    expect(result?.token).toMatch(/^[0-9a-f]{64}$/);
+    const insert = getDb().query.mock.calls.find(c => /INSERT INTO password_reset_tokens/i.test(String(c[0])));
+    expect(insert).toBeTruthy();
+    // The plaintext token must never be written to the database.
+    expect(String(insert?.[1]?.[1])).not.toBe(result?.token);
+  });
+
+  it('resetPassword with a too-short new password → 400', async () => {
+    const err = await capture(() => authService.resetPassword('a'.repeat(64), 'short'));
+    expect(err.status).toBe(400);
+  });
+
+  it('resetPassword with a missing token → 400', async () => {
+    const err = await capture(() => authService.resetPassword('', 'NewPassword1'));
+    expect(err.status).toBe(400);
+  });
+
+  it('resetPassword with an invalid/expired token → 400', async () => {
+    getDb().query.mockResolvedValueOnce([]);
+    const err = await capture(() => authService.resetPassword('a'.repeat(64), 'NewPassword1'));
+    expect(err.status).toBe(400);
+    expect(err.message).toMatch(/invalid or has expired/i);
+  });
+
+  it('resetPassword with a valid token updates the password and clears tokens', async () => {
+    getDb().query
+      .mockResolvedValueOnce([{ user_id: 'user_1' }])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+    await expect(authService.resetPassword('a'.repeat(64), 'NewPassword1')).resolves.toBeUndefined();
+    const calls = getDb().query.mock.calls.map(c => String(c[0]));
+    expect(calls.some(s => /UPDATE users/i.test(s))).toBe(true);
+    expect(calls.some(s => /DELETE FROM password_reset_tokens WHERE user_id/i.test(s))).toBe(true);
+  });
 });

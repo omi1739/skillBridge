@@ -40,7 +40,11 @@ export class RateLimitGuard implements CanActivate {
     ]) ?? 60_000;
 
     const request = context.switchToHttp().getRequest<Request & { user?: { userId?: string } }>();
-    const key = request.user?.userId || request.ip || 'anonymous';
+    // Scope the bucket per endpoint (class + handler) as well as per caller.
+    // Without the route component a burst on one endpoint (e.g. login) would
+    // exhaust every other rate-limited endpoint for the same IP.
+    const scope = `${context.getClass().name}.${context.getHandler().name}`;
+    const key = `${scope}:${request.user?.userId || request.ip || 'anonymous'}`;
     const now = Date.now();
 
     let timestamps = this.buckets.get(key) || [];

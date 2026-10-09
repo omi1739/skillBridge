@@ -1,6 +1,7 @@
 'use client';
 
-import { X, LogIn, PlusCircle, AlertCircle, Users, Mail, Lock, ShieldCheck, GraduationCap, Target, ArrowRight, Play } from 'lucide-react';
+import { useState } from 'react';
+import { X, LogIn, PlusCircle, AlertCircle, Users, Mail, Lock, ShieldCheck, GraduationCap, Target, ArrowRight, ArrowLeft, Play } from 'lucide-react';
 import BrandMark from '@/components/ui/BrandMark';
 import { useSkillBridge } from '@/lib/skillbridge-context';
 import { GOOGLE_CLIENT_ID } from '@/lib/config';
@@ -14,12 +15,140 @@ export default function AuthModal() {
     authError, setAuthError,
     isAuthLoading,
     handleAuthSubmit, handleDemoLogin,
+    requestPasswordReset,
     isDemoAccessEnabled,
     googleBtnHiddenRef,
     allRoles
   } = useSkillBridge();
 
+  const [forgotMode, setForgotMode] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotError, setForgotError] = useState('');
+  const [forgotSent, setForgotSent] = useState(false);
+  const [forgotDevUrl, setForgotDevUrl] = useState('');
+
   if (!showAuthModal) return null;
+
+  const openForgot = () => {
+    setForgotMode(true);
+    setForgotError('');
+    setForgotSent(false);
+    setForgotDevUrl('');
+    setForgotEmail(authForm.email.trim());
+  };
+
+  const closeForgot = () => {
+    setForgotMode(false);
+    setForgotError('');
+    setForgotSent(false);
+    setForgotDevUrl('');
+  };
+
+  const handleForgotSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setForgotError('');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(forgotEmail.trim())) {
+      setForgotError('Please enter a valid email address.');
+      return;
+    }
+    setForgotLoading(true);
+    try {
+      const { devResetUrl } = await requestPasswordReset(forgotEmail);
+      setForgotSent(true);
+      if (devResetUrl) setForgotDevUrl(devResetUrl);
+    } catch (err: any) {
+      setForgotError(err?.message || 'Could not send the reset email.');
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  if (forgotMode) {
+    return (
+      <div className="modal-backdrop">
+        <div className="modal-box" style={{ maxWidth: 440 }}>
+          <div style={{ position: 'relative' }}>
+            <button
+              className="btn btn-ghost"
+              onClick={() => setShowAuthModal(false)}
+              style={{ position: 'absolute', top: 0, right: 0, padding: '0.35rem', borderRadius: '8px' }}
+              aria-label="Close"
+            >
+              <X size={18} />
+            </button>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '0.5rem' }}>
+              <BrandMark size={34} className="auth-brand-mark" />
+              <div>
+                <h2 style={{ fontSize: '1.15rem', fontWeight: 800, letterSpacing: '-0.01em', lineHeight: 1.2 }}>
+                  Reset your password
+                </h2>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.1rem' }}>
+                  Enter your account email and we&apos;ll send a reset link.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {forgotError && (
+            <div className="auth-error">
+              <AlertCircle size={15} style={{ flexShrink: 0 }} />
+              <span>{forgotError}</span>
+            </div>
+          )}
+
+          {forgotSent ? (
+            <>
+              <div className="auth-success">
+                <ShieldCheck size={15} style={{ flexShrink: 0 }} />
+                <span>If an account exists for that email, a reset link has been sent. Check your inbox (and spam folder).</span>
+              </div>
+              {forgotDevUrl && (
+                <div className="auth-dev-link">
+                  Email not configured (dev): <a href={forgotDevUrl}>open reset link</a>
+                </div>
+              )}
+              <div className="auth-switch">
+                <span>Back to <button onClick={closeForgot}>Sign in</button></span>
+              </div>
+            </>
+          ) : (
+            <>
+              <form onSubmit={handleForgotSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+                <div className="auth-field">
+                  <label className="auth-label" htmlFor="forgot-email">Email Address</label>
+                  <div className="auth-input-wrap">
+                    <Mail size={15} className="auth-input-icon" />
+                    <input
+                      id="forgot-email"
+                      type="email"
+                      placeholder="you@example.com"
+                      value={forgotEmail}
+                      onChange={e => setForgotEmail(e.target.value)}
+                      required
+                      className="auth-input"
+                    />
+                  </div>
+                </div>
+                <button type="submit" className="btn btn-primary auth-submit" disabled={forgotLoading}>
+                  {forgotLoading ? <>Sending…</> : <>Send reset link <ArrowRight size={16} /></>}
+                </button>
+              </form>
+              <div className="auth-switch">
+                <span>
+                  <button onClick={closeForgot}>
+                    <ArrowLeft size={13} style={{ verticalAlign: '-2px', marginRight: 4 }} />
+                    Back to sign in
+                  </button>
+                </span>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="modal-backdrop">
@@ -141,6 +270,14 @@ export default function AuthModal() {
               />
             </div>
           </div>
+
+          {authMode === 'LOGIN' && (
+            <div style={{ textAlign: 'right', marginTop: '-0.35rem' }}>
+              <button type="button" className="auth-link" onClick={openForgot}>
+                Forgot password?
+              </button>
+            </div>
+          )}
 
           {authMode === 'REGISTER' && (
             <>

@@ -100,3 +100,25 @@ export class ChangePasswordDto {
   @IsNotEmpty({ message: 'Please confirm your new password.' })
   confirmPassword!: string;
 }
+
+export class ForgotPasswordDto {
+  @IsEmail({}, { message: 'Please provide a valid email address.' })
+  email!: string;
+}
+
+export class ResetPasswordDto {
+  @IsString()
+  @IsNotEmpty({ message: 'A reset token is required.' })
+  token!: string;
+
+  @IsString()
+  @MinLength(8, { message: 'Password must be at least 8 characters long.' })
+  @Matches(/^(?=.*[A-Za-z])(?=.*\d).+$/, {
+    message: 'Password must contain at least one letter and one number.'
+  })
+  newPassword!: string;
+
+  @IsString()
+  @IsNotEmpty({ message: 'Please confirm your new password.' })
+  confirmPassword!: string;
+}

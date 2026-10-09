@@ -305,6 +305,82 @@ export class AuthService {
     return this.mapUserRow(rows[0]);
   }
 
+  /** SHA-256 a reset token; only the hash is ever persisted. */
+  private hashResetToken(token: string): string {
+    return crypto.createHash('sha256').update(token).digest('hex');
+  }
+
+  /**
+   * Begin a self-service password reset. Returns the plaintext token and user
+   * when the email belongs to an account, or `undefined` when it does not — the
+   * caller MUST respond identically either way to avoid account enumeration.
+   * Any previously-issued, unused token for the user is invalidated first so
+   * only the most recent link works.
+   */
+  public async createPasswordReset(
+    email: string,
+    ttlMs: number = 60 * 60 * 1000
+  ): Promise<{ token: string; user: User } | undefined> {
+    const user = await this.findUserByEmail(email);
+    if (!user) return undefined;
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const tokenHash = this.hashResetToken(token);
+    const expiresAt = new Date(Date.now() + ttlMs).toISOString();
+
+    await withTransaction(async client => {
+      await client.query(
+        'DELETE FROM password_reset_tokens WHERE user_id = $1 AND used_at IS NULL',
+        [user.id]
+      );
+      await client.query(
+        `INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+         VALUES ($1, $2, $3::timestamptz)`,
+        [user.id, tokenHash, expiresAt]
+      );
+    });
+
+    return { token, user };
+  }
+
+  /**
+   * Complete a password reset. The token is consumed atomically (single-use,
+   * unexpired) and every reset token for the user is cleared afterwards so no
+   * other link can be replayed.
+   */
+  public async resetPassword(token: string, newPassword: string): Promise<void> {
+    if (!newPassword || newPassword.length < 8) {
+      throw new AuthDomainError('Password must be at least 8 characters long.', 400);
+    }
+    if (!token || token.length < 16) {
+      throw new AuthDomainError('This password reset link is invalid or has expired.', 400);
+    }
+
+    const tokenHash = this.hashResetToken(token);
+    const consumed = await query<{ user_id: string }>(
+      `UPDATE password_reset_tokens
+          SET used_at = CURRENT_TIMESTAMP
+        WHERE token_hash = $1 AND used_at IS NULL AND expires_at > CURRENT_TIMESTAMP
+        RETURNING user_id`,
+      [tokenHash]
+    );
+    if (consumed.length === 0) {
+      throw new AuthDomainError('This password reset link is invalid or has expired.', 400);
+    }
+
+    const userId = consumed[0].user_id;
+    const newHash = await this.hashPassword(newPassword);
+    await withTransaction(async client => {
+      await client.query(
+        `UPDATE users
+            SET password_hash = $1, provider = COALESCE(provider, 'EMAIL'), updated_at = CURRENT_TIMESTAMP
+          WHERE id = $2`,
+        [newHash, userId]
+      );
+      await client.query('DELETE FROM password_reset_tokens WHERE user_id = $1', [userId]);
+    });
+  }
+
   /**
    * Link a verified Google identity onto an existing email/password account,
    * then issue a token. The provider stays EMAIL so the password keeps working;

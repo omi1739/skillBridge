@@ -15,7 +15,7 @@ import { NestAuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { AuthPayload } from '../../services/auth.service';
-import { RegisterDto, LoginDto, DeclareSkillDto, UpdateProfileDto, GoogleAuthDto, ChangePasswordDto } from '../../dto/auth.dto';
+import { RegisterDto, LoginDto, DeclareSkillDto, UpdateProfileDto, GoogleAuthDto, ChangePasswordDto, ForgotPasswordDto, ResetPasswordDto } from '../../dto/auth.dto';
 import { RateLimitGuard } from '../../common/rate-limit.guard';
 import { RateLimit, RateWindow } from '../../common/rate-limit.decorators';
 
@@ -50,6 +50,27 @@ export class AuthController {
   @RateWindow(60_000)
   async google(@Body() body: GoogleAuthDto) {
     return this.authService.googleAuth(body.idToken, body.currentStatus);
+  }
+
+  @Post('auth/forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(RateLimitGuard)
+  @RateLimit(5)
+  @RateWindow(60_000)
+  async forgotPassword(@Body() body: ForgotPasswordDto) {
+    return this.authService.requestPasswordReset(body.email);
+  }
+
+  @Post('auth/reset-password')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(RateLimitGuard)
+  @RateLimit(10)
+  @RateWindow(60_000)
+  async resetPassword(@Body() body: ResetPasswordDto) {
+    if (body.newPassword !== body.confirmPassword) {
+      throw new BadRequestException('Passwords do not match.');
+    }
+    return this.authService.resetPassword(body.token, body.newPassword);
   }
 
   @Get('me')

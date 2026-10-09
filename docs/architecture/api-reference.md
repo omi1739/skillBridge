@@ -28,6 +28,8 @@ prefix `/api`. Requests are validated with a global `ValidationPipe`
 | POST   | `/api/auth/register`           | `RegisterDto` (email, password, confirmPassword, fullName, currentStatus?, targetRoleId?) |
 | POST   | `/api/auth/login`              | `LoginDto`                     |
 | POST   | `/api/auth/google`             | `GoogleAuthDto` (idToken, currentStatus?) — Google Sign-In, creates or logs in a user. A Google token whose email is Google-verified may link onto an existing email/password account (the password keeps working); an unverified Google email cannot |
+| POST   | `/api/auth/forgot-password`    | `ForgotPasswordDto` (email) — emails a single-use, 1-hour reset link (`{FRONTEND_URL}/reset-password?token=…`). Always returns `{ success: true }` (no account enumeration). In non-production without `RESEND_API_KEY` the link is returned as `devResetUrl` |
+| POST   | `/api/auth/reset-password`     | `ResetPasswordDto` (token, newPassword, confirmPassword) — consumes the token atomically and sets the new password |
 | GET    | `/api/me?userId=`              | User + profile                 |
 | GET    | `/api/me/account`              | Auth account                    |
 | PATCH  | `/api/me/profile`              | `UpdateProfileDto`             |
@@ -125,3 +127,6 @@ See `backend/.env.example` for the authoritative list. Key values:
 | `REDIS_URL`        | Optional Redis for the caching layer                |
 | `HTTP_TIMEOUT_MS`  | Hard timeout (ms) for every outbound HTTP request (default `15000`) |
 | `ALERT_WEBHOOK_URL`| Optional Slack/Discord/generic webhook for 5xx errors and zero-yield ingestion alerts |
+| `FRONTEND_URL`     | Public frontend origin used to build password-reset links            |
+| `RESEND_API_KEY`   | Resend API key for password-reset emails (unset = log link / dev return) |
+| `EMAIL_FROM`       | From address for outbound email (default `SkillBridge <onboarding@resend.dev>`) |
