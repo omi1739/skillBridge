@@ -11,6 +11,20 @@ export interface AuthPayload {
 }
 
 /**
+ * A business-rule failure in the auth flow (bad credentials, conflicting
+ * account, validation). The Nest layer maps this to `err.status` instead of
+ * letting it fall through to the default exception filter as a 500 — a wrong
+ * password must read 401, a duplicate signup 409, never "Internal Server
+ * Error".
+ */
+export class AuthDomainError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+    this.name = 'AuthDomainError';
+  }
+}
+
+/**
  * JWT signing secret. Production MUST supply a strong value via JWT_SECRET;
  * boot fails fast if it is missing so tokens are not minted with a throwaway
  * key. In local/dev we fall back to an ephemeral random secret, which means
@@ -78,13 +92,13 @@ export class AuthService {
   ): Promise<{ token: string; user: User; profile: Profile }> {
     const cleanEmail = email.trim().toLowerCase();
     if (!this.isValidEmail(cleanEmail)) {
-      throw new Error('Please provide a valid email address.');
+      throw new AuthDomainError('Please provide a valid email address.', 400);
     }
     if (password.length < 8) {
-      throw new Error('Password must be at least 8 characters long.');
+      throw new AuthDomainError('Password must be at least 8 characters long.', 400);
     }
     if (!fullName || !fullName.trim()) {
-      throw new Error('Full name is required.');
+      throw new AuthDomainError('Full name is required.', 400);
     }
 
     const existing = await query<{ id: string }>(
@@ -92,7 +106,7 @@ export class AuthService {
       [cleanEmail]
     );
     if (existing.length > 0) {
-      throw new Error('An account with this email address already exists.');
+      throw new AuthDomainError('An account with this email address already exists.', 409);
     }
 
     const userId = `user_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
@@ -135,7 +149,7 @@ export class AuthService {
       // Two registrations racing on the same email: the pre-check above is not
       // atomic, so the DB unique constraint is the source of truth.
       if (err && err.code === '23505') {
-        throw new Error('An account with this email address already exists.');
+        throw new AuthDomainError('An account with this email address already exists.', 409);
       }
       throw err;
     }
@@ -159,7 +173,7 @@ export class AuthService {
   ): Promise<{ token: string; user: User; profile: Profile; isNewUser: boolean }> {
     const cleanEmail = profileInfo.email.trim().toLowerCase();
     if (!this.isValidEmail(cleanEmail)) {
-      throw new Error('Google account has no valid email address.');
+      throw new AuthDomainError('Google account has no valid email address.', 401);
     }
 
     const existing = await this.findUserByEmail(cleanEmail);
@@ -169,10 +183,10 @@ export class AuthService {
       // original password (or verify ownership) instead of granting access via a
       // different identity provider.
       if (existing.provider === 'EMAIL') {
-        throw new Error('An account with this email already uses email/password. Sign in with your password.');
+        throw new AuthDomainError('An account with this email already uses email/password. Sign in with your password.', 409);
       }
       if (existing.googleId && existing.googleId !== profileInfo.googleId) {
-        throw new Error('This email is already linked to a different Google account.');
+        throw new AuthDomainError('This email is already linked to a different Google account.', 409);
       }
       const profile = await this.findProfile(existing.id);
       if (!profile) {
@@ -224,16 +238,22 @@ export class AuthService {
            VALUES ($1, $2, $3, $4::varchar, $5, $6, $7::varchar, $8::timestamptz, $9::timestamptz)`,
           [userId, cleanEmail, 'USER', status || null, profileInfo.googleId, 'GOOGLE', user.avatarUrl || null, now, now]
         );
+        // Placeholders must run $1..$5 contiguously: PostgreSQL sizes the bind
+        // to the HIGHEST $n in the statement, so a skipped index ($4) makes it
+        // demand 6 parameters while 5 are supplied ("bind message supplies 5
+        // parameters, but prepared statement requires 6") and the whole
+        // Google sign-up transaction aborts. target_role_id stays a literal
+        // NULL — untyped NULLs are fine, only parameters need the cast.
         await client.query(
           `INSERT INTO profiles (id, user_id, full_name, target_role_id, created_at, updated_at)
-           VALUES ($1, $2, $3, NULL, $5::timestamptz, $6::timestamptz)`,
+           VALUES ($1, $2, $3, NULL, $4::timestamptz, $5::timestamptz)`,
           [profileId, userId, profile.fullName, now, now]
         );
       });
     } catch (err: any) {
       // The email / google_id uniqueness race; surface a clean message.
       if (err && err.code === '23505') {
-        throw new Error('An account with this identity already exists. Sign in instead.');
+        throw new AuthDomainError('An account with this identity already exists. Sign in instead.', 409);
       }
       throw err;
     }
@@ -251,13 +271,13 @@ export class AuthService {
 
     const rows = await query<any>('SELECT * FROM users WHERE email = $1', [cleanEmail]);
     if (rows.length === 0) {
-      throw new Error('Invalid email or password.');
+      throw new AuthDomainError('Invalid email or password.', 401);
     }
 
     const u = rows[0];
     const storedHash: string | null = u.password_hash;
     if (!storedHash || !(await this.verifyPassword(password, storedHash))) {
-      throw new Error('Invalid email or password.');
+      throw new AuthDomainError('Invalid email or password.', 401);
     }
 
     const user = this.mapUserRow(u);

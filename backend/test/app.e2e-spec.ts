@@ -3,12 +3,45 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 
+// bcrypt hash of 'CorrectPassword123' (cost 10). Inlined rather than computed
+// so the jest.mock factory below references no out-of-scope state at all.
+const EXISTING_PASSWORD_HASH = '$2b$10$g/VXwOC7P.QQAATPwLh5pucAkLXvA3gKbeiX59bhu2gE1D8kLMgTW';
+
 // Mock the database layer so the whole app runs against in-memory data.
 jest.mock('../src/db/client', () => {
-  const fakeQuery = jest.fn(async (text: string) => {
+  const existingUser = () => ({
+    id: 'user_existing',
+    email: 'existing@example.com',
+    password_hash: EXISTING_PASSWORD_HASH,
+    role: 'USER',
+    provider: 'EMAIL',
+    current_status: null,
+    google_id: null,
+    avatar_url: null,
+    created_at: new Date().toISOString()
+  });
+  const fakeQuery = jest.fn(async (text: string, params?: any[]) => {
     const key = String(text).toLowerCase();
     if (key.includes('select 1')) {
       return [{ '?column?': 1 }];
+    }
+    if (key.includes('from users') && params?.[0] === 'existing@example.com') {
+      return [existingUser()];
+    }
+    if (key.includes('from profiles') && params?.[0] === 'user_existing') {
+      return [
+        {
+          id: 'profile_existing',
+          user_id: 'user_existing',
+          full_name: 'Existing User',
+          target_role_id: null,
+          github_url: null,
+          portfolio_url: null,
+          bio: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+      ];
     }
     return [];
   });
@@ -148,6 +181,48 @@ describe('SkillBridge API (e2e)', () => {
       .post('/api/auth/google')
       .send({ idToken: 'not-a-real-google-token' })
       .expect(401);
+  });
+
+  // The three cases below all used to surface as 500s: the service threw plain
+  // Errors that the exception filter could not classify.
+  it('POST /api/auth/login returns 401 (not 500) for an unknown email', () => {
+    return request(app.getHttpServer())
+      .post('/api/auth/login')
+      .send({ email: 'nobody@example.com', password: 'CorrectPassword123' })
+      .expect(401)
+      .expect(res => {
+        expect(res.body.message).toMatch(/invalid email or password/i);
+      });
+  });
+
+  it('POST /api/auth/login returns 401 (not 500) for a wrong password', () => {
+    return request(app.getHttpServer())
+      .post('/api/auth/login')
+      .send({ email: 'existing@example.com', password: 'WrongPassword999' })
+      .expect(401);
+  });
+
+  it('POST /api/auth/register returns 409 (not 500) for a duplicate email', () => {
+    return request(app.getHttpServer())
+      .post('/api/auth/register')
+      .send({
+        email: 'existing@example.com',
+        password: 'CorrectPassword123',
+        confirmPassword: 'CorrectPassword123',
+        fullName: 'Duplicate User'
+      })
+      .expect(409);
+  });
+
+  it('POST /api/auth/login signs in with valid credentials', () => {
+    return request(app.getHttpServer())
+      .post('/api/auth/login')
+      .send({ email: 'existing@example.com', password: 'CorrectPassword123' })
+      .expect(200)
+      .expect(res => {
+        expect(typeof res.body.token).toBe('string');
+        expect(res.body.user.email).toBe('existing@example.com');
+      });
   });
 
   it('POST /api/admin/skills/alias returns 401 without a token', () => {

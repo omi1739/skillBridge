@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException, BadRequestException, UnauthorizedException, InternalServerErrorException } from '@nestjs/common';
-import { User, Profile, SkillEvidence, ActionRecommendation } from '@skillbridge/types';
-import { authService, AuthPayload } from '../../services/auth.service';
+import { Injectable, NotFoundException, UnauthorizedException, InternalServerErrorException, HttpException } from '@nestjs/common';
+import { Profile, SkillEvidence } from '@skillbridge/types';
+import { authService, AuthDomainError } from '../../services/auth.service';
 import { store } from '../../store';
 import { gapService } from '../../services/gap.service';
 import { recommendationService } from '../../services/recommendation.service';
@@ -8,12 +8,35 @@ import { googleVerifier } from '../../services/google-verifier.service';
 
 @Injectable()
 export class NestAuthService {
+  /**
+   * Re-throw an auth failure with the status it deserves. `AuthDomainError`
+   * carries the business status (401 bad credentials, 409 conflict, 400
+   * validation); anything else is genuinely unexpected, so it is logged with
+   * its real cause and reported as an opaque 500 so internals never leak.
+   */
+  private rethrow(err: any, context: string): never {
+    if (err instanceof AuthDomainError) {
+      throw new HttpException(err.message, err.status);
+    }
+    const msg = err?.message || 'unknown error';
+    console.error(`[SkillBridge] ${context} failed:`, msg);
+    throw new InternalServerErrorException(`${context} failed. Please try again.`);
+  }
+
   async register(email: string, password: string, fullName: string, targetRoleId?: string, currentStatus?: string) {
-    return authService.register(email, password, fullName, targetRoleId, currentStatus);
+    try {
+      return await authService.register(email, password, fullName, targetRoleId, currentStatus);
+    } catch (err: any) {
+      this.rethrow(err, 'Registration');
+    }
   }
 
   async login(email: string, password: string) {
-    return authService.login(email, password);
+    try {
+      return await authService.login(email, password);
+    } catch (err: any) {
+      this.rethrow(err, 'Sign-in');
+    }
   }
 
   async googleAuth(idToken: string, currentStatus?: string) {
@@ -26,9 +49,7 @@ export class NestAuthService {
     try {
       return await authService.registerOrLoginWithGoogle(profileInfo, currentStatus);
     } catch (err: any) {
-      const msg = err?.message || 'Could not provision the Google account.';
-      console.error('[SkillBridge] Google account provisioning failed:', msg);
-      throw new InternalServerErrorException(`Google account provisioning failed: ${msg}`);
+      this.rethrow(err, 'Google account provisioning');
     }
   }
 
@@ -45,18 +66,27 @@ export class NestAuthService {
     return { user, profile };
   }
 
+  /**
+   * Applies a profile patch. Field presence — not `??` — decides what is
+   * written: the client clears a field by sending an explicit `null`, and
+   * `null ?? stored` would silently keep the stored value, so no edit could
+   * ever blank a bio or link. Absent keys are left untouched.
+   */
   async updateProfile(userId: string, patch: Partial<Profile>) {
     const profile = await store.getProfile(userId);
     if (!profile) {
       throw new NotFoundException('Profile not found');
     }
 
+    const pick = <K extends keyof Profile>(key: K): Profile[K] | undefined =>
+      key in patch ? (patch[key] ?? undefined) : profile[key];
+
     return store.saveProfile(userId, {
-      fullName: patch.fullName ?? profile.fullName,
-      targetRoleId: patch.targetRoleId ?? profile.targetRoleId,
-      githubUrl: patch.githubUrl ?? profile.githubUrl,
-      portfolioUrl: patch.portfolioUrl ?? profile.portfolioUrl,
-      bio: patch.bio ?? profile.bio
+      fullName: pick('fullName') ?? profile.fullName,
+      targetRoleId: pick('targetRoleId'),
+      githubUrl: pick('githubUrl'),
+      portfolioUrl: pick('portfolioUrl'),
+      bio: pick('bio')
     });
   }
 
