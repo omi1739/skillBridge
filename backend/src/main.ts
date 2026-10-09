@@ -3,6 +3,8 @@ import * as path from 'path';
 import { NestFactory } from '@nestjs/core';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
+import { AllExceptionsFilter } from './common/all-exceptions.filter';
+import { isAlertingConfigured } from './common/error-reporter';
 
 // Load .env file from the api workspace root (Node 22+ or fallback)
 try {
@@ -46,11 +48,18 @@ async function bootstrap() {
     })
   );
 
+  // Log every server error and, when ALERT_WEBHOOK_URL is set, forward it to the
+  // configured alert channel. Client (4xx) responses are left untouched.
+  app.useGlobalFilters(new AllExceptionsFilter());
+
   const port = process.env.PORT || 4000;
   await app.listen(port);
 
   logger.log(`🚀 SkillBridge NestJS API successfully running at: http://localhost:${port}/api`);
   logger.log(`📚 Health check available at: http://localhost:${port}/api/health`);
+  if (isAlertingConfigured()) {
+    logger.log('🔔 Error alerting is enabled (ALERT_WEBHOOK_URL set).');
+  }
 }
 
 bootstrap();

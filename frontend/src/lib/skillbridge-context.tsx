@@ -32,8 +32,53 @@ const TAB_PATH: Record<AppTab, string> = {
   admin: '/admin'
 };
 
+const API_TIMEOUT_MS = Number(process.env.NEXT_PUBLIC_API_TIMEOUT_MS || 20000);
+
+function hasAuthorizationHeader(init?: RequestInit): boolean {
+  if (!init?.headers) return false;
+  const headers = new Headers(init.headers);
+  return headers.has('Authorization') || headers.has('authorization');
+}
+
+let unauthorizedNotifiedAt = 0;
+
+/**
+ * Dispatch a single session-expired event when an *authenticated* request is
+ * rejected with 401. Login/register calls carry no Authorization header, so a
+ * wrong-password 401 does not trigger this.
+ */
+function notifyUnauthorized(): void {
+  if (typeof window === 'undefined') return;
+  const now = Date.now();
+  if (now - unauthorizedNotifiedAt < 5000) return;
+  unauthorizedNotifiedAt = now;
+  window.dispatchEvent(new Event('skillbridge:unauthorized'));
+}
+
+/**
+ * `fetch` with a hard client-side timeout. Every network call in the app goes
+ * through this so a slow/unreachable API surfaces a clear message instead of an
+ * indefinite spinner, and stale tokens sign the user out exactly once.
+ */
+async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), Math.max(1000, API_TIMEOUT_MS));
+  try {
+    const res = await globalThis.fetch(input, { ...init, signal: init.signal ?? controller.signal });
+    if (res.status === 401 && hasAuthorizationHeader(init)) notifyUnauthorized();
+    return res;
+  } catch (err: any) {
+    if (err?.name === 'AbortError') {
+      throw new Error('The request timed out. Please check your connection and try again.', { cause: err });
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function fetchJSON<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
-  return fetch(input, init).then(async res => {
+  return apiFetch(input, init).then(async res => {
     const body = await res.json().catch(() => null);
     if (!res.ok) {
       throw new Error(apiErrorMessage(body, `Request failed (${res.status})`));
@@ -207,7 +252,7 @@ function useSkillBridgeValue() {
     setAttemptResult(null);
     setTimeRemaining(0);
     try {
-      const diagRes = await fetch(`${API_BASE}/assessments/diagnostic?count=${count}`);
+      const diagRes = await apiFetch(`${API_BASE}/assessments/diagnostic?count=${count}`);
       const data = await diagRes.json().catch(() => null);
       if (!diagRes.ok) throw new Error(apiErrorMessage(data, 'Could not load the assessment.'));
 
@@ -223,7 +268,7 @@ function useSkillBridgeValue() {
       // other non-2xx (real 401 on expired tokens, 400 on expired attempts, …)
       // stays a hard error so auth/expiry problems are never masked.
       if (effectiveToken) {
-        const startRes = await fetch(`${API_BASE}/assessments/assessment_backend_diagnostic/start`, {
+        const startRes = await apiFetch(`${API_BASE}/assessments/assessment_backend_diagnostic/start`, {
           method: 'POST',
           headers: headersFor(effectiveToken),
           body: JSON.stringify({ count })
@@ -295,7 +340,7 @@ function useSkillBridgeValue() {
 
   // ---- Skill-centric assessment API helpers ----
   const loadSkillAssessSkills = () => {
-    fetch(`${API_BASE}/assessments/skills`)
+    apiFetch(`${API_BASE}/assessments/skills`)
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data) && data.length > 0) {
@@ -316,7 +361,7 @@ function useSkillBridgeValue() {
     setSkillAnswered({});
     setSkillQuestionIdx(0);
     try {
-      const res = await fetch(`${API_BASE}/assessments`, {
+      const res = await apiFetch(`${API_BASE}/assessments`, {
         method: 'POST',
         headers: authHeaders(),
         body: JSON.stringify({
@@ -340,7 +385,7 @@ function useSkillBridgeValue() {
   const submitSkillAnswer = async (questionId: string, answer: string | string[]) => {
     if (!skillSession) return;
     try {
-      const res = await fetch(`${API_BASE}/assessments/session/${skillSession.id}/answers`, {
+      const res = await apiFetch(`${API_BASE}/assessments/session/${skillSession.id}/answers`, {
         method: 'POST',
         headers: authHeaders(),
         body: JSON.stringify({ questionId, answer })
@@ -365,7 +410,7 @@ function useSkillBridgeValue() {
     setIsSubmittingSkill(true);
     setSkillAssessError('');
     try {
-      const res = await fetch(`${API_BASE}/assessments/session/${skillSession.id}/submit`, {
+      const res = await apiFetch(`${API_BASE}/assessments/session/${skillSession.id}/submit`, {
         method: 'POST',
         headers: authHeaders()
       });
@@ -384,7 +429,7 @@ function useSkillBridgeValue() {
 
   const loadSkillAssessResult = async (sessionId: string) => {
     try {
-      const res = await fetch(`${API_BASE}/assessments/session/${sessionId}/result`, { headers: authHeaders() });
+      const res = await apiFetch(`${API_BASE}/assessments/session/${sessionId}/result`, { headers: authHeaders() });
       const data = await res.json();
       if (!res.ok) throw new Error(apiErrorMessage(data, 'Could not load result.'));
       setSkillResult(data);
@@ -396,14 +441,14 @@ function useSkillBridgeValue() {
   };
 
   const loadSkillAssessHistory = () => {
-    fetch(`${API_BASE}/assessments/history`, { headers: authHeaders() })
+    apiFetch(`${API_BASE}/assessments/history`, { headers: authHeaders() })
       .then(res => res.json())
       .then(data => setSkillHistory(Array.isArray(data) ? data : null))
       .catch(() => setSkillHistory(null));
   };
 
   const loadSkillAssessProgress = (skillId: string) => {
-    fetch(`${API_BASE}/assessments/skills/${skillId}/progress`, { headers: authHeaders() })
+    apiFetch(`${API_BASE}/assessments/skills/${skillId}/progress`, { headers: authHeaders() })
       .then(res => (res.ok ? res.json() : null))
       .then(data => setSkillProgress(data || null))
       .catch(() => setSkillProgress(null));
@@ -440,7 +485,7 @@ function useSkillBridgeValue() {
       setAllJobs([]);
       return;
     }
-    fetch(`${API_BASE}/jobs`, { headers: headersFor(t) })
+    apiFetch(`${API_BASE}/jobs`, { headers: headersFor(t) })
       .then(res => (res.ok ? res.json() : Promise.reject(res)))
       .then(data => {
         if (Array.isArray(data)) {
@@ -525,7 +570,7 @@ function useSkillBridgeValue() {
     const search = opts?.search !== undefined ? opts.search : adminUsersSearch;
     const qs = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
     if (search) qs.set('search', search);
-    fetch(`${API_BASE}/admin/users?${qs.toString()}`, { headers: headersFor(token) })
+    apiFetch(`${API_BASE}/admin/users?${qs.toString()}`, { headers: headersFor(token) })
       .then(res => (res.ok ? res.json() : Promise.reject(res)))
       .then((data: any) => {
         if (data && Array.isArray(data.items)) {
@@ -543,7 +588,7 @@ function useSkillBridgeValue() {
 
   const handleChangeUserRole = (userId: string, role: string) => {
     setAdminUserMsg(null);
-    fetch(`${API_BASE}/admin/users/${userId}/role`, {
+    apiFetch(`${API_BASE}/admin/users/${userId}/role`, {
       method: 'PATCH',
       headers: authHeaders(),
       body: JSON.stringify({ role })
@@ -563,7 +608,7 @@ function useSkillBridgeValue() {
   const handleDeleteUser = (userId: string, email: string) => {
     if (!window.confirm(`Delete user ${email}? This is permanent.`)) return;
     setAdminUserMsg(null);
-    fetch(`${API_BASE}/admin/users/${userId}`, {
+    apiFetch(`${API_BASE}/admin/users/${userId}`, {
       method: 'DELETE',
       headers: authHeaders()
     })
@@ -591,7 +636,7 @@ function useSkillBridgeValue() {
       return;
     }
     setAdminUserMsg(null);
-    fetch(`${API_BASE}/admin/users/${userId}/password`, {
+    apiFetch(`${API_BASE}/admin/users/${userId}/password`, {
       method: 'PATCH',
       headers: authHeaders(),
       body: JSON.stringify({ newPassword })
@@ -635,7 +680,7 @@ function useSkillBridgeValue() {
   const handleRoleSelect = (roleId: string) => {
     if (!currentUser || !authToken || !roleId) return;
     setRoleDraft('');
-    fetch(`${API_BASE}/me/profile`, {
+    apiFetch(`${API_BASE}/me/profile`, {
       method: 'PATCH',
       headers: authHeaders(),
       body: JSON.stringify({ targetRoleId: roleId })
@@ -663,7 +708,7 @@ function useSkillBridgeValue() {
     setProfileError('');
     setProfileSuccess('');
     try {
-      const res = await fetch(`${API_BASE}/me/profile`, {
+      const res = await apiFetch(`${API_BASE}/me/profile`, {
         method: 'PATCH',
         headers: authHeaders(),
         body: JSON.stringify(patch)
@@ -694,7 +739,7 @@ function useSkillBridgeValue() {
   ): Promise<{ ok: boolean; message: string }> => {
     if (!currentUser || !authToken) return { ok: false, message: 'You must be signed in.' };
     try {
-      const res = await fetch(`${API_BASE}/me/password`, {
+      const res = await apiFetch(`${API_BASE}/me/password`, {
         method: 'POST',
         headers: authHeaders(),
         body: JSON.stringify({
@@ -826,7 +871,7 @@ function useSkillBridgeValue() {
     setIsAuthLoading(true);
     try {
       const token = 'demo_token_demo_user_01';
-      const res = await fetch(`${API_BASE}/me`, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await apiFetch(`${API_BASE}/me`, { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.user || !data?.profile) {
         throw new Error(apiErrorMessage(data, 'Demo sign-in failed.'));
@@ -910,7 +955,7 @@ function useSkillBridgeValue() {
         };
 
     try {
-      const res = await fetch(endpoint, {
+      const res = await apiFetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -945,7 +990,7 @@ function useSkillBridgeValue() {
     setIsAuthLoading(true);
     setAuthError('');
     try {
-      const res = await fetch(`${API_BASE}/auth/google`, {
+      const res = await apiFetch(`${API_BASE}/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -992,6 +1037,22 @@ function useSkillBridgeValue() {
     router.push('/');
   };
 
+  // Sign the user out when the API rejects a stored token (expired JWT, changed
+  // password, deleted account). A ref keeps the listener bound once while always
+  // calling the latest handler.
+  const logoutRef = useRef(handleLogout);
+  useEffect(() => {
+    logoutRef.current = handleLogout;
+  });
+  useEffect(() => {
+    const onUnauthorized = () => {
+      setGlobalError('Your session expired. Please sign in again.');
+      logoutRef.current();
+    };
+    window.addEventListener('skillbridge:unauthorized', onUnauthorized);
+    return () => window.removeEventListener('skillbridge:unauthorized', onUnauthorized);
+  }, []);
+
   const handleCurriculumChange = (currId: string) => {
     setSelectedCurriculumId(currId);
     fetchJSON<CurriculumComparisonResult>(`${API_BASE}/curriculum/analyze?institutionId=${currId}&roleId=${effectiveRoleId}`)
@@ -1009,7 +1070,7 @@ function useSkillBridgeValue() {
       return;
     }
     try {
-      const res = await fetch(`${API_BASE}/me/report?userId=${activeUserId}&roleId=${effectiveRoleId}`, { headers: authHeaders() });
+      const res = await apiFetch(`${API_BASE}/me/report?userId=${activeUserId}&roleId=${effectiveRoleId}`, { headers: authHeaders() });
       const data = await res.json();
       if (!res.ok) throw new Error(apiErrorMessage(data, 'Could not load your skill passport.'));
       setPassportData(data);
@@ -1062,7 +1123,7 @@ function useSkillBridgeValue() {
     const current = assessment;
     if (!current) return null;
     const questions = current.questions || [];
-    const res = await fetch(`${API_BASE}/assessments/${current.id}/start`, {
+    const res = await apiFetch(`${API_BASE}/assessments/${current.id}/start`, {
       method: 'POST',
       headers: authHeaders(),
       body: JSON.stringify({ count: questions.length || 12, questionIds: questions.map(q => q.id) })
@@ -1110,7 +1171,7 @@ function useSkillBridgeValue() {
         if (attemptId) setDiagnosticAttemptId(attemptId);
       }
 
-      const res = await fetch(`${API_BASE}/assessments/${assessment.id}/submit`, {
+      const res = await apiFetch(`${API_BASE}/assessments/${assessment.id}/submit`, {
         method: 'POST',
         headers: authHeaders(),
         body: JSON.stringify({
@@ -1191,7 +1252,7 @@ function useSkillBridgeValue() {
     setGenerateError('');
     setSandboxResult(null);
     try {
-      const res = await fetch(`${API_BASE}/sandbox/generate`, {
+      const res = await apiFetch(`${API_BASE}/sandbox/generate`, {
         method: 'POST',
         headers: authHeaders(),
         body: JSON.stringify({ type: 'SQL', skillId: 'skill_sql', difficulty: 'Intermediate' })
@@ -1224,7 +1285,7 @@ function useSkillBridgeValue() {
       : { challengeId: challenge.id, code: sandboxCode };
 
     try {
-      const res = await fetch(endpoint, {
+      const res = await apiFetch(endpoint, {
         method: 'POST',
         headers: authHeaders(),
         body: JSON.stringify(payload)
@@ -1257,7 +1318,7 @@ function useSkillBridgeValue() {
     setProjectSuccessMsg('');
 
     try {
-      const res = await fetch(`${API_BASE}/me/projects`, {
+      const res = await apiFetch(`${API_BASE}/me/projects`, {
         method: 'POST',
         headers: authHeaders(),
         body: JSON.stringify({
@@ -1299,7 +1360,7 @@ function useSkillBridgeValue() {
     if (!aliasForm.rawAlias.trim() || !aliasForm.canonicalSkillId) return;
 
     try {
-      const res = await fetch(`${API_BASE}/admin/skills/alias`, {
+      const res = await apiFetch(`${API_BASE}/admin/skills/alias`, {
         method: 'POST',
         headers: authHeaders(),
         body: JSON.stringify({
@@ -1327,7 +1388,7 @@ function useSkillBridgeValue() {
     if (!role || !editingSkillWeight) return;
 
     try {
-      const res = await fetch(`${API_BASE}/admin/roles/${role.id}/weights`, {
+      const res = await apiFetch(`${API_BASE}/admin/roles/${role.id}/weights`, {
         method: 'PATCH',
         headers: authHeaders(),
         body: JSON.stringify(editingSkillWeight)
@@ -1351,7 +1412,7 @@ function useSkillBridgeValue() {
   const loadAdminSkillQuestions = (status = adminQStatusFilter || 'pending_review') => {
     if (!authToken) return;
     const qs = status ? `?status=${encodeURIComponent(status)}` : '';
-    fetch(`${API_BASE}/assessments/admin/questions${qs}`, { headers: authHeaders() })
+    apiFetch(`${API_BASE}/assessments/admin/questions${qs}`, { headers: authHeaders() })
       .then(res => (res.ok ? res.json() : Promise.reject(res)))
       .then((data: any) => setAdminSkillQuestions(Array.isArray(data) ? data : []))
       .catch(() => setAdminSkillQuestions([]));
@@ -1360,7 +1421,7 @@ function useSkillBridgeValue() {
   const setAdminQuestionStatus = async (id: string, status: string) => {
     setAdminQMsg(null);
     try {
-      const res = await fetch(`${API_BASE}/assessments/admin/questions/${id}/status`, {
+      const res = await apiFetch(`${API_BASE}/assessments/admin/questions/${id}/status`, {
         method: 'PATCH',
         headers: authHeaders(),
         body: JSON.stringify({ status })
@@ -1378,7 +1439,7 @@ function useSkillBridgeValue() {
     setAdminQMsg(null);
     setIsGeneratingQuestions(true);
     try {
-      const res = await fetch(`${API_BASE}/assessments/admin/generate`, {
+      const res = await apiFetch(`${API_BASE}/assessments/admin/generate`, {
         method: 'POST',
         headers: authHeaders(),
         body: JSON.stringify({

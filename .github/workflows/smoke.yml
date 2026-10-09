@@ -1,0 +1,37 @@
+name: Production smoke test
+
+# Runs against the deployed API to catch regressions that unit/e2e tests can't:
+# a broken deploy, an unreachable database, a scheduler that stopped ingesting.
+# Set the repository variable/secret PROD_API_BASE to override the default.
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  smoke:
+    name: Health & data smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: API health
+        run: |
+          BASE="${{ secrets.PROD_API_BASE || 'https://skillbridge-cv3e.onrender.com/api' }}"
+          echo "Probing $BASE/health"
+          code=$(curl -sS -o /tmp/health.json -w '%{http_code}' --max-time 30 --retry 3 --retry-all-errors "$BASE/health")
+          echo "HTTP $code"
+          cat /tmp/health.json
+          test "$code" = "200"
+
+      - name: Market data present
+        run: |
+          BASE="${{ secrets.PROD_API_BASE || 'https://skillbridge-cv3e.onrender.com/api' }}"
+          code=$(curl -sS -o /tmp/demand.json -w '%{http_code}' --max-time 30 --retry 3 --retry-all-errors "$BASE/market/demand")
+          echo "HTTP $code"
+          test "$code" = "200"
+          total=$(jq -r '.totalJobs // 0' /tmp/demand.json)
+          echo "totalJobs=$total"
+          if [ "$total" -eq 0 ]; then
+            echo "::warning::Market demand returned 0 jobs - ingestion may be failing."
+          fi

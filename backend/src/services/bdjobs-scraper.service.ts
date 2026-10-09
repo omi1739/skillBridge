@@ -1,4 +1,5 @@
 import { Logger } from '@nestjs/common';
+import { fetchWithRetry } from '../common/http';
 
 /**
  * Scraper for BdJobs (bdjobs.com), Bangladesh's largest job board.
@@ -80,9 +81,10 @@ export class BdJobsScraper {
       const url = `${LIST_URL}?isPro=1&rpp=50&pg=${page}`;
       let text: string;
       try {
-        const res = await fetch(url, {
-          headers: { 'user-agent': USER_AGENT, accept: 'application/json' }
-        });
+        const res = await fetchWithRetry(url, {
+          headers: { 'user-agent': USER_AGENT, accept: 'application/json' },
+          timeoutMs: 15000
+        }, { attempts: 3 });
         if (!res.ok) {
           this.logger.warn(`BdJobs list API returned ${res.status} on page ${page}; stopping.`);
           break;
@@ -148,9 +150,10 @@ export class BdJobsScraper {
     const url = `${DETAILS_URL}?jobId=${encodeURIComponent(jobId)}`;
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        const res = await fetch(url, {
-          headers: { 'user-agent': USER_AGENT, accept: 'application/json' }
-        });
+        const res = await fetchWithRetry(url, {
+          headers: { 'user-agent': USER_AGENT, accept: 'application/json' },
+          timeoutMs: 10000
+        }, { attempts: 2 });
         if (!res.ok) continue;
         const json: any = await res.json();
         const rec: BdDetailRecord | undefined = Array.isArray(json?.data) ? json.data[0] : json?.data;

@@ -19,6 +19,14 @@ export class IngestionController {
     return store.getJobSources();
   }
 
+  @Get('ingest/runs')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async getIngestRuns(@Query('limit') limit?: string) {
+    const parsed = Number(limit);
+    return store.getRecentIngestRuns(Number.isFinite(parsed) && parsed > 0 ? parsed : 20);
+  }
+
   @Post('ingest/run')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')

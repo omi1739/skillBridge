@@ -673,6 +673,74 @@ export class AppDataStore {
     );
   }
 
+  async recordIngestRunStart(source: string): Promise<string> {
+    const rows = await query<{ id: string }>(
+      `INSERT INTO job_ingest_runs (source, status) VALUES ($1, 'running') RETURNING id`,
+      [source]
+    );
+    return rows[0].id;
+  }
+
+  async recordIngestRunFinish(
+    id: string,
+    patch: {
+      status: string;
+      fetched?: number;
+      classified?: number;
+      inserted?: number;
+      updated?: number;
+      removed?: number;
+      expired?: number;
+      deleted?: number;
+      totalJobs?: number;
+      error?: string | null;
+    }
+  ): Promise<void> {
+    await query(
+      `UPDATE job_ingest_runs SET
+         status = $2, fetched = $3, classified = $4, inserted = $5, updated = $6,
+         removed = $7, expired = $8, deleted = $9, total_jobs = $10, error = $11,
+         finished_at = CURRENT_TIMESTAMP
+       WHERE id = $1`,
+      [
+        id,
+        patch.status,
+        patch.fetched ?? 0,
+        patch.classified ?? 0,
+        patch.inserted ?? 0,
+        patch.updated ?? 0,
+        patch.removed ?? 0,
+        patch.expired ?? 0,
+        patch.deleted ?? 0,
+        patch.totalJobs ?? 0,
+        patch.error ?? null
+      ]
+    );
+  }
+
+  async getRecentIngestRuns(limit = 20): Promise<any[]> {
+    const rows = await query<any>(
+      `SELECT * FROM job_ingest_runs ORDER BY started_at DESC LIMIT $1`,
+      [Math.max(1, Math.min(100, limit))]
+    );
+    return rows.map(r => ({
+      id: r.id,
+      source: r.source,
+      status: r.status,
+      fetched: r.fetched,
+      classified: r.classified,
+      inserted: r.inserted,
+      updated: r.updated,
+      removed: r.removed,
+      expired: r.expired,
+      deleted: r.deleted,
+      totalJobs: r.total_jobs,
+      error: r.error || null,
+      startedAt: r.started_at,
+      finishedAt: r.finished_at || null
+    }));
+  }
+
   async runVerificationSweep(): Promise<{ expired: number; deleted: number; recentlyChecked: number; verified: number }> {
     const RECENT_INTERVAL = "48 hours";
 

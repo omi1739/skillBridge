@@ -79,6 +79,21 @@ Error bodies follow the Nest shape `{ statusCode, message, error }`, where
 | GET    | `/api/jobs/matches`   | Matches for a user              |
 | GET    | `/api/jobs/:id/match` | Per-job match for a user (404 if job unknown) |
 
+## Market & ingestion
+
+| Method | Route                | Notes                                                          |
+|--------|----------------------|---------------------------------------------------------------|
+| GET    | `/api/market/demand` | Computed demand per skill for a role (`?roleId=`)             |
+| GET    | `/api/ingest/sources`| Registered job sources with counts and last-sync times        |
+| GET    | `/api/ingest/runs`   | Recent ingestion runs (`?limit=`, ADMIN) — status/fetched/inserted/updated/error |
+| POST   | `/api/ingest/run`    | Trigger ingestion (`source`, `replace`, ADMIN)                |
+
+Ingestion is serialized by a Postgres advisory lock, so a scheduled cron, the
+admin endpoint and a manual `npm run db:ingest` can never run concurrently. Each
+run is recorded in `job_ingest_runs`; a run that inserts/updates zero jobs is
+flagged and reported to `ALERT_WEBHOOK_URL` (when configured).
+
+
 ## Curriculum
 
 | Method | Route                       | Notes       |
@@ -108,3 +123,5 @@ See `backend/.env.example` for the authoritative list. Key values:
 | `GITHUB_TOKEN`     | Optional GitHub token for project verification      |
 | `AUTO_INIT_DB`     | Apply schema+seed on boot (default `true`)          |
 | `REDIS_URL`        | Optional Redis for the caching layer                |
+| `HTTP_TIMEOUT_MS`  | Hard timeout (ms) for every outbound HTTP request (default `15000`) |
+| `ALERT_WEBHOOK_URL`| Optional Slack/Discord/generic webhook for 5xx errors and zero-yield ingestion alerts |

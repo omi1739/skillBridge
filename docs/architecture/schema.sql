@@ -444,3 +444,27 @@ BEGIN
   END IF;
 END
 $$;
+
+-- ============================================================
+-- Job ingestion run history (observability for the scraper)
+-- One row per scheduled/manual ingestion so a silent failure or a
+-- zero-yield run is visible instead of leaving the dataset empty.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS job_ingest_runs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    source VARCHAR(255) NOT NULL,
+    status VARCHAR(50) NOT NULL DEFAULT 'running',  -- running, success, empty, failed
+    fetched INT DEFAULT 0,
+    classified INT DEFAULT 0,
+    inserted INT DEFAULT 0,
+    updated INT DEFAULT 0,
+    removed INT DEFAULT 0,
+    expired INT DEFAULT 0,
+    deleted INT DEFAULT 0,
+    total_jobs INT DEFAULT 0,
+    error TEXT,
+    started_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    finished_at TIMESTAMP WITH TIME ZONE
+);
+CREATE INDEX IF NOT EXISTS idx_job_ingest_runs_started ON job_ingest_runs(started_at DESC);
+

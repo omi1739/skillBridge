@@ -1,11 +1,18 @@
 import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
 import { store } from '../../store';
-import { query } from '../../db/client';
+import { query, withAdvisoryLock } from '../../db/client';
 import { Skill, MarketDemandResponse, MarketDemandStat } from '@skillbridge/types';
 import { CacheService } from '../../common/cache.service';
+import { fetchWithTimeout } from '../../common/http';
+import { reportAlert } from '../../common/error-reporter';
 import { bdJobsScraper, BdJobItem } from '../../services/bdjobs-scraper.service';
 
 const TARGET_ROLE = 'role_full_stack';
+
+// Arbitrary fixed key for the global job-ingestion advisory lock. Any process
+// using this key serializes ingestion, so the Render cron, the admin endpoint
+// and a manual `node dist/scripts/ingest.js` can never overlap.
+const INGEST_LOCK_KEY = 918273645;
 
 // Keywords that hint at an IT/engineering role. A job is classified as a
 // software engineering role when its title/description matches one of these OR
@@ -39,6 +46,34 @@ interface RawJob {
   postingUrl: string;
   postedAt?: string;
   isRemote?: boolean;
+}
+
+interface IngestReport {
+  fetched: number;
+  classified: number;
+  inserted: number;
+  updated: number;
+  removed: number;
+  expired: number;
+  deleted: number;
+  recomputedRoles: number;
+  totalJobs: number;
+  source: string;
+  skipped?: boolean;
+}
+
+interface IngestConfig {
+  source: 'arbeitnow' | 'bdjobs';
+  sourceUrl: string;
+  minMatches: number;
+  replace: boolean;
+  sourceName: string;
+  sourceConfig: {
+    name: string;
+    accessMethod: string;
+    description: string;
+    meta: Record<string, any>;
+  };
 }
 
 interface ArbeitnowItem {
@@ -76,23 +111,12 @@ export class IngestionService {
     minMatches?: number;
     replace?: boolean;
     source?: string;
-  }): Promise<{
-    fetched: number;
-    classified: number;
-    inserted: number;
-    updated: number;
-    removed: number;
-    expired: number;
-    deleted: number;
-    recomputedRoles: number;
-    totalJobs: number;
-    source: string;
-  }> {
+  }): Promise<IngestReport> {
     const sourceUrl = params?.sourceUrl || process.env.JOB_API_URL || 'https://www.arbeitnow.com/api/job-board-api';
     const minMatches = params?.minMatches ?? 1;
     const replace = params?.replace ?? false;
     const requestedSource = (params?.source || process.env.JOB_INGEST_SOURCE || 'arbeitnow').trim().toLowerCase();
-    const source = requestedSource === 'bdjobs' ? 'bdjobs' : 'arbeitnow';
+    const source: 'arbeitnow' | 'bdjobs' = requestedSource === 'bdjobs' ? 'bdjobs' : 'arbeitnow';
 
     const sourceConfig = source === 'bdjobs' ? {
       name: 'BdJobs',
@@ -116,76 +140,134 @@ export class IngestionService {
       }
     };
 
-    const sourceName = sourceConfig.name;
-    const sourceId = await store.ensureJobSource(sourceName, 'API',
-      sourceConfig.description,
-      sourceConfig.meta);
-
-    // Replacing clears this source's previously-ingested jobs first so a
-    // re-sync with a stricter classifier (or expired listings) stays accurate.
-    let removed = 0;
-    if (replace) {
-      removed = await store.deleteJobsBySource(sourceId);
-      this.logger.log(`Cleared ${removed} previously ingested jobs for source "${sourceName}".`);
-    }
-
-    const skills = await store.getSkills();
-    const raw: RawJob[] = source === 'bdjobs'
-      ? (await bdJobsScraper.scrape()).map(toRawJob)
-      : await this.fetchRaw(sourceUrl);
-
-    const built: Array<Parameters<typeof store.upsertJobs>[0][number]> = [];
-    for (const item of raw) {
-      const classification = this.classifyAndMatch(item, skills, minMatches);
-      if (!classification) continue;
-      built.push({
-        externalId: String(item.externalId),
-        sourceId,
-        title: classification.title,
-        company: classification.company,
-        location: classification.location,
-        experienceLevel: '',
-        roleId: TARGET_ROLE,
-        description: classification.description,
-        postingUrl: classification.postingUrl,
-        postedAt: classification.postedAt,
-        isRemote: classification.isRemote,
-        requiredSkillIds: classification.requiredSkills,
-        preferredSkillIds: classification.preferredSkills
-      });
-    }
-
-    let inserted = 0;
-    let updated = 0;
-    if (built.length > 0) {
-      const res = await store.upsertJobs(built);
-      inserted = res.inserted;
-      updated = res.updated;
-    }
-
-    // Mark this source as synced and run verification sweep to expire old
-    // jobs from sources that haven't been re-checked recently.
-    await store.markSourceSynced(sourceId);
-    const sweep = await store.runVerificationSweep();
-
-    const recomputed = await store.recomputeMarketDemand();
-    await this.bustCaches();
-
-    this.logger.log(
-      `Ingestion complete: fetched=${raw.length} classified=${built.length} inserted=${inserted} updated=${updated} removed=${removed} expired=${sweep.expired} deleted=${sweep.deleted} totalJobs=${recomputed.totalJobs}`
-    );
-    return {
-      fetched: raw.length,
-      classified: built.length,
-      inserted,
-      updated,
-      removed,
-      expired: sweep.expired,
-      deleted: sweep.deleted,
-      recomputedRoles: recomputed.updatedRoles,
-      totalJobs: recomputed.totalJobs,
-      source: sourceName
+    const cfg: IngestConfig = {
+      source,
+      sourceUrl,
+      minMatches,
+      replace,
+      sourceName: sourceConfig.name,
+      sourceConfig
     };
+
+    // Serialize all ingestion behind a DB advisory lock. If a run is already in
+    // progress we skip instead of piling up duplicate scrapes.
+    const lock = await withAdvisoryLock(INGEST_LOCK_KEY, () => this.performIngest(cfg));
+    if (!lock.acquired) {
+      this.logger.warn('Ingestion skipped: another ingestion run is already in progress.');
+      return {
+        fetched: 0,
+        classified: 0,
+        inserted: 0,
+        updated: 0,
+        removed: 0,
+        expired: 0,
+        deleted: 0,
+        recomputedRoles: 0,
+        totalJobs: 0,
+        source: cfg.sourceName,
+        skipped: true
+      };
+    }
+    return lock.result!;
+  }
+
+  private async performIngest(cfg: IngestConfig): Promise<IngestReport> {
+    const { source, sourceUrl, minMatches, replace, sourceName, sourceConfig } = cfg;
+    const runId = await store.recordIngestRunStart(sourceName);
+
+    try {
+      const sourceId = await store.ensureJobSource(sourceName, 'API',
+        sourceConfig.description,
+        sourceConfig.meta);
+
+      // Replacing clears this source's previously-ingested jobs first so a
+      // re-sync with a stricter classifier (or expired listings) stays accurate.
+      let removed = 0;
+      if (replace) {
+        removed = await store.deleteJobsBySource(sourceId);
+        this.logger.log(`Cleared ${removed} previously ingested jobs for source "${sourceName}".`);
+      }
+
+      const skills = await store.getSkills();
+      const raw: RawJob[] = source === 'bdjobs'
+        ? (await bdJobsScraper.scrape()).map(toRawJob)
+        : await this.fetchRaw(sourceUrl);
+
+      const built: Array<Parameters<typeof store.upsertJobs>[0][number]> = [];
+      for (const item of raw) {
+        const classification = this.classifyAndMatch(item, skills, minMatches);
+        if (!classification) continue;
+        built.push({
+          externalId: String(item.externalId),
+          sourceId,
+          title: classification.title,
+          company: classification.company,
+          location: classification.location,
+          experienceLevel: '',
+          roleId: TARGET_ROLE,
+          description: classification.description,
+          postingUrl: classification.postingUrl,
+          postedAt: classification.postedAt,
+          isRemote: classification.isRemote,
+          requiredSkillIds: classification.requiredSkills,
+          preferredSkillIds: classification.preferredSkills
+        });
+      }
+
+      let inserted = 0;
+      let updated = 0;
+      if (built.length > 0) {
+        const res = await store.upsertJobs(built);
+        inserted = res.inserted;
+        updated = res.updated;
+      }
+
+      // Mark this source as synced and run verification sweep to expire old
+      // jobs from sources that haven't been re-checked recently.
+      await store.markSourceSynced(sourceId);
+      const sweep = await store.runVerificationSweep();
+
+      const recomputed = await store.recomputeMarketDemand();
+      await this.bustCaches();
+
+      const report: IngestReport = {
+        fetched: raw.length,
+        classified: built.length,
+        inserted,
+        updated,
+        removed,
+        expired: sweep.expired,
+        deleted: sweep.deleted,
+        recomputedRoles: recomputed.updatedRoles,
+        totalJobs: recomputed.totalJobs,
+        source: sourceName
+      };
+
+      const status = inserted + updated > 0 ? 'success' : 'empty';
+      await store.recordIngestRunFinish(runId, { status, ...report });
+
+      this.logger.log(
+        `Ingestion complete: fetched=${report.fetched} classified=${report.classified} inserted=${inserted} updated=${updated} removed=${removed} expired=${sweep.expired} deleted=${sweep.deleted} totalJobs=${recomputed.totalJobs}`
+      );
+
+      // A scrape that yields nothing new is usually a silent upstream breakage.
+      if (status === 'empty') {
+        reportAlert(`Job ingestion for "${sourceName}" produced 0 new or updated jobs.`, {
+          source: sourceName,
+          fetched: report.fetched,
+          classified: report.classified
+        });
+      }
+
+      return report;
+    } catch (err: any) {
+      await store.recordIngestRunFinish(runId, {
+        status: 'failed',
+        error: err?.message || String(err)
+      }).catch(() => undefined);
+      this.logger.error(`Ingestion for "${sourceName}" failed: ${err?.message || err}`, err?.stack);
+      throw err;
+    }
   }
 
   /**
@@ -260,8 +342,9 @@ export class IngestionService {
     for (let page = 1; page <= maxPages; page++) {
       const url = sourceUrl.includes('?') ? `${sourceUrl}&page=${page}` : `${sourceUrl}?page=${page}`;
       try {
-        const control = await fetch(url, {
-          headers: { 'user-agent': 'SkillBridge-LaborMarketIntelligence/1.0 (+https://skillbridge.org)' }
+        const control = await fetchWithTimeout(url, {
+          headers: { 'user-agent': 'SkillBridge-LaborMarketIntelligence/1.0 (+https://skillbridge.org)' },
+          timeoutMs: 15000
         });
         if (!control.ok) {
           this.logger.warn(`Job API returned ${control.status} on page ${page}; stopping.`);

@@ -1,3 +1,5 @@
+import { fetchWithRetry } from '../common/http';
+
 export interface RepoVerification {
   rawUrl: string;
   owner: string;
@@ -295,7 +297,7 @@ export class GitHubVerifier {
     if (this.token) {
       headers['Authorization'] = `Bearer ${this.token}`;
     }
-    return fetch(`${API_BASE}${path}`, { headers });
+    return fetchWithRetry(`${API_BASE}${path}`, { headers, timeoutMs: 15000 }, { attempts: 2 });
   }
 
   private baseFailure(rawUrl: string, error: string): RepoVerification {

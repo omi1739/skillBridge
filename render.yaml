@@ -35,6 +35,12 @@ services:
         sync: false
       - key: CORS_ORIGIN
         sync: false
+      # Hard timeout (ms) for every outbound request (scrapers, GitHub verifier).
+      - key: HTTP_TIMEOUT_MS
+        value: "15000"
+      # Optional alert webhook: 5xx errors and zero-yield ingestion runs are POSTed here.
+      - key: ALERT_WEBHOOK_URL
+        sync: false
       # Allow the anonymous-demo flow (frontend uses the static demo token).
       # The token maps to a regular USER role only, so admin routes stay guarded.
       - key: ALLOW_DEMO_TOKEN
@@ -101,3 +107,8 @@ services:
         value: 7
       - key: JOB_RETENTION_DAYS
         value: 14
+      - key: HTTP_TIMEOUT_MS
+        value: "15000"
+      # Optional alert webhook: failed/zero-yield ingestion runs are POSTed here.
+      - key: ALERT_WEBHOOK_URL
+        sync: false

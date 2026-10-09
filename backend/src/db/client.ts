@@ -154,6 +154,33 @@ export async function withTransaction<T>(
   return runWithRetry(p => withTransactionOn(p, fn));
 }
 
+/**
+ * Run `fn` while holding a Postgres session-level advisory lock, so a scheduled
+ * ingestion cron, the admin endpoint and a manual run can't execute the same
+ * work concurrently. The lock is held on a single pooled connection for the
+ * whole callback and always released. Returns `{ acquired: false }` (without
+ * running `fn`) when another holder owns the lock.
+ */
+export async function withAdvisoryLock<T>(
+  key: number,
+  fn: () => Promise<T>
+): Promise<{ acquired: boolean; result?: T }> {
+  const client = await activePool().connect();
+  try {
+    const res = await client.query<{ locked: boolean }>('SELECT pg_try_advisory_lock($1) AS locked', [key]);
+    if (!res.rows[0]?.locked) {
+      return { acquired: false };
+    }
+    try {
+      return { acquired: true, result: await fn() };
+    } finally {
+      await client.query('SELECT pg_advisory_unlock($1)', [key]).catch(() => undefined);
+    }
+  } finally {
+    client.release();
+  }
+}
+
 export async function testConnection(): Promise<boolean> {
   try {
     await query('SELECT 1');
