@@ -35,6 +35,9 @@ export default function ProfileView() {
         bio: currentProfile?.bio || ''
       });
     }
+    // `currentUser` is intentionally omitted: a background profile refresh
+    // would otherwise clobber in-progress edits.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing, currentProfile]);
 
   useEffect(() => () => {
@@ -50,12 +53,14 @@ export default function ProfileView() {
   const isAdmin = currentUser.role === 'ADMIN';
 
   const save = async () => {
+    // Cleared optional fields must be sent as explicit nulls — `undefined` is
+    // dropped by JSON.stringify, so the server would never see the clear.
     await handleUpdateProfile({
       fullName: form.fullName.trim() || undefined,
       targetRoleId: form.targetRoleId || undefined,
-      githubUrl: form.githubUrl.trim() || undefined,
-      portfolioUrl: form.portfolioUrl.trim() || undefined,
-      bio: form.bio.trim() || undefined
+      githubUrl: form.githubUrl.trim() || null,
+      portfolioUrl: form.portfolioUrl.trim() || null,
+      bio: form.bio.trim() || null
     });
     setEditing(false);
   };

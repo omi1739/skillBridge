@@ -1,10 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import {
-  BookOpen, Search, ExternalLink, Youtube, FileText, Code2,
+  Search, ExternalLink, Youtube, FileText, Code2,
   Briefcase, Building2, ChevronRight, Target, Wrench
 } from 'lucide-react';
 import {
@@ -122,10 +121,15 @@ export default function LearnView() {
   const selected = TOPIC_RESOURCES.find(t => t.key === selectedKey) || TOPIC_RESOURCES[0] || null;
 
   useEffect(() => {
-    const topic = searchParams.get('topic');
-    if (topic && topic !== selectedKey) {
+    // Deep links arrive two ways: `/learn?topic=sql` from the footer and
+    // `/learn#sql` from the assessment/gap screens. Reading only the query
+    // string left every hash link landing on the default topic.
+    const fromHash = typeof window !== 'undefined' ? window.location.hash.replace(/^#/, '') : '';
+    const topic = searchParams.get('topic') || fromHash;
+    if (topic && topic !== selectedKey && TOPIC_RESOURCES.some(t => t.key === topic)) {
       setSelectedKey(topic);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   const filteredCategories = TOPIC_CATEGORIES.map(cat => {

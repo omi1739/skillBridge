@@ -2,13 +2,12 @@
 
 import { useSkillBridge } from '@/lib/skillbridge-context';
 import { BrainCircuit, Database, Code2, Play, CheckCircle2, AlertCircle, FlaskConical } from 'lucide-react';
-import { EmptyState, Toolbar, Alert, Chip } from '@/components/ui/primitives';
+import { EmptyState, Alert, Chip } from '@/components/ui/primitives';
 
 export default function SandboxView() {
   const {
     challenges,
     selectedChallengeIdx,
-    setSelectedChallengeIdx,
     sandboxCode,
     setSandboxCode,
     isRunningSandbox,

@@ -1,7 +1,7 @@
 'use client';
 
 import { useSkillBridge } from '@/lib/skillbridge-context';
-import { BarChart3, RotateCcw, Clock, Check, ArrowRight, BrainCircuit, ExternalLink } from 'lucide-react';
+import { BarChart3, RotateCcw, Check, ArrowRight, BrainCircuit, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { resolveResources } from '@/lib/learning-resources';
 import { safeExternalUrl } from '@/lib/safe-url';
@@ -169,14 +169,22 @@ export default function AssessmentView() {
   }
 
   const questions = assessment.questions || [];
-  if (questions.length === 0) {
+  // The served set can shrink underneath the current index (the server may
+  // adopt a previously recorded subset). Guard the out-of-range case too —
+  // otherwise the first dereference below reads properties off undefined.
+  if (questions.length === 0 || currentQuestionIdx >= questions.length) {
+    const outOfSync = questions.length > 0;
     return (
       <EmptyState
         icon={BrainCircuit}
         tone="info"
-        title="No questions available"
-        subtitle="The diagnostic question bank is empty right now. Please try again later."
-        actions={<button className="btn btn-secondary" onClick={() => loadDiagnostic(12)}><RotateCcw size={14} /> Retry</button>}
+        title={outOfSync ? 'Assessment out of sync' : 'No questions available'}
+        subtitle={
+          outOfSync
+            ? 'The question set changed under you. Reload to pick up the current one — your answers are kept.'
+            : 'The diagnostic question bank is empty right now. Please try again later.'
+        }
+        actions={<button className="btn btn-secondary" onClick={() => loadDiagnostic(12)}><RotateCcw size={14} /> Reload</button>}
       />
     );
   }

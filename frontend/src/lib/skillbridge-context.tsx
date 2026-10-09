@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import {
   Role,
   Assessment,
@@ -17,6 +17,7 @@ import {
   Profile
 } from '@skillbridge/types';
 import { API_BASE, GOOGLE_CLIENT_ID, DEMO_ACCESS_ENABLED } from './config';
+import { apiErrorMessage } from './api-error';
 
 export type AppTab = 'market' | 'curriculum' | 'assessment' | 'sandbox' | 'gaps' | 'actions' | 'jobs' | 'admin';
 
@@ -35,12 +36,7 @@ function fetchJSON<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> 
   return fetch(input, init).then(async res => {
     const body = await res.json().catch(() => null);
     if (!res.ok) {
-      const message =
-        (body && typeof body === 'object' && (body as any).message) ||
-        (body && typeof body === 'object' && (body as any).error) ||
-        (Array.isArray(body?.message) ? body.message.join(', ') : '') ||
-        `Request failed (${res.status})`;
-      throw new Error(typeof message === 'string' ? message : `Request failed (${res.status})`);
+      throw new Error(apiErrorMessage(body, `Request failed (${res.status})`));
     }
     return body as T;
   });
@@ -48,6 +44,7 @@ function fetchJSON<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> 
 
 function useSkillBridgeValue() {
   const router = useRouter();
+  const pathname = usePathname();
 
   // Auth state
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -212,7 +209,7 @@ function useSkillBridgeValue() {
     try {
       const diagRes = await fetch(`${API_BASE}/assessments/diagnostic?count=${count}`);
       const data = await diagRes.json().catch(() => null);
-      if (!diagRes.ok) throw new Error(data?.message || data?.error || 'Could not load the assessment.');
+      if (!diagRes.ok) throw new Error(apiErrorMessage(data, 'Could not load the assessment.'));
 
       let timeLimitMinutes = data?.timeLimitMinutes || 15;
       let attemptId: string | null = null;
@@ -255,7 +252,7 @@ function useSkillBridgeValue() {
           }
         } else if (startRes.status !== 404 && startRes.status !== 405) {
           const start = await startRes.json().catch(() => null);
-          throw new Error(start?.message || start?.error || 'Could not start the assessment. Please sign in first.');
+          throw new Error(apiErrorMessage(start, 'Could not start the assessment. Please sign in first.'));
         } else {
           // 404/405 — backend not re-deployed yet; keep the client timer (legacy mode).
           console.warn('[SkillBridge] /assessments/:id/start unavailable on the API host; using the client-sided timer (legacy backend).');
@@ -330,7 +327,7 @@ function useSkillBridgeValue() {
         })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || data.error || 'Could not start assessment.');
+      if (!res.ok) throw new Error(apiErrorMessage(data, 'Could not start assessment.'));
       setSkillSession(data);
       setSkillSavedCorrect({});
     } catch (err: any) {
@@ -349,7 +346,7 @@ function useSkillBridgeValue() {
         body: JSON.stringify({ questionId, answer })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Answer could not be saved.');
+      if (!res.ok) throw new Error(apiErrorMessage(data, 'Answer could not be saved.'));
       setSkillSavedCorrect(prev => ({ ...prev, [questionId]: data.correct }));
       setSkillAnswers(prev => ({ ...prev, [questionId]: answer }));
       setSkillAnswered(prev => ({ ...prev, [questionId]: true }));
@@ -373,7 +370,7 @@ function useSkillBridgeValue() {
         headers: authHeaders()
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Could not submit assessment.');
+      if (!res.ok) throw new Error(apiErrorMessage(data, 'Could not submit assessment.'));
       setSkillResult(data);
       setSkillSession(null);
       loadSkillAssessHistory();
@@ -389,7 +386,7 @@ function useSkillBridgeValue() {
     try {
       const res = await fetch(`${API_BASE}/assessments/session/${sessionId}/result`, { headers: authHeaders() });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Could not load result.');
+      if (!res.ok) throw new Error(apiErrorMessage(data, 'Could not load result.'));
       setSkillResult(data);
       setViewingResultId(sessionId);
       setSkillSession(null);
@@ -434,7 +431,6 @@ function useSkillBridgeValue() {
 
   useEffect(() => {
     loadSkillAssessSkills();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Raw job postings are only served to authenticated members. This also
@@ -633,7 +629,11 @@ function useSkillBridgeValue() {
       .catch((err) => console.error('[SkillBridge] Role update failed:', err));
   };
 
-  const handleUpdateProfile = async (patch: Partial<Profile>) => {
+  /**
+   * `null` means "clear this field"; an omitted key means "leave it alone".
+   * The server treats them differently, so the type has to allow nulls.
+   */
+  const handleUpdateProfile = async (patch: Partial<{ [K in keyof Profile]: Profile[K] | null }>) => {
     if (!currentUser || !authToken) return;
     setProfileSaving(true);
     setProfileError('');
@@ -646,7 +646,7 @@ function useSkillBridgeValue() {
       });
       const data = await res.json().then((d: any) => ({ ok: res.ok, data: d }));
       if (!data.ok || !data.data?.userId) {
-        throw new Error(data.data?.message || data.data?.error || 'Could not update profile.');
+        throw new Error(apiErrorMessage(data.data, 'Could not update profile.'));
       }
       const updatedProfile: Profile = data.data;
       setCurrentProfile(updatedProfile);
@@ -736,10 +736,18 @@ function useSkillBridgeValue() {
       setAllJobs([]);
       setJobMatches([]);
     }
+    // Mount-only: seeds global state once. The referenced loaders are
+    // store-backed functions, not reactive values.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // `timeRemaining > 0` is extracted so the dependency is a plain boolean: the
+  // interval must be (re)created when the assessment changes or when the
+  // countdown crosses back above zero, and nothing else.
+  const timerRunning = timeRemaining > 0;
+
   useEffect(() => {
-    if (!assessment || timeRemaining <= 0) return;
+    if (!assessment || !timerRunning) return;
     const interval = setInterval(() => {
       setTimeRemaining(prev => {
         if (prev <= 1) {
@@ -750,7 +758,17 @@ function useSkillBridgeValue() {
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, [assessment, timeRemaining > 0]);
+  }, [assessment, timerRunning]);
+
+  /**
+   * Where sign-in drops the user. Normally the dashboard — but someone who
+   * signs in *to submit* an in-progress diagnostic must stay on it, or their
+   * answers look lost.
+   */
+  const navigateAfterAuth = () => {
+    if (pathname === TAB_PATH.assessment && assessment && !attemptResult) return;
+    navigate('market');
+  };
 
   const handleDemoLogin = async () => {
     if (!DEMO_ACCESS_ENABLED) {
@@ -761,21 +779,22 @@ function useSkillBridgeValue() {
     try {
       const token = 'demo_token_demo_user_01';
       const res = await fetch(`${API_BASE}/me`, { headers: { Authorization: `Bearer ${token}` } });
-      const data = await res.json();
-      if (data.user && data.profile) {
-        setCurrentUser(data.user);
-        setCurrentProfile(data.profile);
-        setAuthToken(token);
-        localStorage.setItem('skillbridge_token', token);
-        localStorage.setItem('skillbridge_user', JSON.stringify(data.user));
-        localStorage.setItem('skillbridge_profile', JSON.stringify(data.profile));
-        setShowAuthModal(false);
-        navigate('market');
-        refreshUserData('demo_user_01', data.user.role, token, data.profile.targetRoleId);
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.user || !data?.profile) {
+        throw new Error(apiErrorMessage(data, 'Demo sign-in failed.'));
       }
-    } catch (err) {
+      setCurrentUser(data.user);
+      setCurrentProfile(data.profile);
+      setAuthToken(token);
+      localStorage.setItem('skillbridge_token', token);
+      localStorage.setItem('skillbridge_user', JSON.stringify(data.user));
+      localStorage.setItem('skillbridge_profile', JSON.stringify(data.profile));
+      setShowAuthModal(false);
+      navigateAfterAuth();
+      refreshUserData('demo_user_01', data.user.role, token, data.profile.targetRoleId);
+    } catch (err: any) {
       console.error(err);
-      reportError('Demo login failed. Please try again.');
+      reportError(err?.message || 'Demo login failed. Please try again.');
     } finally {
       setIsAuthLoading(false);
     }
@@ -850,7 +869,7 @@ function useSkillBridgeValue() {
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Authentication failed.');
+        throw new Error(apiErrorMessage(data, 'Authentication failed.'));
       }
 
       applyAuthResult(data);
@@ -870,7 +889,7 @@ function useSkillBridgeValue() {
     localStorage.setItem('skillbridge_profile', JSON.stringify(data.profile));
     setShowAuthModal(false);
     setAuthForm({ email: '', password: '', confirmPassword: '', fullName: '', currentStatus: '', targetRoleId: '' });
-    navigate('market');
+    navigateAfterAuth();
     refreshUserData(data.user.id, data.user.role, data.token, data.profile.targetRoleId);
   };
 
@@ -888,7 +907,7 @@ function useSkillBridgeValue() {
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Google sign-in failed.');
+        throw new Error(apiErrorMessage(data, 'Google sign-in failed.'));
       }
       applyAuthResult(data);
     } catch (err: any) {
@@ -944,7 +963,7 @@ function useSkillBridgeValue() {
     try {
       const res = await fetch(`${API_BASE}/me/report?userId=${activeUserId}&roleId=${effectiveRoleId}`, { headers: authHeaders() });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || data.error || 'Could not load your skill passport.');
+      if (!res.ok) throw new Error(apiErrorMessage(data, 'Could not load your skill passport.'));
       setPassportData(data);
       setShowPassportModal(true);
     } catch (err: any) {
@@ -979,6 +998,47 @@ function useSkillBridgeValue() {
     setUserAnswers(prev => ({ ...prev, [questionId]: optionText }));
   };
 
+  /**
+   * Open a server-side attempt over the questions currently on screen.
+   *
+   * `loadDiagnostic` only calls `/start` when it already has a token, so a
+   * visitor who loaded the test anonymously holds questions but no attempt —
+   * submitting one is rejected with "not started". Replaying the displayed ids
+   * makes the attempt cover exactly what the user answered (a plain `/start`
+   * would draw a different random subset and grade against that instead).
+   *
+   * Returns the attempt id, or null when the host predates `/start` (legacy
+   * backend), in which case submission must fall back to the old contract.
+   */
+  const startAttemptForCurrentQuestions = async (): Promise<string | null> => {
+    const current = assessment;
+    if (!current) return null;
+    const questions = current.questions || [];
+    const res = await fetch(`${API_BASE}/assessments/${current.id}/start`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ count: questions.length || 12, questionIds: questions.map(q => q.id) })
+    });
+    if (res.status === 404 || res.status === 405) return null;
+    const body = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(apiErrorMessage(body, 'Could not start the assessment. Please reload and try again.'));
+
+    // An attempt already in progress (started in an earlier session) keeps its
+    // own recorded subset. Adopt those questions so grading matches what the
+    // server will actually count; answers are keyed by question id, so any
+    // overlapping responses survive the swap.
+    if (Array.isArray(body?.questions) && body.questions.length > 0) {
+      const servedIds = body.questions.map((q: { id: string }) => q.id);
+      const shownIds = questions.map(q => q.id);
+      const differs = servedIds.length !== shownIds.length || servedIds.some((id: string, i: number) => id !== shownIds[i]);
+      if (differs) {
+        setAssessment({ ...current, questions: body.questions });
+        setCurrentQuestionIdx(0);
+      }
+    }
+    return body?.attemptId ?? null;
+  };
+
   const handleSubmitAssessment = async () => {
     if (!assessment) return;
     setIsSubmittingAssessment(true);
@@ -989,18 +1049,31 @@ function useSkillBridgeValue() {
     }));
 
     try {
+      // Submitting requires an account. Keep the answers on screen and let the
+      // user sign in, rather than burning them on a 401 they cannot act on.
+      if (!authToken) {
+        setShowAuthModal(true);
+        throw new Error('Sign in to submit your answers — they will be kept.');
+      }
+
+      let attemptId = diagnosticAttemptId || undefined;
+      if (!attemptId) {
+        attemptId = (await startAttemptForCurrentQuestions()) || undefined;
+        if (attemptId) setDiagnosticAttemptId(attemptId);
+      }
+
       const res = await fetch(`${API_BASE}/assessments/${assessment.id}/submit`, {
         method: 'POST',
         headers: authHeaders(),
         body: JSON.stringify({
           answers: answersPayload,
-          attemptId: diagnosticAttemptId || undefined
+          attemptId
         })
       });
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.message || data.error || 'Could not submit assessment.');
+        throw new Error(apiErrorMessage(data, 'Could not submit assessment.'));
       }
       // The backend returns `{ attempt, gaps, detailedResults }`; the view reads
       // score/passed/points off the attempt, so merge the top-level
@@ -1070,14 +1143,14 @@ function useSkillBridgeValue() {
     setGenerateError('');
     setSandboxResult(null);
     try {
-const res = await fetch(`${API_BASE}/sandbox/generate`, {
+      const res = await fetch(`${API_BASE}/sandbox/generate`, {
         method: 'POST',
         headers: authHeaders(),
         body: JSON.stringify({ type: 'SQL', skillId: 'skill_sql', difficulty: 'Intermediate' })
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
       if (!res.ok) {
-        throw new Error(data.message || data.error || 'Generation failed.');
+        throw new Error(apiErrorMessage(data, 'Generation failed.'));
       }
       setChallenges(prev => [...prev, data]);
       const newIdx = challenges.length;
@@ -1108,14 +1181,19 @@ const res = await fetch(`${API_BASE}/sandbox/generate`, {
         headers: authHeaders(),
         body: JSON.stringify(payload)
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
+      // A 401/429 body is `{statusCode, message, error}` — storing it as the
+      // result renders a blank panel, so surface it as a failure instead.
+      if (!res.ok) {
+        throw new Error(apiErrorMessage(data, 'Could not run your solution.'));
+      }
       setSandboxResult(data);
-      if (data.passed) {
+      if (data?.passed) {
         refreshUserData();
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setSandboxResult({ passed: false, error: 'Failed to run code.' });
+      setSandboxResult({ passed: false, error: err?.message || 'Failed to run code.' });
     } finally {
       setIsRunningSandbox(false);
     }
@@ -1123,7 +1201,9 @@ const res = await fetch(`${API_BASE}/sandbox/generate`, {
 
   const handleProjectSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!projectForm.title.trim() || !projectForm.repoUrl.trim()) return;
+    // The server requires all three; mirror that here so a rejected submit
+    // never looks like a button that does nothing.
+    if (!projectForm.title.trim() || !projectForm.repoUrl.trim() || !projectForm.description.trim()) return;
 
     setIsSubmittingProject(true);
     setProjectSuccessMsg('');
@@ -1135,29 +1215,29 @@ const res = await fetch(`${API_BASE}/sandbox/generate`, {
         body: JSON.stringify({
           title: projectForm.title.trim(),
           repoUrl: projectForm.repoUrl.trim(),
-          description: projectForm.description,
+          description: projectForm.description.trim(),
           primarySkills: projectForm.primarySkills
         })
       });
 
-      const data = await res.json();
-      if (!data.project) {
-        throw new Error(data.message || data.error || 'Could not submit project.');
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.project) {
+        throw new Error(apiErrorMessage(data, 'Could not submit project.'));
       }
       const status = data.project.verificationStatus;
-        const statusMsg =
-          status === 'VERIFIED'
-            ? `Successfully verified ${data.project.title}! Detected stack: ${data.project.detectedStack.join(', ')}.`
-            : status === 'NEEDS_REVIEW'
-              ? `${data.project.title} was received, but no test suite was detected — status: Needs Review.`
-              : `${data.project.title} could not be verified against GitHub — status: Pending Review.`;
-        setProjectSuccessMsg(statusMsg);
-        setProjectForm({ title: '', repoUrl: '', description: '', primarySkills: [] });
-        refreshUserData();
-        setTimeout(() => {
-          setShowProjectModal(false);
-          setProjectSuccessMsg('');
-        }, 3000);
+      const statusMsg =
+        status === 'VERIFIED'
+          ? `Successfully verified ${data.project.title}! Detected stack: ${data.project.detectedStack.join(', ')}.`
+          : status === 'NEEDS_REVIEW'
+            ? `${data.project.title} was received, but no test suite was detected — status: Needs Review.`
+            : `${data.project.title} could not be verified against GitHub — status: Pending Review.`;
+      setProjectSuccessMsg(statusMsg);
+      setProjectForm({ title: '', repoUrl: '', description: '', primarySkills: [] });
+      refreshUserData();
+      setTimeout(() => {
+        setShowProjectModal(false);
+        setProjectSuccessMsg('');
+      }, 3000);
     } catch (err: any) {
       console.error(err);
       reportError(err.message || 'Could not submit project.');
@@ -1186,7 +1266,7 @@ const res = await fetch(`${API_BASE}/sandbox/generate`, {
         refreshUserData();
         setTimeout(() => setAliasSaveSuccess(false), 3000);
       } else {
-        throw new Error(data.message || 'Could not create alias.');
+        throw new Error(apiErrorMessage(data, 'Could not create alias.'));
       }
     } catch (err: any) {
       console.error(err);
@@ -1211,7 +1291,7 @@ const res = await fetch(`${API_BASE}/sandbox/generate`, {
         refreshUserData();
         setTimeout(() => setWeightSaveSuccess(false), 3000);
       } else {
-        throw new Error(data.message || 'Could not update role weights.');
+        throw new Error(apiErrorMessage(data, 'Could not update role weights.'));
       }
     } catch (err: any) {
       console.error(err);
@@ -1238,7 +1318,7 @@ const res = await fetch(`${API_BASE}/sandbox/generate`, {
         body: JSON.stringify({ status })
       });
       const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message || 'Update failed.');
+      if (!res.ok || !data.success) throw new Error(apiErrorMessage(data, 'Update failed.'));
       setAdminQMsg({ ok: true, text: `Question ${status}.` });
       loadAdminSkillQuestions();
     } catch (err: any) {
@@ -1261,8 +1341,8 @@ const res = await fetch(`${API_BASE}/sandbox/generate`, {
           count: adminGenForm.count
         })
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || data.error || 'Generation failed.');
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(apiErrorMessage(data, 'Generation failed.'));
       setAdminQMsg({ ok: true, text: `Generated ${data.created} question(s); ${data.rejected} rejected.` });
       loadAdminSkillQuestions();
     } catch (err: any) {

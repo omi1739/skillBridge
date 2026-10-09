@@ -59,6 +59,8 @@ export default function ProjectModal() {
               value={projectForm.description}
               onChange={e => setProjectForm({ ...projectForm, description: e.target.value })}
               rows={3}
+              required
+              minLength={1}
               style={{ width: '100%', padding: '0.65rem', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '0.85rem', resize: 'vertical' }}
             />
           </div>

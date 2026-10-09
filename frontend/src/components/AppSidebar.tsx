@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { LogOut, FileText, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
@@ -46,10 +46,15 @@ export default function AppSidebar() {
   const activeTab = pathname === '/' ? 'home' : pathname.split('/')[1];
   const goTab = (tab: string) => router.push(tab === 'home' ? '/' : `/${tab}`);
 
-  const [expanded, setExpanded] = useState(() => {
-    if (typeof window === 'undefined') return true;
-    return localStorage.getItem(SIDEBAR_STORAGE_KEY) !== 'collapsed';
-  });
+  // Expanded is the server's answer too — reading localStorage in the state
+  // initializer made the first client render differ from SSR whenever the
+  // preference was 'collapsed', and hydration failed. The stored value is
+  // applied once on mount instead.
+  const [expanded, setExpanded] = useState(true);
+
+  useEffect(() => {
+    setExpanded(localStorage.getItem(SIDEBAR_STORAGE_KEY) !== 'collapsed');
+  }, []);
 
   const toggleSidebar = () => {
     const next = !expanded;

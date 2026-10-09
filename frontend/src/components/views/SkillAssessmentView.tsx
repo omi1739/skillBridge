@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSkillBridge } from '@/lib/skillbridge-context';
 import { BrainCircuit, CheckCircle2, ShieldCheck, Check, X } from 'lucide-react';
-import { EmptyState, PageHeader, SectionCard, Field, Chip, Toolbar, Alert } from '@/components/ui/primitives';
+import { PageHeader, SectionCard, Field, Chip, Toolbar, Alert } from '@/components/ui/primitives';
 
 export default function SkillAssessmentView() {
   const {
@@ -26,7 +26,6 @@ export default function SkillAssessmentView() {
     skillHistory,
     skillProgress,
     setSkillProgress,
-    viewingResultId,
     setViewingResultId,
     startSkillAssessment,
     submitSkillAnswer,
@@ -49,6 +48,9 @@ export default function SkillAssessmentView() {
   const submittedRef = useRef(false);
 
   useEffect(() => {
+    // The ref outlives the session it belongs to. Re-arm it whenever a new
+    // session starts, otherwise a second timed-out run never auto-submits.
+    submittedRef.current = false;
     if (!skillSession?.startedAt || skillSession.status !== 'in_progress' || !skillSession.timeLimitMinutes) return;
     const started = new Date(skillSession.startedAt).getTime();
     const budgetMs = skillSession.timeLimitMinutes * 60 * 1000;
