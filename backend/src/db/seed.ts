@@ -88,7 +88,11 @@ export async function seedAll(target?: Pool): Promise<void> {
         await client.query(
           `INSERT INTO role_skills (role_id, skill_id, is_required, role_weight, market_demand_frequency, proficiency_target)
            VALUES ($1,$2,$3,$4,$5,$6)
-           ON CONFLICT (role_id, skill_id) DO NOTHING`,
+           ON CONFLICT (role_id, skill_id) DO UPDATE SET
+             market_demand_frequency = CASE
+               WHEN role_skills.market_demand_frequency > 0 THEN role_skills.market_demand_frequency
+               ELSE EXCLUDED.market_demand_frequency
+             END`,
           [r.id, rs.skillId, rs.required, rs.roleWeight, rs.marketDemandFrequency, rs.proficiencyTarget]
         );
       }

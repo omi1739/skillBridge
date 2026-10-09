@@ -144,56 +144,56 @@ export const INITIAL_ROLES: Role[] = [
         skillId: 'skill_javascript',
         required: true,
         roleWeight: 0.90,
-        marketDemandFrequency: 0,
+        marketDemandFrequency: 0.88,
         proficiencyTarget: 'Intermediate'
       },
       {
         skillId: 'skill_nodejs',
         required: true,
         roleWeight: 0.95,
-        marketDemandFrequency: 0,
+        marketDemandFrequency: 0.85,
         proficiencyTarget: 'Intermediate'
       },
       {
         skillId: 'skill_sql',
         required: true,
         roleWeight: 0.90,
-        marketDemandFrequency: 0,
+        marketDemandFrequency: 0.82,
         proficiencyTarget: 'Intermediate'
       },
       {
         skillId: 'skill_postgresql',
         required: true,
         roleWeight: 0.85,
-        marketDemandFrequency: 0,
+        marketDemandFrequency: 0.74,
         proficiencyTarget: 'Intermediate'
       },
       {
         skillId: 'skill_rest_api',
         required: true,
         roleWeight: 0.95,
-        marketDemandFrequency: 0,
+        marketDemandFrequency: 0.92,
         proficiencyTarget: 'Intermediate'
       },
       {
         skillId: 'skill_git',
         required: true,
         roleWeight: 0.80,
-        marketDemandFrequency: 0,
+        marketDemandFrequency: 0.80,
         proficiencyTarget: 'Intermediate'
       },
       {
         skillId: 'skill_docker',
         required: false,
         roleWeight: 0.65,
-        marketDemandFrequency: 0,
+        marketDemandFrequency: 0.58,
         proficiencyTarget: 'Beginner'
       },
       {
         skillId: 'skill_redis',
         required: false,
         roleWeight: 0.50,
-        marketDemandFrequency: 0,
+        marketDemandFrequency: 0.42,
         proficiencyTarget: 'Beginner'
       }
     ]
@@ -218,42 +218,42 @@ export const INITIAL_ROLES: Role[] = [
         skillId: 'skill_javascript',
         required: true,
         roleWeight: 0.90,
-        marketDemandFrequency: 0,
+        marketDemandFrequency: 0.92,
         proficiencyTarget: 'Intermediate'
       },
       {
         skillId: 'skill_typescript',
         required: true,
         roleWeight: 0.90,
-        marketDemandFrequency: 0,
+        marketDemandFrequency: 0.90,
         proficiencyTarget: 'Intermediate'
       },
       {
         skillId: 'skill_react',
         required: true,
         roleWeight: 0.95,
-        marketDemandFrequency: 0,
+        marketDemandFrequency: 0.88,
         proficiencyTarget: 'Intermediate'
       },
       {
         skillId: 'skill_html_css',
         required: true,
         roleWeight: 0.85,
-        marketDemandFrequency: 0,
+        marketDemandFrequency: 0.85,
         proficiencyTarget: 'Intermediate'
       },
       {
         skillId: 'skill_rest_api',
         required: true,
         roleWeight: 0.80,
-        marketDemandFrequency: 0,
+        marketDemandFrequency: 0.80,
         proficiencyTarget: 'Intermediate'
       },
       {
         skillId: 'skill_git',
         required: true,
         roleWeight: 0.80,
-        marketDemandFrequency: 0,
+        marketDemandFrequency: 0.78,
         proficiencyTarget: 'Intermediate'
       }
     ]
@@ -278,84 +278,84 @@ export const INITIAL_ROLES: Role[] = [
         skillId: 'skill_javascript',
         required: true,
         roleWeight: 0.90,
-        marketDemandFrequency: 0,
+        marketDemandFrequency: 0.92,
         proficiencyTarget: 'Intermediate'
       },
       {
         skillId: 'skill_typescript',
         required: true,
         roleWeight: 0.85,
-        marketDemandFrequency: 0,
+        marketDemandFrequency: 0.84,
         proficiencyTarget: 'Intermediate'
       },
       {
         skillId: 'skill_react',
         required: true,
         roleWeight: 0.90,
-        marketDemandFrequency: 0,
+        marketDemandFrequency: 0.86,
         proficiencyTarget: 'Intermediate'
       },
       {
         skillId: 'skill_html_css',
         required: true,
         roleWeight: 0.70,
-        marketDemandFrequency: 0,
+        marketDemandFrequency: 0.78,
         proficiencyTarget: 'Intermediate'
       },
       {
         skillId: 'skill_nodejs',
         required: true,
         roleWeight: 0.85,
-        marketDemandFrequency: 0,
+        marketDemandFrequency: 0.85,
         proficiencyTarget: 'Intermediate'
       },
       {
         skillId: 'skill_express',
         required: true,
         roleWeight: 0.70,
-        marketDemandFrequency: 0,
+        marketDemandFrequency: 0.76,
         proficiencyTarget: 'Intermediate'
       },
       {
         skillId: 'skill_sql',
         required: true,
         roleWeight: 0.80,
-        marketDemandFrequency: 0,
+        marketDemandFrequency: 0.80,
         proficiencyTarget: 'Intermediate'
       },
       {
         skillId: 'skill_mongodb',
         required: false,
         roleWeight: 0.60,
-        marketDemandFrequency: 0,
+        marketDemandFrequency: 0.62,
         proficiencyTarget: 'Beginner'
       },
       {
         skillId: 'skill_postgresql',
         required: false,
         roleWeight: 0.60,
-        marketDemandFrequency: 0,
+        marketDemandFrequency: 0.66,
         proficiencyTarget: 'Intermediate'
       },
       {
         skillId: 'skill_rest_api',
         required: true,
         roleWeight: 0.85,
-        marketDemandFrequency: 0,
+        marketDemandFrequency: 0.85,
         proficiencyTarget: 'Intermediate'
       },
       {
         skillId: 'skill_git',
         required: true,
         roleWeight: 0.80,
-        marketDemandFrequency: 0,
+        marketDemandFrequency: 0.78,
         proficiencyTarget: 'Intermediate'
       },
       {
         skillId: 'skill_docker',
         required: false,
         roleWeight: 0.50,
-        marketDemandFrequency: 0,
+        marketDemandFrequency: 0.55,
         proficiencyTarget: 'Beginner'
       }
     ]
