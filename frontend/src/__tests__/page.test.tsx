@@ -148,17 +148,28 @@ vi.mock('next/navigation', async () => {
 
 vi.mock('next/link', async () => {
   const ReactMod = await import('react');
-  return {
-    __esModule: true,
-    default: ({ href, children, className, style }: any) => {
-      const ctx = ReactMod.useContext(navMock.ctx) as any;
-      return ReactMod.createElement('a', {
+  // Must be a named component starting with an uppercase letter: React calls
+  // it as a component, and an inline `default: () => ...` arrow trips
+  // rules-of-hooks because the linter cannot see that it is a component.
+  function MockLink({ href, children, className, style }: any) {
+    const ctx = ReactMod.useContext(navMock.ctx) as any;
+    return ReactMod.createElement(
+      'a',
+      {
         href: String(href),
         className,
         style,
-        onClick: (e: any) => { e.preventDefault(); ctx?.router.push(String(href)); }
-      }, children);
-    }
+        onClick: (e: any) => {
+          e.preventDefault();
+          ctx?.router.push(String(href));
+        }
+      },
+      children
+    );
+  }
+  return {
+    __esModule: true,
+    default: MockLink
   };
 });
 

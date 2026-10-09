@@ -3,7 +3,6 @@ import {
   AssessmentQuestionView,
   BankQuestion,
   QuestionGenerationResult,
-  QuestionGenerationRequest,
   Skill,
   SkillLevel,
   SkillProgress,

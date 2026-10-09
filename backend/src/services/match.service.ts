@@ -43,7 +43,7 @@ export class MatchService {
     const matchedNames = matchedSkills.map(m => m.canonicalName).join(', ');
     const missingReqNames = missingSkills.filter(m => m.isRequired).map(m => m.canonicalName).join(', ');
 
-    let explanation = '';
+    let explanation: string;
     if (matchScore >= 75) {
       explanation = `Strong match (${matchScore}%). You have demonstrated evidence in key requirements: ${matchedNames}.`;
     } else if (matchScore >= 45) {

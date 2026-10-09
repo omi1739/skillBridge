@@ -15,6 +15,8 @@
     "build": "npm run build --workspaces",
     "start": "npm run start --workspace=@skillbridge/api",
     "typecheck": "npm run typecheck --workspaces",
+    "lint": "eslint .",
+    "test": "npm run test --workspaces --if-present",
     "db:setup": "npm run db:setup --workspace=@skillbridge/api",
     "db:seed": "npm run db:seed --workspace=@skillbridge/api"
   },
@@ -25,5 +27,12 @@
     "career-development"
   ],
   "author": "SkillBridge Team",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.12.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.13.0",
+    "typescript-eslint": "^8.71.1"
+  }
 }

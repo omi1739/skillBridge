@@ -6,7 +6,6 @@ import {
   testConnection,
   getConfiguredPools,
   startFailoverProbe,
-  stopFailoverProbe,
   endAllPools
 } from '../db/client';
 import { applySchema, seedAll } from '../db/seed';

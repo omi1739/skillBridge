@@ -1,6 +1,6 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
-import path from 'path';
 
 export default defineConfig({
   plugins: [react()],
@@ -12,7 +12,9 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src')
+      // fileURLToPath keeps this correct on Windows, where a bare
+      // new URL(...).pathname yields a leading-slash drive path.
+      '@': fileURLToPath(new URL('./src', import.meta.url))
     }
   }
 });

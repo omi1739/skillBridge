@@ -1,7 +1,7 @@
 import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
 import { store } from '../../store';
 import { query } from '../../db/client';
-import { Skill, JobListing, MarketDemandResponse, MarketDemandStat } from '@skillbridge/types';
+import { Skill, MarketDemandResponse, MarketDemandStat } from '@skillbridge/types';
 import { CacheService } from '../../common/cache.service';
 import { bdJobsScraper, BdJobItem } from '../../services/bdjobs-scraper.service';
 

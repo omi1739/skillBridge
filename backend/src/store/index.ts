@@ -58,20 +58,6 @@ interface QuestionRow {
   points: number;
 }
 
-interface AttemptRow {
-  id: string;
-  user_id: string;
-  assessment_id: string;
-  started_at: string;
-  completed_at: string | null;
-  score: number;
-  total_points_earned: number;
-  max_points: number;
-  passed: boolean;
-  sub_skill_scores_json: any;
-  status: string;
-}
-
 interface ProjectRow {
   id: string;
   user_id: string;

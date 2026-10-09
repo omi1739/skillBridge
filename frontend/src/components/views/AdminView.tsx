@@ -2,7 +2,7 @@
 
 import { useSkillBridge } from '@/lib/skillbridge-context';
 import { ShieldAlert } from 'lucide-react';
-import { SectionCard, Field, Chip, Alert, EmptyState, Toolbar } from '@/components/ui/primitives';
+import { SectionCard, Field, Alert, EmptyState } from '@/components/ui/primitives';
 
 export default function AdminView() {
   const {

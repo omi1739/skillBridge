@@ -2,7 +2,7 @@
 
 import { useSkillBridge } from '@/lib/skillbridge-context';
 import { Database } from 'lucide-react';
-import { SectionCard, Field, Chip, Toolbar, EmptyState } from '@/components/ui/primitives';
+import { SectionCard, Field, Chip, EmptyState } from '@/components/ui/primitives';
 
 export default function SkillAdminView() {
   const {

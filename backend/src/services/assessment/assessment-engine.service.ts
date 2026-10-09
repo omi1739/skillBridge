@@ -128,7 +128,7 @@ export class AssessmentEngine {
       status: 'in_progress',
       timeLimitMinutes: this.sessionTimeLimitMinutes(questions.length),
       startedAt: new Date().toISOString(),
-      questions: questions.map((q, i) => this.toQuestionView(q, allocation, i))
+      questions: questions.map(q => this.toQuestionView(q))
     };
   }
 
@@ -159,7 +159,8 @@ export class AssessmentEngine {
   }
 
   async submitAnswer(userId: string, attemptId: string, questionId: string, answer: unknown): Promise<{ correct: boolean }> {
-    const session = await this.assertOwnerInProgress(userId, attemptId);
+    // Throws unless this user owns a live attempt — the guard is the point.
+    await this.assertOwnerInProgress(userId, attemptId);
     const question = await getBankQuestionById(questionId);
     if (!question) throw new NotFoundException(`Question ${questionId} not found`);
     // Verify the question is part of this fixed assessment session.
@@ -413,7 +414,7 @@ export class AssessmentEngine {
     };
   }
 
-  private toQuestionView(q: BankQuestion, cfg: AssessmentConfig, index: number) {
+  private toQuestionView(q: BankQuestion) {
     return {
       id: q.id,
       topic: q.topic || 'General',

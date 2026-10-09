@@ -177,7 +177,7 @@ export class GitHubVerifier {
     }
     const tree = await res.json();
     let entries: Array<{ path?: string; type?: string }> = Array.isArray(tree.tree) ? tree.tree : [];
-    let truncated = tree.truncated === true;
+    const truncated = tree.truncated === true;
 
     if (truncated) {
       // Very large repos truncate the recursive listing. Fall back to a shallow

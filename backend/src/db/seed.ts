@@ -2,9 +2,6 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { Pool, PoolClient } from 'pg';
 import {
-  Skill,
-  Role,
-  Assessment,
   User,
   Profile,
   SkillEvidence

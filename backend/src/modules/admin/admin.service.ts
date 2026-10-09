@@ -7,9 +7,8 @@ import { AuthPayload } from '../../services/auth.service';
 @Injectable()
 export class AdminService {
   async getOverview() {
-    const [skills, roles, assessments, jobs] = await Promise.all([
+    const [skills, assessments, jobs] = await Promise.all([
       store.getSkills(),
-      store.getRoles(),
       store.getAssessments(),
       store.getJobs()
     ]);

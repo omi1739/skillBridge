@@ -258,8 +258,7 @@ export class SandboxService {
         if (settled) return;
         settled = true;
         try {
-          // eslint-disable-next-line no-caller
-          child.stdin && child.stdin.destroy();
+          if (child.stdin) child.stdin.destroy();
         } catch {
           /* already closed */
         }
@@ -593,22 +592,6 @@ function rowsMatch(expected: Array<Record<string, any>>, actual: Array<Record<st
     }
   }
   return true;
-}
-
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('Execution timed out')), ms);
-    promise.then(
-      value => {
-        clearTimeout(timer);
-        resolve(value);
-      },
-      err => {
-        clearTimeout(timer);
-        reject(err);
-      }
-    );
-  });
 }
 
 export const sandboxService = new SandboxService();

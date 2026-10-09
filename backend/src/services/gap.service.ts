@@ -54,7 +54,7 @@ export class GapService {
         status = 'MAJOR_GAP';
       }
 
-      let explanation = '';
+      let explanation: string;
       if (status === 'MAINTAIN') {
         explanation = `Strong demonstrated competency in ${skillName}. Meets or exceeds the target threshold for ${role.title}.`;
       } else if (status === 'MINOR_GAP') {

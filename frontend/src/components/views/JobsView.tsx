@@ -6,7 +6,7 @@ import { RemoteBadge } from '@/components/ui/badges';
 import { RolePromptView, SignInPromptView } from './prompts';
 import {
   ChevronLeft, ChevronRight, Building2, MapPin, CheckCircle2, XCircle,
-  Calendar, ChevronDown, Layers
+  Calendar, ChevronDown
 } from 'lucide-react';
 
 const PAGE_SIZE = 6;
@@ -41,7 +41,7 @@ export default function JobsView() {
       return true;
     });
 
-    let sorted = [...remoteFiltered];
+    const sorted = [...remoteFiltered];
     if (jobSort === 'recent') {
       sorted.sort((a, b) => new Date(b.job.postedAt).getTime() - new Date(a.job.postedAt).getTime());
     } else {
@@ -67,8 +67,6 @@ export default function JobsView() {
 
   const bdCount = jobMatches.filter(m => m.job.isBangladesh).length;
   const internationalCount = jobMatches.length - bdCount;
-  const bdOnsite = jobMatches.filter(m => m.job.isBangladesh && !m.job.isRemote).length;
-  const bdRemote = jobMatches.filter(m => m.job.isBangladesh && m.job.isRemote).length;
   const remoteCount = jobMatches.filter(m => m.job.isRemote).length;
 
   const totalPages = Math.max(1, Math.ceil(filteredMatches.length / PAGE_SIZE));

@@ -20,16 +20,8 @@ export class AppController {
 
   @Get('health/db')
   async getDbHealth() {
-    let dbOk = false;
-    let dbStatus = 'unreachable';
-    try {
-      dbOk = await testConnection();
-    } catch {
-      dbOk = false;
-    }
-    if (dbOk) {
-      dbStatus = 'connected';
-    }
+    const dbOk = await testConnection().catch(() => false);
+    const dbStatus = dbOk ? 'connected' : 'unreachable';
     return {
       status: dbOk ? 'ok' : 'error',
       service: 'skillbridge-api',

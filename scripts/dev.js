@@ -25,7 +25,7 @@ function freePort(port) {
         }
       }
     }
-  } catch (err) {
+  } catch {
     // Port was already free
   }
 }
@@ -43,7 +43,7 @@ try {
     shell: isWin
   });
 } catch (err) {
-  console.error('[Dev Runner] Failed to build @skillbridge/types. Aborting.');
+  console.error('[Dev Runner] Failed to build @skillbridge/types. Aborting.', err?.message || err);
   process.exit(1);
 }
 

@@ -10,6 +10,7 @@
     "start": "node dist/main.js",
     "pretypecheck": "npm run build --workspace=@skillbridge/types",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
     "test": "jest --maxWorkers=2",
     "test:e2e": "jest --config ./test/jest-e2e.js",
     "db:setup": "tsx src/db/seed.ts",

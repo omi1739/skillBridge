@@ -86,7 +86,7 @@ export class CurriculumService {
 
     const alignmentScore = totalWeight > 0 ? Math.round((alignedWeight / totalWeight) * 100) : 50;
 
-    let summaryAnalysis = '';
+    let summaryAnalysis: string;
     if (availableCurriculum.type === 'UNIVERSITY_DEGREE') {
       summaryAnalysis = `The B.Sc. CSE syllabus builds formidable foundations in database theory, algorithmic problem solving, and software engineering principles. However, modern industry backend requirements (Node.js runtime, Docker containerization, REST API contracts, and Git workflows) have a ${100 - alignmentScore}% practical gap that students must bridge through hands-on capstones.`;
     } else {

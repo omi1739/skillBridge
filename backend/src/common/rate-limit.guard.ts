@@ -51,8 +51,9 @@ export class RateLimitGuard implements CanActivate {
       throw new HttpException(
         {
           statusCode: HttpStatus.TOO_MANY_REQUESTS,
-          message: 'Too many requests. Please slow down.',
-          error: 'Too Many Requests'
+          message: `Too many requests. Please slow down and retry in ${retryAfterSec}s.`,
+          error: 'Too Many Requests',
+          retryAfterSec
         },
         HttpStatus.TOO_MANY_REQUESTS
       );
