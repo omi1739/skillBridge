@@ -232,7 +232,7 @@ export function PageHeader({
   return (
     <div className={`page-header ${className}`.trim()}>
       <div>
-        {kicker && <div className="jobs-kicker">{kicker}</div>}
+        {kicker && <div className="page-header-kicker">{kicker}</div>}
         <h1 className="page-title">{title}</h1>
         {subtitle && <p className="page-subtitle">{subtitle}</p>}
       </div>

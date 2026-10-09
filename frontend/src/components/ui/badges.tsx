@@ -23,7 +23,7 @@ export function RemoteBadge({ isRemote, location }: { isRemote?: boolean; locati
       color: remote ? 'var(--accent-text)' : 'var(--text-secondary)',
       border: remote ? '1px solid var(--success-border)' : '1px solid var(--border-color)'
     }}>
-      <span className="badge-chip-dot" style={{ background: remote ? 'var(--teal)' : 'var(--text-muted)' }} />
+      <span className="badge-chip-dot" style={{ background: remote ? 'var(--accent-primary)' : 'var(--text-muted)' }} />
       {remote ? 'Remote · WFH' : loc}
     </span>
   );

@@ -1990,6 +1990,11 @@ a {
   border-radius: var(--radius-md);
 }
 
+.btn:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-glow);
+}
+
 /* Theme toggle */
 .theme-toggle {
   display: inline-flex;
@@ -2528,7 +2533,8 @@ a {
   gap: 1.25rem;
 }
 
-.jobs-kicker {
+.jobs-kicker,
+.page-header-kicker {
   font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -2540,7 +2546,8 @@ a {
   gap: 0.4rem;
 }
 
-.jobs-kicker::before {
+.jobs-kicker::before,
+.page-header-kicker::before {
   content: '';
   width: 20px;
   height: 2px;
@@ -3991,20 +3998,21 @@ button:focus-visible {
 .segmented {
   display: inline-flex;
   align-items: center;
-  background: var(--bg-surface);
+  background: var(--bg-inset);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
+  border-radius: calc(var(--radius-sm) + 2px);
   padding: 3px;
   gap: 2px;
+  box-shadow: inset 0 1px 2px rgba(16, 24, 40, 0.04);
 }
 .segmented-btn {
   background: transparent;
-  border: none;
+  border: 1px solid transparent;
   color: var(--text-secondary);
   font-family: var(--font-sans);
   font-size: 0.8rem;
   font-weight: 600;
-  padding: 0.4rem 0.85rem;
+  padding: 0.38rem 0.85rem;
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 0.14s ease;
@@ -4015,12 +4023,16 @@ button:focus-visible {
 }
 .segmented-btn:hover {
   color: var(--text-primary);
-  background: var(--bg-raise);
+}
+.segmented-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-glow);
 }
 .segmented-btn.active {
-  background: var(--accent-primary-soft);
-  color: var(--accent-text);
-  border-color: var(--accent-primary-border);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+  box-shadow: var(--shadow-xs);
 }
 
 /* ---------- Quiz / question helpers ---------- */

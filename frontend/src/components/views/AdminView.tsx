@@ -35,7 +35,7 @@ export default function AdminView() {
   } = useSkillBridge();
 
   const dash = adminDashboard || null;
-  const roleColor: Record<string, string> = { ADMIN: 'var(--warning)', RECRUITER: 'var(--info)', USER: 'var(--teal)' };
+  const roleColor: Record<string, string> = { ADMIN: 'var(--warning)', RECRUITER: 'var(--info)', USER: 'var(--accent-primary)' };
 
   const roleCount = (r: string) =>
     dash && Array.isArray(dash.byRole)
@@ -53,7 +53,7 @@ export default function AdminView() {
   });
   const donutBg = gradients.length
     ? `conic-gradient(${gradients.join(', ')})`
-    : `conic-gradient(var(--teal) 0deg 360deg)`;
+    : `conic-gradient(var(--accent-primary) 0deg 360deg)`;
 
   const signupData = dash?.recentSignups || [];
   const maxSignups = Math.max(1, ...signupData.map((s: any) => s.count));
@@ -100,7 +100,7 @@ export default function AdminView() {
             <div className="stat-card"><div className="stat-label">Users</div><div className="stat-value">{dash?.totalUsers ?? '—'}</div></div>
             <div className="stat-card"><div className="stat-label">Admins</div><div className="stat-value" style={{ color: 'var(--warning)' }}>{dash ? roleCount('ADMIN') : '—'}</div></div>
             <div className="stat-card"><div className="stat-label">Recruiters</div><div className="stat-value" style={{ color: 'var(--info)' }}>{dash ? roleCount('RECRUITER') : '—'}</div></div>
-            <div className="stat-card"><div className="stat-label">Candidates</div><div className="stat-value" style={{ color: 'var(--teal)' }}>{dash ? roleCount('USER') : '—'}</div></div>
+            <div className="stat-card"><div className="stat-label">Candidates</div><div className="stat-value" style={{ color: 'var(--accent-primary)' }}>{dash ? roleCount('USER') : '—'}</div></div>
           </div>
 
           <div className="grid-2">
