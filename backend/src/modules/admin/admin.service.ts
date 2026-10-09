@@ -1,6 +1,7 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ForbiddenException, HttpException } from '@nestjs/common';
 import { store } from '../../store';
 import { query } from '../../db/client';
+import { authService, AuthDomainError } from '../../services/auth.service';
 import { AddJobSourceDto, UpdateJobSourceDto } from '../../dto/admin.dto';
 import { AuthPayload } from '../../services/auth.service';
 
@@ -253,6 +254,19 @@ export class AdminService {
       byProvider: providerRows.map(r => ({ provider: r.provider, count: r.count })),
       recentSignups: recentRows.map(r => ({ day: r.day, count: r.count }))
     };
+  }
+
+  async resetUserPassword(userId: string, newPassword: string) {
+    if (!userId) throw new BadRequestException('userId is required');
+    const target = await store.getUserById(userId);
+    if (!target) throw new NotFoundException('User not found');
+    try {
+      await authService.setPassword(userId, newPassword);
+    } catch (err: any) {
+      if (err instanceof AuthDomainError) throw new HttpException(err.message, err.status);
+      throw err;
+    }
+    return { success: true, userId };
   }
 
   async updateUserRole(userId: string, role: string, currentUser: AuthPayload) {

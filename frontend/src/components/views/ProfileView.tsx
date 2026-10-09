@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Mail, Calendar, ShieldCheck, Globe, Github, Target, Pencil, Check, ArrowLeft, AlertCircle } from 'lucide-react';
+import { Mail, Calendar, ShieldCheck, Globe, Github, Target, Pencil, Check, ArrowLeft, AlertCircle, Lock } from 'lucide-react';
 import { useSkillBridge } from '@/lib/skillbridge-context';
 import Avatar from '@/components/ui/Avatar';
 import { safeExternalUrl } from '@/lib/safe-url';
@@ -11,7 +11,7 @@ import { CURRENT_STATUS_OPTIONS } from '@/lib/constants';
 export default function ProfileView() {
   const {
     currentUser, currentProfile, role, allRoles,
-    handleUpdateProfile, profileSaving, profileSuccess, profileError,
+    handleUpdateProfile, handleChangePassword, profileSaving, profileSuccess, profileError,
     setProfileSuccess, setProfileError
   } = useSkillBridge();
   const router = useRouter();
@@ -24,6 +24,10 @@ export default function ProfileView() {
     portfolioUrl: '',
     bio: ''
   });
+
+  const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
+  const [pwBusy, setPwBusy] = useState(false);
+  const [pwResult, setPwResult] = useState<{ ok: boolean; message: string } | null>(null);
 
   useEffect(() => {
     if (!editing) {
@@ -51,6 +55,21 @@ export default function ProfileView() {
   const targetRoleTitle = allRoles.find(r => r.id === currentProfile.targetRoleId)?.title || role?.title || 'Not set';
   const joined = new Date(currentUser.createdAt).toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
   const isAdmin = currentUser.role === 'ADMIN';
+  const isGoogleUser = currentUser.provider === 'GOOGLE';
+
+  const changePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPwResult(null);
+    if (pwForm.next !== pwForm.confirm) {
+      setPwResult({ ok: false, message: 'New passwords do not match.' });
+      return;
+    }
+    setPwBusy(true);
+    const result = await handleChangePassword(pwForm.current, pwForm.next, pwForm.confirm);
+    setPwBusy(false);
+    setPwResult(result);
+    if (result.ok) setPwForm({ current: '', next: '', confirm: '' });
+  };
 
   const save = async () => {
     // Cleared optional fields must be sent as explicit nulls — `undefined` is
@@ -274,6 +293,72 @@ export default function ProfileView() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Password */}
+      <div className="profile-section">
+        <h3 className="profile-section-title"><Lock size={15} style={{ verticalAlign: '-2px', marginRight: '0.35rem' }} />Password</h3>
+        <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+          {isGoogleUser
+            ? 'Your account was created with Google. Set a password here to also sign in with your email.'
+            : 'Change the password used to sign in with your email.'}
+        </p>
+
+        {pwResult && (
+          pwResult.ok
+            ? <div className="confirmed-banner" style={{ marginBottom: '0.9rem' }}><Check size={16} /> {pwResult.message}</div>
+            : <div className="error-banner" style={{ marginBottom: '0.9rem' }}><AlertCircle size={16} /> {pwResult.message}</div>
+        )}
+
+        <form className="stack stack-sm" onSubmit={changePassword} style={{ maxWidth: 420 }}>
+          {!isGoogleUser && (
+            <div className="auth-field">
+              <label className="auth-label" htmlFor="pw-current">Current password</label>
+              <div className="auth-input-wrap">
+                <input
+                  id="pw-current"
+                  type="password"
+                  className="auth-input"
+                  autoComplete="current-password"
+                  value={pwForm.current}
+                  onChange={e => setPwForm({ ...pwForm, current: e.target.value })}
+                />
+              </div>
+            </div>
+          )}
+          <div className="auth-field">
+            <label className="auth-label" htmlFor="pw-next">New password</label>
+            <div className="auth-input-wrap">
+              <input
+                id="pw-next"
+                type="password"
+                className="auth-input"
+                autoComplete="new-password"
+                placeholder="At least 8 characters, with a letter and a number"
+                value={pwForm.next}
+                onChange={e => setPwForm({ ...pwForm, next: e.target.value })}
+              />
+            </div>
+          </div>
+          <div className="auth-field">
+            <label className="auth-label" htmlFor="pw-confirm">Confirm new password</label>
+            <div className="auth-input-wrap">
+              <input
+                id="pw-confirm"
+                type="password"
+                className="auth-input"
+                autoComplete="new-password"
+                value={pwForm.confirm}
+                onChange={e => setPwForm({ ...pwForm, confirm: e.target.value })}
+              />
+            </div>
+          </div>
+          <div className="profile-actions">
+            <button type="submit" className="btn btn-primary" disabled={pwBusy} style={{ gap: '0.4rem' }}>
+              <Check size={15} /> {pwBusy ? 'Saving…' : 'Update Password'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

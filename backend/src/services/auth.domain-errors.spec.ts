@@ -116,6 +116,35 @@ describe('AuthService domain errors carry HTTP statuses', () => {
     expect(err.message).toMatch(/email\/password/i);
   });
 
+  it('Google sign-in with a *verified* email links onto the password account and signs in', async () => {
+    getDb().query
+      .mockResolvedValueOnce([userRow({ provider: 'EMAIL' })])
+      .mockResolvedValueOnce([
+        {
+          id: 'profile_1',
+          user_id: 'user_1',
+          full_name: 'Person',
+          target_role_id: null,
+          github_url: null,
+          portfolio_url: null,
+          bio: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+      ])
+      .mockResolvedValueOnce([]);
+    const result = await authService.registerOrLoginWithGoogle({
+      email: 'person@example.com',
+      fullName: 'Person',
+      googleId: 'sub-1',
+      emailVerified: true
+    });
+    expect(result.isNewUser).toBe(false);
+    expect(typeof result.token).toBe('string');
+    const update = getDb().query.mock.calls.find(c => /UPDATE users/i.test(String(c[0])));
+    expect(update).toBeTruthy();
+  });
+
   it('Google sign-in linked to a different Google account → 409', async () => {
     getDb().query.mockResolvedValueOnce([
       userRow({ provider: 'GOOGLE', google_id: 'sub-original', password_hash: null })
@@ -125,5 +154,40 @@ describe('AuthService domain errors carry HTTP statuses', () => {
     );
     expect(err.status).toBe(409);
     expect(err.message).toMatch(/different google account/i);
+  });
+
+  it('changePassword with a new password that is too short → 400', async () => {
+    const err = await capture(() => authService.changePassword('user_1', 'anything', 'short'));
+    expect(err.status).toBe(400);
+  });
+
+  it('changePassword with a wrong current password → 401', async () => {
+    getDb().query.mockResolvedValueOnce([{ password_hash: 'stored-hash' }]);
+    getBcrypt().compare.mockResolvedValue(false);
+    const err = await capture(() => authService.changePassword('user_1', 'WrongPass1', 'NewPassword1'));
+    expect(err.status).toBe(401);
+    expect(err.message).toMatch(/current password/i);
+  });
+
+  it('changePassword succeeds with the correct current password', async () => {
+    getDb().query
+      .mockResolvedValueOnce([{ password_hash: 'stored-hash' }])
+      .mockResolvedValueOnce([]);
+    getBcrypt().compare.mockResolvedValue(true);
+    await expect(authService.changePassword('user_1', 'RightPass1', 'NewPassword1')).resolves.toBeUndefined();
+  });
+
+  it('changePassword lets a Google-only user (no stored hash) set a password', async () => {
+    getDb().query
+      .mockResolvedValueOnce([{ password_hash: null }])
+      .mockResolvedValueOnce([]);
+    await expect(authService.changePassword('user_1', undefined, 'NewPassword1')).resolves.toBeUndefined();
+    expect(getBcrypt().compare).not.toHaveBeenCalled();
+  });
+
+  it('admin setPassword on an unknown user → 404', async () => {
+    getDb().query.mockResolvedValueOnce([]);
+    const err = await capture(() => authService.setPassword('missing', 'NewPassword1'));
+    expect(err.status).toBe(404);
   });
 });

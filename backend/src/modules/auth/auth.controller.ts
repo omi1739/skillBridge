@@ -15,7 +15,7 @@ import { NestAuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { AuthPayload } from '../../services/auth.service';
-import { RegisterDto, LoginDto, DeclareSkillDto, UpdateProfileDto, GoogleAuthDto } from '../../dto/auth.dto';
+import { RegisterDto, LoginDto, DeclareSkillDto, UpdateProfileDto, GoogleAuthDto, ChangePasswordDto } from '../../dto/auth.dto';
 import { RateLimitGuard } from '../../common/rate-limit.guard';
 import { RateLimit, RateWindow } from '../../common/rate-limit.decorators';
 
@@ -70,6 +70,16 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   async updateProfile(@CurrentUser() user: AuthPayload, @Body() body: UpdateProfileDto) {
     return this.authService.updateProfile(user.userId, body);
+  }
+
+  @Post('me/password')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  async changePassword(@CurrentUser() user: AuthPayload, @Body() body: ChangePasswordDto) {
+    if (body.newPassword !== body.confirmPassword) {
+      throw new BadRequestException('Passwords do not match.');
+    }
+    return this.authService.changePassword(user.userId, body.currentPassword, body.newPassword);
   }
 
   @Post('me/skills/declare')

@@ -583,6 +583,30 @@ function useSkillBridgeValue() {
       .catch(() => setAdminUserMsg({ ok: false, text: 'Delete failed.' }));
   };
 
+  const handleResetUserPassword = (userId: string, email: string) => {
+    const newPassword = window.prompt(`Set a new password for ${email}\n(min 8 characters, at least one letter and one number)`);
+    if (!newPassword) return;
+    if (newPassword.length < 8) {
+      setAdminUserMsg({ ok: false, text: 'Password must be at least 8 characters.' });
+      return;
+    }
+    setAdminUserMsg(null);
+    fetch(`${API_BASE}/admin/users/${userId}/password`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify({ newPassword })
+    })
+      .then(res => res.json().then((data: any) => ({ ok: res.ok, data })))
+      .then(({ ok, data }) => {
+        if (ok && data?.success) {
+          setAdminUserMsg({ ok: true, text: `Password reset for ${email}. Share it securely and ask them to change it.` });
+        } else {
+          setAdminUserMsg({ ok: false, text: (data?.message) || 'Could not reset password.' });
+        }
+      })
+      .catch(() => setAdminUserMsg({ ok: false, text: 'Reset failed.' }));
+  };
+
   const fetchAllRoles = () => {
     fetchJSON<Role[]>(`${API_BASE}/roles`)
       .then(data => setAllRoles(Array.isArray(data) ? data : []))
@@ -660,6 +684,30 @@ function useSkillBridgeValue() {
       setProfileError(err.message || 'Profile update failed.');
     } finally {
       setProfileSaving(false);
+    }
+  };
+
+  const handleChangePassword = async (
+    currentPassword: string,
+    newPassword: string,
+    confirmPassword: string
+  ): Promise<{ ok: boolean; message: string }> => {
+    if (!currentUser || !authToken) return { ok: false, message: 'You must be signed in.' };
+    try {
+      const res = await fetch(`${API_BASE}/me/password`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          currentPassword: currentPassword || undefined,
+          newPassword,
+          confirmPassword
+        })
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) return { ok: false, message: apiErrorMessage(data, 'Could not change password.') };
+      return { ok: true, message: 'Password updated.' };
+    } catch (err: any) {
+      return { ok: false, message: err?.message || 'Could not change password.' };
     }
   };
 
@@ -1504,6 +1552,7 @@ function useSkillBridgeValue() {
     profileError,
     setProfileError,
     handleUpdateProfile,
+    handleChangePassword,
     // admin
     adminOverview,
     adminDashboard,
@@ -1519,6 +1568,7 @@ function useSkillBridgeValue() {
     adminUserMsg,
     handleChangeUserRole,
     handleDeleteUser,
+    handleResetUserPassword,
     editingSkillWeight,
     setEditingSkillWeight,
     aliasForm,

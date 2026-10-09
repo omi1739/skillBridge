@@ -3,6 +3,12 @@ export interface GoogleProfile {
   fullName: string;
   googleId: string;
   picture?: string;
+  /**
+   * Whether Google reports the email as verified. Only a verified address may
+   * be linked onto an existing email/password account; an unverified one proves
+   * no ownership and must not be allowed to take the account over.
+   */
+  emailVerified?: boolean;
 }
 
 const TOKENINFO_BASE = 'https://oauth2.googleapis.com/tokeninfo';
@@ -67,7 +73,8 @@ export async function verifyGoogleIdToken(idToken: string): Promise<GoogleProfil
     email,
     fullName: typeof payload.name === 'string' ? payload.name : defaultNameFromEmail(email),
     googleId: typeof payload.sub === 'string' ? payload.sub : `google_${email}`,
-    picture: typeof payload.picture === 'string' ? payload.picture : undefined
+    picture: typeof payload.picture === 'string' ? payload.picture : undefined,
+    emailVerified: payload.email_verified === true || payload.email_verified === 'true'
   };
 }
 

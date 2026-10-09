@@ -62,14 +62,16 @@ services:
 
   # Scheduled job-board ingestion, separate from the always-on web service so
   # it runs a fixed number of times per day instead of in the background.
-  # Runs the BdJobs (Bangladesh) scraper three times a day (00/08/16 UTC).
+  # Runs both boards (Arbeitnow + BdJobs) three times a day (00/08/16 UTC) so
+  # every source stays fresh and its jobs are re-upserted (which refreshes the
+  # verification timestamp) before the retention sweep can delete them.
   - type: cron
-    name: skillbridge-api-bdjobs-ingest
+    name: skillbridge-api-ingest
     runtime: node
     plan: free
     schedule: "0 */8 * * *"
     buildCommand: npm install && npm run build --workspace=@skillbridge/types && npm run build --workspace=@skillbridge/api
-    startCommand: npm run db:ingest --workspace=@skillbridge/api bdjobs
+    startCommand: npm run db:ingest --workspace=@skillbridge/api all
     envVars:
       - key: NODE_ENV
         value: production
@@ -83,14 +85,15 @@ services:
       - key: REDIS_URL
         sync: false
       - key: JOB_INGEST_SOURCE
-        value: bdjobs
+        value: all
       - key: JOB_BD_PAGES
         sync: false
       - key: JOB_MIN_MATCHES
         sync: false
-      # Jobs must vanish within 3 days: expired for demand stats after 3 days,
-      # then hard-deleted from the database during the next verification sweep.
+      # Jobs are refreshed every 8 hours by this cron, so a 7-day expiry plus a
+      # 14-day hard-delete window tolerates a few missed runs without letting
+      # stale postings linger indefinitely.
       - key: JOB_EXPIRE_DAYS
-        value: 3
+        value: 7
       - key: JOB_RETENTION_DAYS
-        value: 3
+        value: 14

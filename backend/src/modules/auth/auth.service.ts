@@ -53,6 +53,15 @@ export class NestAuthService {
     }
   }
 
+  async changePassword(userId: string, currentPassword: string | undefined, newPassword: string) {
+    try {
+      await authService.changePassword(userId, currentPassword, newPassword);
+      return { success: true };
+    } catch (err: any) {
+      this.rethrow(err, 'Password change');
+    }
+  }
+
   async getCurrentUser(userId: string) {
     const [user, profile] = await Promise.all([
       store.getUser(userId),

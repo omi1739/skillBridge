@@ -18,6 +18,7 @@ export default function AdminView() {
     adminUserMsg,
     handleChangeUserRole,
     handleDeleteUser,
+    handleResetUserPassword,
     currentUser,
     role,
     editingSkillWeight,
@@ -341,14 +342,22 @@ export default function AdminView() {
                       )}
                     </td>
                     <td>
-                      <button
-                        disabled={isSelf}
-                        onClick={() => handleDeleteUser(u.id, u.email)}
-                        className="btn btn-sm"
-                        style={{ background: 'var(--danger-bg)', color: 'var(--danger-text)', border: '1px solid var(--danger-border)' }}
-                      >
-                        Delete
-                      </button>
+                      <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                        <button
+                          onClick={() => handleResetUserPassword(u.id, u.email)}
+                          className="btn btn-sm btn-secondary"
+                        >
+                          Reset password
+                        </button>
+                        <button
+                          disabled={isSelf}
+                          onClick={() => handleDeleteUser(u.id, u.email)}
+                          className="btn btn-sm"
+                          style={{ background: 'var(--danger-bg)', color: 'var(--danger-text)', border: '1px solid var(--danger-border)' }}
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );

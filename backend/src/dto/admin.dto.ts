@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsNumber, Min, Max, IsArray, IsBoolean, IsIn } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsNumber, Min, Max, IsArray, IsBoolean, IsIn, MinLength, Matches } from 'class-validator';
 
 export class AddAliasDto {
   @IsString()
@@ -125,6 +125,15 @@ export class UpdateUserRoleDto {
   @IsNotEmpty()
   @IsIn(['USER', 'ADMIN', 'RECRUITER'])
   role!: string;
+}
+
+export class AdminResetPasswordDto {
+  @IsString()
+  @MinLength(8, { message: 'Password must be at least 8 characters long.' })
+  @Matches(/^(?=.*[A-Za-z])(?=.*\d).+$/, {
+    message: 'Password must contain at least one letter and one number.'
+  })
+  newPassword!: string;
 }
 
 export class UpdateJobSourceDto {

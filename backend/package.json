@@ -15,7 +15,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.js",
     "db:setup": "tsx src/db/seed.ts",
     "db:seed": "tsx src/db/seed.ts",
-    "db:ingest": "tsx src/scripts/ingest.ts"
+    "db:ingest": "node dist/scripts/ingest.js"
   },
   "dependencies": {
     "@nestjs/common": "^10.3.8",

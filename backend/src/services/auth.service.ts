@@ -168,6 +168,7 @@ export class AuthService {
       fullName: string;
       googleId: string;
       picture?: string;
+      emailVerified?: boolean;
     },
     currentStatus?: string
   ): Promise<{ token: string; user: User; profile: Profile; isNewUser: boolean }> {
@@ -178,12 +179,20 @@ export class AuthService {
 
     const existing = await this.findUserByEmail(cleanEmail);
     if (existing) {
-      // Account-linking guard: an email/password account must not be silently
-      // taken over by a Google credential. Require the user to sign in with the
-      // original password (or verify ownership) instead of granting access via a
-      // different identity provider.
+      // An email/password account may be linked to Google only when Google has
+      // verified the address — that proves the caller owns the mailbox, so
+      // granting access via the Google credential is safe (the password keeps
+      // working too). An unverified Google email proves no ownership and must
+      // never be able to take the account over.
       if (existing.provider === 'EMAIL') {
-        throw new AuthDomainError('An account with this email already uses email/password. Sign in with your password.', 409);
+        if (!profileInfo.emailVerified) {
+          throw new AuthDomainError('An account with this email already uses email/password. Sign in with your password.', 409);
+        }
+        if (existing.googleId && existing.googleId !== profileInfo.googleId) {
+          throw new AuthDomainError('This email is already linked to a different Google account.', 409);
+        }
+        const linked = await this.linkGoogleIdentity(existing, profileInfo);
+        return { token: linked.token, user: linked.user, profile: linked.profile, isNewUser: false };
       }
       if (existing.googleId && existing.googleId !== profileInfo.googleId) {
         throw new AuthDomainError('This email is already linked to a different Google account.', 409);
@@ -294,6 +303,83 @@ export class AuthService {
     const rows = await query<any>('SELECT * FROM users WHERE email = $1', [email.trim().toLowerCase()]);
     if (rows.length === 0) return undefined;
     return this.mapUserRow(rows[0]);
+  }
+
+  /**
+   * Link a verified Google identity onto an existing email/password account,
+   * then issue a token. The provider stays EMAIL so the password keeps working;
+   * only the `google_id`/avatar are recorded.
+   */
+  private async linkGoogleIdentity(
+    existing: User,
+    profileInfo: { googleId: string; picture?: string }
+  ): Promise<{ token: string; user: User; profile: Profile }> {
+    const profile = await this.findProfile(existing.id);
+    if (!profile) {
+      throw new Error('User profile record not found.');
+    }
+    const now = new Date().toISOString();
+    await query(
+      `UPDATE users
+          SET google_id = $1, avatar_url = COALESCE($2, avatar_url), updated_at = $3::timestamptz
+        WHERE id = $4`,
+      [profileInfo.googleId, profileInfo.picture || null, now, existing.id]
+    );
+    existing.googleId = profileInfo.googleId;
+    if (profileInfo.picture) existing.avatarUrl = profileInfo.picture;
+    const token = this.signToken({ userId: existing.id, email: existing.email, role: existing.role });
+    return { token, user: existing, profile };
+  }
+
+  /**
+   * Change the signed-in user's password. A user who already has a password must
+   * prove it; a Google-only user (no stored hash) may set one without a current
+   * password so they gain email/password sign-in too.
+   */
+  public async changePassword(userId: string, currentPassword: string | undefined, newPassword: string): Promise<void> {
+    if (!newPassword || newPassword.length < 8) {
+      throw new AuthDomainError('Password must be at least 8 characters long.', 400);
+    }
+    const rows = await query<{ password_hash: string | null }>(
+      'SELECT password_hash FROM users WHERE id = $1',
+      [userId]
+    );
+    if (rows.length === 0) {
+      throw new AuthDomainError('User not found.', 404);
+    }
+    const storedHash = rows[0].password_hash;
+    if (storedHash) {
+      if (!currentPassword || !(await this.verifyPassword(currentPassword, storedHash))) {
+        throw new AuthDomainError('Current password is incorrect.', 401);
+      }
+    }
+    const newHash = await this.hashPassword(newPassword);
+    await query(
+      `UPDATE users
+          SET password_hash = $1, provider = COALESCE(provider, 'EMAIL'), updated_at = CURRENT_TIMESTAMP
+        WHERE id = $2`,
+      [newHash, userId]
+    );
+  }
+
+  /**
+   * Administrative password reset. Used to recover an account whose owner can no
+   * longer sign in (there is no self-service email reset flow).
+   */
+  public async setPassword(userId: string, newPassword: string): Promise<void> {
+    if (!newPassword || newPassword.length < 8) {
+      throw new AuthDomainError('Password must be at least 8 characters long.', 400);
+    }
+    const rows = await query<{ id: string }>(
+      `UPDATE users
+          SET password_hash = $1, provider = COALESCE(provider, 'EMAIL'), updated_at = CURRENT_TIMESTAMP
+        WHERE id = $2
+        RETURNING id`,
+      [await this.hashPassword(newPassword), userId]
+    );
+    if (rows.length === 0) {
+      throw new AuthDomainError('User not found.', 404);
+    }
   }
 
   public async findProfile(userId: string): Promise<Profile | undefined> {

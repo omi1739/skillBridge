@@ -27,10 +27,11 @@ prefix `/api`. Requests are validated with a global `ValidationPipe`
 |--------|--------------------------------|--------------------------------|
 | POST   | `/api/auth/register`           | `RegisterDto` (email, password, confirmPassword, fullName, currentStatus?, targetRoleId?) |
 | POST   | `/api/auth/login`              | `LoginDto`                     |
-| POST   | `/api/auth/google`             | `GoogleAuthDto` (idToken, currentStatus?) — Google Sign-In, creates or logs in a user |
+| POST   | `/api/auth/google`             | `GoogleAuthDto` (idToken, currentStatus?) — Google Sign-In, creates or logs in a user. A Google token whose email is Google-verified may link onto an existing email/password account (the password keeps working); an unverified Google email cannot |
 | GET    | `/api/me?userId=`              | User + profile                 |
 | GET    | `/api/me/account`              | Auth account                    |
 | PATCH  | `/api/me/profile`              | `UpdateProfileDto`             |
+| POST   | `/api/me/password`             | `ChangePasswordDto` (currentPassword?, newPassword, confirmPassword) — change own password; `currentPassword` required only when one is already set (Google-only users may set a first password) |
 | POST   | `/api/me/skills/declare`       | `DeclareSkillDto`              |
 | GET    | `/api/me/gaps`                 | Skill gaps                     |
 | GET    | `/api/me/recommendations`      | Recommended projects/tasks     |
@@ -93,6 +94,7 @@ Error bodies follow the Nest shape `{ statusCode, message, error }`, where
 | POST   | `/api/admin/skills/alias`          | `AddAliasDto`       |
 | PATCH  | `/api/admin/roles/:id/weights`     | `UpdateRoleWeightsDto` |
 | POST   | `/api/admin/questions`             | `AddQuestionDto`    |
+| PATCH  | `/api/admin/users/:id/password`    | `AdminResetPasswordDto` (newPassword) — reset another user's password (account recovery; no self-service email reset exists) |
 
 ## Environment Variables
 

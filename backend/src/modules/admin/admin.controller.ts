@@ -5,7 +5,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthPayload } from '../../services/auth.service';
-import { AddAliasDto, UpdateRoleWeightsDto, AddQuestionDto, AddJobSourceDto, UpdateJobSourceDto, UpdateUserRoleDto } from '../../dto/admin.dto';
+import { AddAliasDto, UpdateRoleWeightsDto, AddQuestionDto, AddJobSourceDto, UpdateJobSourceDto, UpdateUserRoleDto, AdminResetPasswordDto } from '../../dto/admin.dto';
 
 @Controller('admin')
 export class AdminController {
@@ -143,6 +143,16 @@ export class AdminController {
     @Body() body: UpdateUserRoleDto
   ) {
     return this.adminService.updateUserRole(userId, body.role, currentUser);
+  }
+
+  @Patch('users/:id/password')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async resetUserPassword(
+    @Param('id') userId: string,
+    @Body() body: AdminResetPasswordDto
+  ) {
+    return this.adminService.resetUserPassword(userId, body.newPassword);
   }
 
   @Delete('users/:id')

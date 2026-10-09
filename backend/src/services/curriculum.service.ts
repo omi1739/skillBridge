@@ -1,8 +1,13 @@
 import { CurriculumProfile, CurriculumComparisonResult, Role } from '@skillbridge/types';
 import { store } from '../store';
+import { INITIAL_CURRICULA } from '../data/curriculum.seed';
 
 export class CurriculumService {
-  private curricula: CurriculumProfile[] = [];
+  private curricula: CurriculumProfile[];
+
+  constructor(curricula: CurriculumProfile[] = INITIAL_CURRICULA) {
+    this.curricula = curricula;
+  }
 
   public getCurricula(): CurriculumProfile[] {
     return this.curricula;
