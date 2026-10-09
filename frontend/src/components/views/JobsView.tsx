@@ -93,10 +93,10 @@ export default function JobsView() {
     <div className="jobs-page">
       <div className="page-header">
         <div>
-          <div className="jobs-kicker">Verified Compatibility</div>
-          <h1 className="page-title">Matching Engineering Jobs</h1>
+          <div className="jobs-kicker">Job matches</div>
+          <h1 className="page-title">Matching engineering jobs</h1>
           <p className="page-subtitle">
-            Bangladesh-first: on-site roles in Bangladesh are shown first, then remote, then other on-site postings. Scores are computed against your verified skill evidence with full requirement traceability.
+            Roles ranked against your verified skills. On-site jobs in Bangladesh come first, then remote, then other on-site postings.
           </p>
         </div>
       </div>
@@ -198,8 +198,8 @@ export default function JobsView() {
                     </div>
                     <div className="job-card-badges">
                       {match.job.isBangladesh && (
-                        <span className="badge-chip" style={{ background: 'var(--teal-bg)', color: 'var(--accent-text)', border: '1px solid var(--teal-border)' }}>
-                          <span className="badge-chip-dot" style={{ background: 'var(--teal)' }} />
+                        <span className="badge-chip">
+                          <span className="badge-chip-dot" style={{ background: 'var(--accent-primary)' }} />
                           Bangladesh
                         </span>
                       )}

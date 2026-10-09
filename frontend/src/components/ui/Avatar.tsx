@@ -38,15 +38,16 @@ export default function Avatar({ src, name, email, size = 32, className, style }
       style={{
         width: size,
         height: size,
-        borderRadius: 8,
-        background: 'linear-gradient(135deg, var(--teal), var(--cyan))',
-        color: '#06201c',
+        borderRadius: size >= 32 ? 10 : 8,
+        background: 'var(--accent-primary-soft)',
+        color: 'var(--accent-text)',
+        border: '1px solid var(--accent-primary-border)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         fontSize: Math.max(10, Math.round(size * 0.38)),
         fontWeight: 700,
-        fontFamily: 'var(--font-mono)',
+        fontFamily: 'var(--font-sans)',
         flexShrink: 0,
         ...style
       }}

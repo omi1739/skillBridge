@@ -36,14 +36,13 @@ export default function GapsView() {
     <div className="stack stack-lg">
       <div className="page-header">
         <div>
-          <h1 className="page-title">My Skill Gaps & Prioritization</h1>
+          <h1 className="page-title">Skill gaps</h1>
           <p className="page-subtitle">
-            Gaps prioritized mathematically using role weight, market demand frequency, and demonstrated proficiency:
-            Priority = Role Weight × Market Demand × (1 - Demonstrated Proficiency).
+            Missing skills ranked by how much they matter for your target role, and how far your demonstrated level is from the target.
           </p>
         </div>
         <Toolbar>
-          <span className="badge" style={{ fontSize: '0.7rem', whiteSpace: 'nowrap' }}>Target role</span>
+          <span className="small text-muted">Target role</span>
           <select
             className="select"
             value={activeTargetRoleId}
@@ -76,9 +75,9 @@ export default function GapsView() {
                 </div>
 
                 <div style={{ textAlign: 'right', minWidth: '130px' }}>
-                  <div className="tiny text-muted" style={{ textTransform: 'uppercase' }}>Priority Score</div>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 800, fontFamily: 'var(--font-mono)', color: scoreTone }}>
-                    {gap.priorityScore.toFixed(3)}
+                  <div className="tiny text-muted">Priority</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: scoreTone }}>
+                    {Math.round(gap.priorityScore * 100)}
                   </div>
                 </div>
               </div>
@@ -98,11 +97,11 @@ export default function GapsView() {
                     <BookOpen size={13} style={{ color: 'var(--accent-text)', flexShrink: 0 }} />
                     <span className="small text-secondary">Improve with:</span>
                     {topic.resources.slice(0, 2).map((res, i) => (
-                      <a key={i} href={safeExternalUrl(res.url)} target="_blank" rel="noreferrer" className="badge" style={{ fontSize: '0.7rem', padding: '0.2rem 0.55rem', color: 'var(--accent-text)', textDecoration: 'none' }}>
+                      <a key={i} href={safeExternalUrl(res.url)} target="_blank" rel="noreferrer" className="small" style={{ color: 'var(--accent-text)', textDecoration: 'underline' }}>
                         {res.source}
                       </a>
                     ))}
-                    <Link href={`/learn#${topic.key}`} className="badge badge-preferred" style={{ fontSize: '0.7rem', textDecoration: 'none', cursor: 'pointer' }}>
+                    <Link href={`/learn#${topic.key}`} className="small" style={{ color: 'var(--accent-text)', textDecoration: 'none', cursor: 'pointer' }}>
                       All resources →
                     </Link>
                   </div>

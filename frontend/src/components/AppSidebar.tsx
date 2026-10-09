@@ -3,45 +3,56 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LogOut, FileText, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import {
+  LogOut, FileText, PanelLeftClose, PanelLeftOpen, Home as HomeIcon,
+  TrendingUp, GraduationCap, BookOpen, ClipboardCheck, Terminal,
+  Target, Wrench, Briefcase, ShieldCheck, LucideIcon
+} from 'lucide-react';
 import { useSkillBridge } from '@/lib/skillbridge-context';
 import Avatar from '@/components/ui/Avatar';
 import BrandMark from '@/components/ui/BrandMark';
 
-const NAV_SECTIONS: { title: string; items: { tab: string; label: string }[] }[] = [
+type NavItem = { tab: string; label: string; icon: LucideIcon };
+
+const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
   {
     title: 'Explore',
     items: [
-      { tab: 'learn', label: 'Learning Resources' },
-      { tab: 'market', label: 'Job Market Demand' },
-      { tab: 'curriculum', label: 'University Syllabi' }
+      { tab: 'market', label: 'Job Market Demand', icon: TrendingUp },
+      { tab: 'curriculum', label: 'University Syllabi', icon: GraduationCap },
+      { tab: 'learn', label: 'Learning Resources', icon: BookOpen }
     ]
   },
   {
-    title: 'Benchmarks',
+    title: 'Practice',
     items: [
-      { tab: 'assessment', label: 'Diagnostic Test' },
-      { tab: 'sandbox', label: 'SQL & Code Sandbox' }
+      { tab: 'assessment', label: 'Diagnostic Test', icon: ClipboardCheck },
+      { tab: 'sandbox', label: 'SQL & Code Sandbox', icon: Terminal }
     ]
   },
   {
-    title: 'Career',
+    title: 'Your progress',
     items: [
-      { tab: 'gaps', label: 'My Skill Gaps' },
-      { tab: 'actions', label: 'Projects to Build' },
-      { tab: 'jobs', label: 'Matching Jobs' }
+      { tab: 'gaps', label: 'Skill Gaps', icon: Target },
+      { tab: 'actions', label: 'Projects to Build', icon: Wrench },
+      { tab: 'jobs', label: 'Matching Jobs', icon: Briefcase }
     ]
   }
 ];
 
 const SIDEBAR_STORAGE_KEY = 'skillbridge_sidebar';
 
+function roleLabel(userRole?: string) {
+  if (userRole === 'ADMIN') return 'Administrator';
+  if (userRole === 'RECRUITER') return 'Recruiter';
+  return 'Candidate';
+}
+
 export default function AppSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const {
-    currentUser, currentProfile, role, activeTargetRoleId,
-    handleLogout, handleOpenPassport
+    currentUser, currentProfile, handleLogout, handleOpenPassport
   } = useSkillBridge();
   const activeTab = pathname === '/' ? 'home' : pathname.split('/')[1];
   const goTab = (tab: string) => router.push(tab === 'home' ? '/' : `/${tab}`);
@@ -79,13 +90,6 @@ export default function AppSidebar() {
         </button>
       </div>
 
-      {expanded && activeTargetRoleId && (
-        <div className="sidebar-track-card">
-          <div className="sidebar-track-label">Active track</div>
-          <div className="sidebar-track-title">{role?.title || 'Select your track'}</div>
-        </div>
-      )}
-
       <nav className="sidebar-nav">
         <button
           className={`sidebar-item ${activeTab === 'home' ? 'active' : ''}`}
@@ -93,12 +97,13 @@ export default function AppSidebar() {
           title="Home"
           aria-label="Home"
         >
-          <span>Home</span>
+          <span className="sidebar-item-icon"><HomeIcon size={17} aria-hidden="true" /></span>
+          <span className="sidebar-item-label">Home</span>
         </button>
 
-        {NAV_SECTIONS.map(section => (
-          <div key={section.title}>
-            {expanded && <div className="sidebar-section-title">{section.title}</div>}
+        {NAV_SECTIONS.map((section, idx) => (
+          <div key={section.title} className={idx === 0 ? '' : 'sidebar-group'}>
+            <div className="sidebar-section-title">{section.title}</div>
             {section.items.map(item => (
               <button
                 key={item.tab}
@@ -107,22 +112,24 @@ export default function AppSidebar() {
                 title={item.label}
                 aria-label={item.label}
               >
-                <span>{item.label}</span>
+                <span className="sidebar-item-icon"><item.icon size={17} aria-hidden="true" /></span>
+                <span className="sidebar-item-label">{item.label}</span>
               </button>
             ))}
           </div>
         ))}
 
         {currentUser?.role === 'ADMIN' && (
-          <div>
-            {expanded && <div className="sidebar-section-title">Platform</div>}
+          <div className="sidebar-group">
+            <div className="sidebar-section-title">Platform</div>
             <button
               className={`sidebar-item ${activeTab === 'admin' ? 'active' : ''}`}
               onClick={() => goTab('admin')}
-              title="Admin & Weights"
-              aria-label="Admin & Weights"
+              title="Admin Console"
+              aria-label="Admin Console"
             >
-              <span>Admin & Weights</span>
+              <span className="sidebar-item-icon"><ShieldCheck size={17} aria-hidden="true" /></span>
+              <span className="sidebar-item-label">Admin Console</span>
             </button>
           </div>
         )}
@@ -141,30 +148,26 @@ export default function AppSidebar() {
             email={currentUser?.email}
             size={30}
           />
-          {expanded && (
-            <span className="sidebar-user-info">
-              <span className="sidebar-user-name">
-                {currentProfile?.fullName || currentUser!.email.split('@')[0]}
-              </span>
-              <span className="sidebar-user-role">
-                {currentUser!.role === 'ADMIN' ? 'Administrator' : currentUser!.role === 'RECRUITER' ? 'Recruiter' : 'Verified Candidate'}
-              </span>
+          <span className="sidebar-user-info">
+            <span className="sidebar-user-name">
+              {currentProfile?.fullName || currentUser!.email.split('@')[0]}
             </span>
-          )}
+            <span className="sidebar-user-role">{roleLabel(currentUser!.role)}</span>
+          </span>
         </button>
 
-        <button className="sidebar-text-btn" onClick={handleOpenPassport} title="Skill Passport">
+        <button className="sidebar-text-btn" onClick={handleOpenPassport} title="Skill Passport" aria-label="Skill Passport">
           <span className="sidebar-text-btn-label">
-            <FileText size={14} /> Skill Passport
+            <FileText size={14} aria-hidden="true" /> Skill Passport
           </span>
-          <span className="sidebar-icon-only"><FileText size={15} /></span>
+          <span className="sidebar-icon-only"><FileText size={15} aria-hidden="true" /></span>
         </button>
 
         <button className="sidebar-text-btn" onClick={handleLogout} title="Sign Out" aria-label="Sign Out">
           <span className="sidebar-text-btn-label">
-            <LogOut size={14} /> Sign Out
+            <LogOut size={14} aria-hidden="true" /> Sign Out
           </span>
-          <span className="sidebar-icon-only"><LogOut size={15} /></span>
+          <span className="sidebar-icon-only"><LogOut size={15} aria-hidden="true" /></span>
         </button>
       </div>
     </aside>

@@ -52,25 +52,25 @@ export default function AssessmentView() {
             </div>
 
             <h2 style={{ fontSize: '1.3rem', fontWeight: 700 }}>
-              {attemptResult.passed ? 'Benchmark Achieved' : 'Benchmark Completed — Focus Areas Identified'}
+              {attemptResult.passed ? 'Diagnostic passed' : 'Completed — focus areas identified'}
             </h2>
             <p style={{ color: 'var(--text-secondary)', maxWidth: '520px', margin: '0 auto', fontSize: '0.9rem' }}>
-              Earned {attemptResult.totalPointsEarned} of {attemptResult.maxPoints} points across practical questions. Your verified skill profile has been updated.
+              Earned {attemptResult.totalPointsEarned} of {attemptResult.maxPoints} points across practical questions. Your skill profile has been updated.
             </p>
 
             <div className="toolbar">
               <button className="btn btn-primary" onClick={() => navigate('gaps')}>
-                View My Skill Gaps <BarChart3 size={15} />
+                View skill gaps <BarChart3 size={15} />
               </button>
               <button className="btn btn-secondary" onClick={() => loadDiagnostic(12)}>
-                <RotateCcw size={14} /> Retake Test (New Questions)
+                <RotateCcw size={14} /> Retake with new questions
               </button>
             </div>
           </div>
         </div>
 
         <div className="card">
-          <h3 className="card-title mb-4">Sub-Skill Breakdown</h3>
+          <h3 className="card-title mb-4">Sub-skill breakdown</h3>
           <div className="grid-2">
             {attemptResult.subSkillScores?.map((sub, i) => (
               <div key={i} className="list-item" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
@@ -94,14 +94,14 @@ export default function AssessmentView() {
                   const topic = topics[0];
                   if (!topic) return null;
                   return (
-                    <div className="list-divider-subtle" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', fontSize: '0.75rem' }}>
+                    <div className="list-divider-subtle" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', fontSize: '0.75rem' }}>
                       <span className="text-muted">Improve:</span>
                       {topic.resources.slice(0, 2).map((res, i) => (
-                        <a key={i} href={safeExternalUrl(res.url)} target="_blank" rel="noreferrer" className="badge" style={{ fontSize: '0.65rem', padding: '0.15rem 0.5rem', color: 'var(--accent-text)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                        <a key={i} href={safeExternalUrl(res.url)} target="_blank" rel="noreferrer" className="small" style={{ color: 'var(--accent-text)', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
                           {res.source} <ExternalLink size={9} />
                         </a>
                       ))}
-                      <Link href={`/learn#${topic.key}`} className="badge badge-preferred" style={{ fontSize: '0.65rem', textDecoration: 'none', cursor: 'pointer' }}>
+                      <Link href={`/learn#${topic.key}`} className="small" style={{ color: 'var(--accent-text)', textDecoration: 'none', cursor: 'pointer' }}>
                         All resources →
                       </Link>
                     </div>
@@ -114,7 +114,7 @@ export default function AssessmentView() {
 
         {attemptResult.detailedResults && attemptResult.detailedResults.length > 0 && (
           <div className="card">
-            <h3 className="card-title mb-1">Question-by-Question Review</h3>
+            <h3 className="card-title mb-1">Question review</h3>
             <p className="card-subtitle mb-4">
               Compare your answers against the correct solutions with explanations.
             </p>
@@ -206,9 +206,9 @@ export default function AssessmentView() {
       <div className="card">
         <div className="row-between" style={{ alignItems: 'center', marginBottom: '0.75rem' }}>
           <span className="quiz-progress-label">
-            QUESTION {currentQuestionIdx + 1} OF {questions.length}
+            Question {currentQuestionIdx + 1} of {questions.length}
           </span>
-          <Chip tone="accent">{currentQuestion.points} POINTS</Chip>
+          <Chip tone="accent">{currentQuestion.points} points</Chip>
         </div>
 
         <div className="progress-container mb-5" style={{ margin: 0 }}>
@@ -260,7 +260,7 @@ export default function AssessmentView() {
               disabled={!isAnswered || isSubmittingAssessment}
               onClick={handleSubmitAssessment}
             >
-              {isSubmittingAssessment ? 'Grading Answers...' : 'Submit Assessment'}
+              {isSubmittingAssessment ? 'Grading…' : 'Submit Assessment'}
             </button>
           ) : (
             <button

@@ -34,9 +34,9 @@ export default function ActionsView() {
     <div className="stack stack-lg">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Recommended Projects to Build</h1>
+          <h1 className="page-title">Recommended projects</h1>
           <p className="page-subtitle">
-            Targeted projects designed to bridge multiple high-priority gaps simultaneously. Submit your GitHub repository URL for automated signal extraction.
+            Projects that cover several of your highest-priority gaps at once. Submit a GitHub repo and we scan it for tests, Dockerfiles, and migrations.
           </p>
         </div>
         <button className="btn btn-primary" onClick={() => setShowProjectModal(true)}>
@@ -76,9 +76,9 @@ export default function ActionsView() {
       <div className="card">
         <div className="card-header">
           <div>
-            <h2 className="card-title">Verified Project Portfolio</h2>
+            <h2 className="card-title">Submitted projects</h2>
             <p className="card-subtitle">
-              GitHub repositories submitted and scanned for Dockerfiles, tests, and database migrations.
+              Repositories you have submitted and what we detected in them.
             </p>
           </div>
         </div>

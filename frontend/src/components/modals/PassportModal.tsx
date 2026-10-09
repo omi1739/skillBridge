@@ -13,7 +13,7 @@ export default function PassportModal() {
       <div className="modal-box passport-modal-content" style={{ maxWidth: '680px', maxHeight: '90vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
           <div>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Verified Skills Passport</h2>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Skills passport</h2>
             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
               ID: {passportData.passportId || passportData.candidate?.candidateId || 'SKILLBRIDGE-VERIFIED'}
             </div>
@@ -38,7 +38,7 @@ export default function PassportModal() {
               <div style={{ fontSize: '0.85rem', color: 'var(--info)' }}>{passportData.candidate?.targetRole || 'Not selected'}</div>
             </div>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Target Alignment</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Target alignment</div>
               <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--success)', fontFamily: 'var(--font-mono)' }}>
                 {passportData.metrics?.overallAlignment ?? passportData.alignmentScore ?? 0}%
               </div>
@@ -48,7 +48,7 @@ export default function PassportModal() {
 
         <div style={{ marginBottom: '1.25rem' }}>
           <h4 style={{ fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
-            Demonstrated Competencies
+            Demonstrated skills
           </h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             {(passportData.evidence || passportData.competencies || []).map((comp: any, idx: number) => {
@@ -70,7 +70,7 @@ export default function PassportModal() {
         </div>
 
         <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-          <span>Verified by SkillBridge Labor Platform</span>
+          <span>Issued by SkillBridge</span>
           <span>Issued: {new Date().toLocaleDateString()}</span>
         </div>
       </div>

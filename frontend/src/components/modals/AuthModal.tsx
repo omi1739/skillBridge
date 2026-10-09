@@ -173,7 +173,7 @@ export default function AuthModal() {
               <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.1rem' }}>
                 {authMode === 'LOGIN'
                   ? 'Sign in to track your skills and job matches.'
-                  : 'Join SkillBridge and start your backend engineering journey.'}
+                  : 'Join SkillBridge and track your skills and job matches.'}
               </div>
             </div>
           </div>
@@ -353,7 +353,7 @@ export default function AuthModal() {
               onClick={handleDemoLogin}
               disabled={isAuthLoading}
             >
-              <Play size={14} /> Try the Demo Account (1-click)
+              <Play size={14} /> Use demo account
             </button>
           )}
         </form>

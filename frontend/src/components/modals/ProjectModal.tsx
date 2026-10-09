@@ -12,7 +12,7 @@ export default function ProjectModal() {
     <div className="modal-backdrop">
       <div className="modal-box">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-          <h2 style={{ fontSize: '1.2rem', fontWeight: 700 }}>Submit Project Repository</h2>
+          <h2 style={{ fontSize: '1.2rem', fontWeight: 700 }}>Submit project</h2>
           <button className="btn btn-ghost" onClick={() => setShowProjectModal(false)} style={{ padding: '0.25rem' }} aria-label="Close">
             <X size={18} />
           </button>
@@ -21,7 +21,7 @@ export default function ProjectModal() {
         <form onSubmit={handleProjectSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div>
             <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>
-              Project Title
+              Project title
             </label>
             <input
               type="text"
@@ -36,7 +36,7 @@ export default function ProjectModal() {
 
           <div>
             <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>
-              GitHub Repository URL
+              GitHub repository URL
             </label>
             <input
               type="url"
@@ -52,7 +52,7 @@ export default function ProjectModal() {
 
           <div>
             <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>
-              Brief Technical Architecture Summary
+              Short description
             </label>
             <textarea
               placeholder="Implemented PostgreSQL connection pooling, Redis caching layer, Docker containerization..."
@@ -76,7 +76,7 @@ export default function ProjectModal() {
               Cancel
             </button>
             <button type="submit" className="btn btn-primary" disabled={isSubmittingProject}>
-              {isSubmittingProject ? 'Scanning Signals...' : 'Verify Repository'}
+              {isSubmittingProject ? 'Scanning…' : 'Submit for verification'}
             </button>
           </div>
         </form>

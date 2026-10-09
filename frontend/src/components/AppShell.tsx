@@ -32,14 +32,19 @@ const PAGE_TITLES: Record<string, string> = {
   '/gaps': 'My Skill Gaps',
   '/actions': 'Projects to Build',
   '/jobs': 'Matching Jobs',
-  '/admin': 'Admin & Ontology Console',
+  '/admin': 'Admin Console',
   '/profile': 'My Profile'
 };
 
+function roleLabel(userRole?: string) {
+  if (userRole === 'ADMIN') return 'Administrator';
+  if (userRole === 'RECRUITER') return 'Recruiter';
+  return 'Candidate';
+}
+
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const {
-    currentUser, currentProfile, role, activeTargetRoleId,
-    globalError, dismissGlobalError, handleLogout
+    currentUser, currentProfile, globalError, dismissGlobalError, handleLogout
   } = useSkillBridge();
   const pathname = usePathname() || '/';
   const router = useRouter();
@@ -71,16 +76,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }, [pathname]);
 
   const errorBanner = globalError ? (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 1000, display: 'flex', justifyContent: 'center', padding: '0.75rem 1rem' }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.65rem 1rem', borderRadius: '8px',
-        background: 'var(--danger-bg)', border: '1px solid var(--danger-border)',
-        color: 'var(--danger-text)', fontSize: '0.85rem', maxWidth: '640px', boxShadow: 'var(--shadow-dropdown)',
-        backdropFilter: 'blur(6px)'
-      }}>
-        <span style={{ flex: 1 }}>{globalError}</span>
-        <button onClick={dismissGlobalError} aria-label="Dismiss" className="btn btn-ghost" style={{ padding: '0.2rem' }}>
-          <X size={14} />
+    <div className="global-banner">
+      <div className="global-banner-inner" role="alert">
+        <span className="global-banner-msg">{globalError}</span>
+        <button onClick={dismissGlobalError} aria-label="Dismiss" className="global-banner-close">
+          <X size={15} />
         </button>
       </div>
     </div>
@@ -93,25 +93,26 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <div>
         <PublicNavbar />
         {errorBanner}
-        <div className="public-container">
-          {showLanding ? (
-            <PublicHomeView />
-          ) : !isPublicPage && protectedLabel ? (
-            <SignInPromptView
-              title={protectedLabel.title}
-              subtitle="Your assessments, skill evidence, and recommendations are linked to a verified account."
-            />
-          ) : (
-            children
-          )}
-        </div>
+        {showLanding ? (
+          <PublicHomeView />
+        ) : (
+          <div className="public-container">
+            {!isPublicPage && protectedLabel ? (
+              <SignInPromptView
+                title={protectedLabel.title}
+                subtitle="Your assessments, skill evidence, and recommendations are linked to a verified account."
+              />
+            ) : (
+              children
+            )}
+          </div>
+        )}
         <SiteFooter />
       </div>
     );
   }
 
   const pageTitle = PAGE_TITLES[pathname] || pathname.replace(/^\//, '');
-  const trackLabel = activeTargetRoleId ? (role?.title || 'Select your track') : null;
 
   return (
     <div className="app-shell">
@@ -126,43 +127,32 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </button>
             <div className="topbar-title">
               <span>{pageTitle}</span>
-              {trackLabel && <span className="topbar-track">{trackLabel}</span>}
             </div>
             <div className="topbar-actions">
               <ThemeToggle />
-              <div className="topbar-user" ref={menuRef} style={{ position: 'relative' }}>
+              <div className="topbar-user" ref={menuRef}>
                 <button
                   className="topbar-user-trigger"
                   onClick={() => setUserMenuOpen(v => !v)}
                   aria-haspopup="menu"
                   aria-expanded={userMenuOpen}
-                  style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', padding: '0.2rem 0.1rem 0.2rem 0.5rem', borderRadius: '8px' }}
                 >
                   <Avatar
                     src={currentUser?.avatarUrl}
                     name={currentProfile?.fullName}
                     email={currentUser?.email}
-                    size={32}
+                    size={30}
                   />
-                  <div style={{ textAlign: 'left' }}>
+                  <div className="topbar-user-meta">
                     <div className="topbar-user-name">
                       {currentProfile?.fullName || currentUser.email.split('@')[0]}
                     </div>
-                    <div className="topbar-user-role">
-                      {currentUser.role === 'ADMIN' ? 'Administrator' : currentUser.role === 'RECRUITER' ? 'Recruiter' : 'Verified Candidate'}
-                    </div>
+                    <div className="topbar-user-role">{roleLabel(currentUser.role)}</div>
                   </div>
-                  <ChevronDown size={14} color="var(--text-muted)" style={{ marginLeft: '0.15rem' }} />
+                  <ChevronDown size={14} className="topbar-user-caret" aria-hidden="true" />
                 </button>
                 {userMenuOpen && (
-                  <div
-                    role="menu"
-                    style={{
-                      position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 50,
-                      minWidth: 180, background: 'var(--bg-surface)', border: '1px solid var(--border-color)',
-                      borderRadius: '8px', boxShadow: 'var(--shadow-dropdown)', padding: '0.3rem'
-                    }}
-                  >
+                  <div role="menu" className="topbar-menu">
                     <button
                       role="menuitem"
                       className="topbar-menu-item"

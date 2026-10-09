@@ -12,8 +12,8 @@ export function RolePromptView() {
       <EmptyState
         icon={Sliders}
         tone="info"
-        title="Choose Your Target Role"
-        subtitle="Pick the role you're preparing for to unlock personalized skill gaps, market demand insights, and job matches."
+        title="Choose your target role"
+        subtitle="Pick the role you're preparing for to unlock skill gaps, market demand insights, and job matches."
         actions={
           <div className="toolbar">
             <select className="select" style={{ maxWidth: '280px' }} value={roleDraft} onChange={e => setRoleDraft(e.target.value)}>
@@ -23,7 +23,7 @@ export function RolePromptView() {
               ))}
             </select>
             <button className="btn btn-primary" disabled={!roleDraft} onClick={() => handleRoleSelect(roleDraft)}>
-              Save Target Role
+              Save role
             </button>
           </div>
         }
@@ -45,7 +45,7 @@ export function SignInPromptView({ title, subtitle }: { title: string; subtitle:
           <div className="toolbar">
             {isDemoAccessEnabled && (
               <button className="btn btn-primary" onClick={handleDemoLogin}>
-                Try Demo (1-Click)
+                Try the demo
               </button>
             )}
             <button className="btn btn-secondary" onClick={() => { setAuthMode('LOGIN'); setShowAuthModal(true); }}>
@@ -65,12 +65,12 @@ export function NoEvidenceView() {
       <EmptyState
         icon={ShieldCheck}
         tone="success"
-        title="You haven't verified any skills yet"
-        subtitle="Take the skill assessment or solve a sandbox challenge to build your skill evidence. Your personalized skill gaps, project recommendations, and job matches will unlock here once you have verified results."
+        title="No verified skills yet"
+        subtitle="Take the assessment or solve a sandbox challenge to build evidence. Your gaps, project recommendations, and job matches unlock here once you have verified results."
         actions={
           <div className="toolbar">
             <button className="btn btn-primary" onClick={() => navigate('assessment')}>
-              <BrainCircuit size={14} /> Take the Skill Assessment
+              <BrainCircuit size={14} /> Take the assessment
             </button>
             <button className="btn btn-secondary" onClick={() => navigate('sandbox')}>
               <Terminal size={14} /> Try the SQL & Code Sandbox

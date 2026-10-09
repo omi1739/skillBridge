@@ -16,9 +16,9 @@ export default function CurriculumView() {
     <div className="stack stack-lg">
       <div className="page-header">
         <div>
-          <h1 className="page-title">University Syllabi vs. Market Reality</h1>
+          <h1 className="page-title">University syllabi vs. market reality</h1>
           <p className="page-subtitle">
-            Benchmarking academic computer science courses against modern software engineering production expectations.
+            How a university&apos;s computer science courses line up with the skills employers actually ask for.
           </p>
         </div>
       </div>
@@ -48,14 +48,14 @@ export default function CurriculumView() {
         <div className="stack stack-lg">
           <div className="stat-grid-3">
             <div className="stat-card">
-              <div className="stat-label">Syllabus Alignment Score</div>
+              <div className="stat-label">Market alignment</div>
               <div className="stat-value" style={{ color: (curriculumAnalysis.marketAlignmentScore ?? 0) >= 65 ? 'var(--success)' : 'var(--warning)' }}>
                 {curriculumAnalysis.marketAlignmentScore ?? 0}%
               </div>
-              <div className="stat-sub">Coverage of {curriculumAnalysis.targetRole || 'Target'} Skills</div>
+              <div className="stat-sub">Coverage of {curriculumAnalysis.targetRole || 'target'} skills</div>
             </div>
             <div className="stat-card" style={{ gridColumn: 'span 2' }}>
-              <div className="stat-label">Analysis Summary</div>
+              <div className="stat-label">Summary</div>
               <p className="small text-secondary" style={{ marginTop: '0.4rem', lineHeight: 1.5 }}>
                 {curriculumAnalysis.summaryAnalysis || 'No curriculum analysis available.'}
               </p>
@@ -65,11 +65,11 @@ export default function CurriculumView() {
           <div className="grid-2">
             <div className="card">
               <h3 className="card-title" style={{ color: 'var(--success-text)', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-                <CheckCircle2 size={18} /> Strong Academic Foundation
+                <CheckCircle2 size={18} /> Strong foundation
               </h3>
               <div className="stack stack-sm">
                 {(curriculumAnalysis.strongAcademicAreas || []).length === 0 && (
-                  <p className="small text-secondary">No strong academic coverage identified yet.</p>
+                  <p className="small text-secondary">No strong coverage identified yet.</p>
                 )}
                 {(curriculumAnalysis.strongAcademicAreas || []).map((item, idx) => (
                   <div key={idx} className="list-item">
@@ -82,12 +82,12 @@ export default function CurriculumView() {
 
             <div className="card">
               <h3 className="card-title" style={{ color: 'var(--danger-text)', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-                <AlertCircle size={18} /> Critical Market Omissions
+                <AlertCircle size={18} /> Missing from the syllabus
               </h3>
               <div className="stack stack-sm">
                 {(curriculumAnalysis.criticalMarketOmissions || []).length === 0 && (
                   <p className="small" style={{ color: 'var(--danger)', fontWeight: 600 }}>
-                    No market-critical omissions found — curriculum coverage is well aligned.
+                    Nothing major missing — coverage is well aligned.
                   </p>
                 )}
                 {(curriculumAnalysis.criticalMarketOmissions || []).map((item, idx) => (
@@ -95,14 +95,14 @@ export default function CurriculumView() {
                     <div className="row-between">
                       <strong style={{ color: 'var(--danger-text)', fontSize: '0.9rem' }}>{item.skill}</strong>
                       <span className="badge badge-critical" style={{ fontSize: '0.675rem' }}>
-                        Demanded by {item.marketDemand}% of Jobs
+                        {item.marketDemand}% of jobs
                       </span>
                     </div>
                     <div className="small" style={{ color: 'var(--danger)', fontWeight: 600, marginTop: '0.25rem' }}>
-                      Academic Status: {item.academicStatus}
+                      Taught as: {item.academicStatus}
                     </div>
                     <p className="small text-secondary" style={{ marginTop: '0.35rem' }}>
-                      Recommendation: {item.recommendation}
+                      Suggested: {item.recommendation}
                     </p>
                   </div>
                 ))}

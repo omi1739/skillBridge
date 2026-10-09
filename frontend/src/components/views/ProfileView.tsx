@@ -2,11 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Mail, Calendar, ShieldCheck, Globe, Github, Target, Pencil, Check, ArrowLeft, AlertCircle, Lock } from 'lucide-react';
+import { Mail, Calendar, ShieldCheck, Globe, Github, Target, Pencil, Check, ArrowLeft, AlertCircle, Lock, User } from 'lucide-react';
 import { useSkillBridge } from '@/lib/skillbridge-context';
 import Avatar from '@/components/ui/Avatar';
 import { safeExternalUrl } from '@/lib/safe-url';
 import { CURRENT_STATUS_OPTIONS } from '@/lib/constants';
+import { EmptyState } from '@/components/ui/primitives';
 
 export default function ProfileView() {
   const {
@@ -49,7 +50,17 @@ export default function ProfileView() {
     setProfileError('');
   }, [setProfileSuccess, setProfileError]);
 
-  if (!currentUser || !currentProfile) return null;
+  if (!currentUser) return null;
+  if (!currentProfile) {
+    return (
+      <EmptyState
+        icon={User}
+        tone="info"
+        title="Loading your profile…"
+        subtitle="Fetching your account details."
+      />
+    );
+  }
 
   const statusLabel = CURRENT_STATUS_OPTIONS.find(o => o.value === (currentUser.currentStatus || 'STUDENT'))?.label || 'Student';
   const targetRoleTitle = allRoles.find(r => r.id === currentProfile.targetRoleId)?.title || role?.title || 'Not set';
@@ -287,7 +298,7 @@ export default function ProfileView() {
               <div>
                 <div className="profile-label">Role on platform</div>
                 <div style={{ fontSize: '0.88rem', color: 'var(--text-primary)' }}>
-                  {isAdmin ? 'Administrator' : currentUser.role === 'RECRUITER' ? 'Recruiter' : 'Verified Candidate'}
+                  {isAdmin ? 'Administrator' : currentUser.role === 'RECRUITER' ? 'Recruiter' : 'Candidate'}
                 </div>
               </div>
             </div>

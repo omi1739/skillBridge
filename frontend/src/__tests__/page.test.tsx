@@ -218,7 +218,7 @@ function renderApp(initialPath = '/') {
 async function loginAsDemo(user: ReturnType<typeof userEvent.setup>) {
   const demo = await screen.findByRole('button', { name: /try demo/i });
   await user.click(demo);
-  await screen.findByRole('heading', { name: /Full-Stack Engineer Job Market Demand/i });
+  await screen.findByRole('heading', { name: /Full-Stack Engineer demand/i });
   await screen.findByText(/matching jobs/i);
 }
 
@@ -299,12 +299,12 @@ describe('SkillBridge app API contract (multi-route)', () => {
     await loginAsDemo(user);
 
     await screen.findByText(/matching jobs/i);
-    expect(screen.queryByRole('button', { name: /Admin & Weights/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Admin Console/i })).toBeNull();
   }, 20000);
 
   it('shows the real job posting count from /stats on the public landing page', async () => {
     renderApp('/');
-    await screen.findByText(/Real job requirements, measured against real skills/i);
+    await screen.findByRole('heading', { name: /Know which skills employers/i });
     const matches = await screen.findAllByText('27');
     expect(matches).not.toHaveLength(0);
   }, 20000);

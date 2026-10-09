@@ -31,11 +31,11 @@ export default function SkillAdminView() {
   return (
     <div className="stack stack-lg">
       <SectionCard
-        title={<><Database size={18} style={{ color: 'var(--violet)' }} /> Skill Question Bank</>}
-        subtitle="Review AI-generated questions and manage the skill question bank."
+        title={<><Database size={18} style={{ color: 'var(--violet)' }} /> Question bank</>}
+        subtitle="Review generated questions and manage the skill question bank."
       >
         <div className="list-item" style={{ padding: '1rem' }}>
-          <h3 style={{ fontSize: '0.9rem', fontWeight: 600, marginBottom: '0.75rem' }}>Generate Questions with AI</h3>
+          <h3 style={{ fontSize: '0.9rem', fontWeight: 600, marginBottom: '0.75rem' }}>Generate questions</h3>
           <div className="grid-5" style={{ alignItems: 'end' }}>
             <Field label="Skill">
               <select className="select" value={skillAssessSelectedSkill} onChange={(e) => setSkillAssessSelectedSkill(e.target.value)}>
@@ -52,7 +52,7 @@ export default function SkillAdminView() {
             </Field>
             <Field label="Type">
               <select className="select" value={adminGenForm.questionType} onChange={(e) => setAdminGenForm(prev => ({ ...prev, questionType: e.target.value }))}>
-                <option value="MCQ">MCQ</option><option value="code_output">Code Output</option><option value="true_false">True/False</option><option value="multiple_select">Multi-Select</option>
+                <option value="MCQ">MCQ</option><option value="code_output">Code output</option><option value="true_false">True/False</option><option value="multiple_select">Multi-select</option>
               </select>
             </Field>
             <Field label="Count">
@@ -93,7 +93,7 @@ export default function SkillAdminView() {
                     <div className="flex-1" style={{ whiteSpace: 'pre-wrap' }}><strong>{q.questionText}</strong></div>
                     <div className="toolbar shrink-0">
                       <Chip tone={q.difficulty === 'hard' ? 'danger' : q.difficulty === 'medium' ? 'warning' : 'info'}>{q.difficulty}</Chip>
-                      <Chip tone="accent">{q.questionType}</Chip>
+                      <Chip tone="accent">{String(q.questionType).replace(/_/g, ' ')}</Chip>
                       {statusChip(q.verificationStatus)}
                     </div>
                   </div>

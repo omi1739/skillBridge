@@ -67,8 +67,8 @@ export default function AdminView() {
       <EmptyState
         icon={ShieldAlert}
         tone="danger"
-        title="Access Restricted"
-        subtitle="The Admin & Ontology Console is limited to administrator accounts. Your account does not have the required role."
+        title="Admins only"
+        subtitle="This console is limited to administrator accounts."
       />
     );
   }
@@ -77,30 +77,30 @@ export default function AdminView() {
     <div className="stack stack-lg">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Admin & Ontology Console</h1>
+          <h1 className="page-title">Admin console</h1>
           <p className="page-subtitle">
-            Manage canonical skill ontologies, merge synonyms, tune role skill importance weights, and inspect ingestion coverage.
+            Manage skills, synonyms, and role weights, and review ingestion coverage.
           </p>
         </div>
       </div>
 
       {adminOverview && (
         <div className="stat-grid-3">
-          <div className="stat-card"><div className="stat-label">Total Jobs Ingested</div><div className="stat-value">{adminOverview.totalJobsCount}</div></div>
-          <div className="stat-card"><div className="stat-label">Canonical Skills</div><div className="stat-value">{adminOverview.canonicalSkillsCount}</div></div>
-          <div className="stat-card"><div className="stat-label">Recognized Aliases</div><div className="stat-value">{adminOverview.totalAliasesCount}</div></div>
+          <div className="stat-card"><div className="stat-label">Jobs ingested</div><div className="stat-value">{adminOverview.totalJobsCount}</div></div>
+          <div className="stat-card"><div className="stat-label">Skills</div><div className="stat-value">{adminOverview.canonicalSkillsCount}</div></div>
+          <div className="stat-card"><div className="stat-label">Aliases</div><div className="stat-value">{adminOverview.totalAliasesCount}</div></div>
         </div>
       )}
 
       {(dash || !adminUsers.length) && (
         <div className="stack stack-lg">
-          <h2 className="card-title mb-0">User Dashboard</h2>
+          <h2 className="card-title mb-0">User overview</h2>
 
           <div className="stat-grid-4">
-            <div className="stat-card"><div className="stat-label">Total Users</div><div className="stat-value">{dash?.totalUsers ?? '—'}</div></div>
+            <div className="stat-card"><div className="stat-label">Users</div><div className="stat-value">{dash?.totalUsers ?? '—'}</div></div>
             <div className="stat-card"><div className="stat-label">Admins</div><div className="stat-value" style={{ color: 'var(--warning)' }}>{dash ? roleCount('ADMIN') : '—'}</div></div>
             <div className="stat-card"><div className="stat-label">Recruiters</div><div className="stat-value" style={{ color: 'var(--info)' }}>{dash ? roleCount('RECRUITER') : '—'}</div></div>
-            <div className="stat-card"><div className="stat-label">Regular Users</div><div className="stat-value" style={{ color: 'var(--teal)' }}>{dash ? roleCount('USER') : '—'}</div></div>
+            <div className="stat-card"><div className="stat-label">Candidates</div><div className="stat-value" style={{ color: 'var(--teal)' }}>{dash ? roleCount('USER') : '—'}</div></div>
           </div>
 
           <div className="grid-2">
@@ -188,28 +188,28 @@ export default function AdminView() {
       )}
 
       <div className="grid-2">
-        <SectionCard title="Add Skill Alias Mapping">
+        <SectionCard title="Add skill alias">
           <form onSubmit={handleCreateAlias} className="stack stack-sm">
-            <Field label="Raw Job Alias / Synonym">
+            <Field label="Alias or synonym">
               <input type="text" className="input" placeholder="e.g. Postgres, PSQL, Node" value={aliasForm.rawAlias} onChange={e => setAliasForm({ ...aliasForm, rawAlias: e.target.value })} />
             </Field>
-            <Field label="Maps To Canonical Skill">
+            <Field label="Canonical skill">
               <select className="select" value={aliasForm.canonicalSkillId} onChange={e => setAliasForm({ ...aliasForm, canonicalSkillId: e.target.value })}>
-                <option value="">Select canonical skill...</option>
+                <option value="">Select a skill…</option>
                 {skills.map(s => (
                   <option key={s.id} value={s.id}>{s.canonicalName}</option>
                 ))}
               </select>
             </Field>
-            <button type="submit" className="btn btn-primary">Add Synonym Mapping</button>
-            {aliasSaveSuccess && <Alert tone="success">✓ Alias mapping registered.</Alert>}
+            <button type="submit" className="btn btn-primary">Add alias</button>
+            {aliasSaveSuccess && <Alert tone="success">Alias added.</Alert>}
           </form>
         </SectionCard>
 
-        <SectionCard title="Role Skill Importance Tuner">
+        <SectionCard title="Role skill weights">
           {role && editingSkillWeight ? (
             <form onSubmit={handleUpdateRoleWeight} className="stack stack-sm">
-              <Field label="Select Role Skill">
+              <Field label="Role skill">
                 <select
                   className="select"
                   value={editingSkillWeight.skillId}
@@ -234,7 +234,7 @@ export default function AdminView() {
 
               <div>
                 <div className="row-between small" style={{ marginBottom: '0.3rem' }}>
-                  <span>Role Importance Weight:</span>
+                  <span>Weight:</span>
                   <strong>{Math.round(editingSkillWeight.roleWeight * 100)}%</strong>
                 </div>
                 <input
@@ -248,8 +248,8 @@ export default function AdminView() {
                 />
               </div>
 
-              <button type="submit" className="btn btn-primary">Save Updated Weight</button>
-              {weightSaveSuccess && <Alert tone="success">✓ Role weight updated and gaps recalculated.</Alert>}
+              <button type="submit" className="btn btn-primary">Save weight</button>
+              {weightSaveSuccess && <Alert tone="success">Weight updated — gaps recalculated.</Alert>}
             </form>
           ) : (
             <p className="small text-muted">No role selected — choose a target role to tune weights.</p>
@@ -258,7 +258,7 @@ export default function AdminView() {
       </div>
 
       <div className="card">
-        <h2 className="card-title mb-1">User Management</h2>
+        <h2 className="card-title mb-1">Users</h2>
         <p className="text-muted small mb-4">
           List, change roles, and remove registered accounts. You cannot change your own role or delete your own account.
         </p>

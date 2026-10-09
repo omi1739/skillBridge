@@ -14,28 +14,24 @@ export default function SiteFooter() {
             <span>SkillBridge</span>
           </Link>
           <p className="site-footer-tagline">
-            Benchmark your skills against real job requirements. A data-driven roadmap for junior engineers.
+            Live job-market demand mapped to your verified skills, with a clear path to the
+            next thing worth learning.
           </p>
-          <div className="site-footer-badge">
-            <span className="badge badge-preferred" style={{ fontSize: '0.65rem' }}>Open Source</span>
-            <span className="badge" style={{ fontSize: '0.65rem' }}>Free for Students</span>
-          </div>
         </div>
 
         <div className="site-footer-col">
-          <div className="site-footer-col-title">Tools</div>
-          <nav className="site-footer-links" aria-label="Tools">
-            <Link href="/market">Job Market Demand</Link>
+          <div className="site-footer-col-title">Product</div>
+          <nav className="site-footer-links" aria-label="Product">
+            <Link href="/market">Job Market</Link>
+            <Link href="/curriculum">University Syllabi</Link>
             <Link href="/assessment">Diagnostic Test</Link>
             <Link href="/sandbox">SQL &amp; Code Sandbox</Link>
-            <Link href="/curriculum">University Syllabi</Link>
-            <Link href="/jobs">Browse Jobs</Link>
           </nav>
         </div>
 
         <div className="site-footer-col">
-          <div className="site-footer-col-title">Learning</div>
-          <nav className="site-footer-links" aria-label="Learning">
+          <div className="site-footer-col-title">Learn</div>
+          <nav className="site-footer-links" aria-label="Learn">
             <Link href="/learn?topic=sql">SQL</Link>
             <Link href="/learn?topic=javascript">JavaScript</Link>
             <Link href="/learn?topic=python">Python</Link>
@@ -46,8 +42,8 @@ export default function SiteFooter() {
         </div>
 
         <div className="site-footer-col">
-          <div className="site-footer-col-title">Platform</div>
-          <nav className="site-footer-links" aria-label="Platform">
+          <div className="site-footer-col-title">Account</div>
+          <nav className="site-footer-links" aria-label="Account">
             <Link href="/gaps">Skill Gaps</Link>
             <Link href="/actions">Projects to Build</Link>
             <Link href="/profile">My Profile</Link>
@@ -58,7 +54,7 @@ export default function SiteFooter() {
       <div className="site-footer-bottom">
         <span>&copy; {year} SkillBridge</span>
         <span className="site-footer-bottom-sep">&middot;</span>
-        <span>Built for engineers who want evidence-backed career growth</span>
+        <span>Evidence-based career growth for engineers</span>
       </div>
     </footer>
   );

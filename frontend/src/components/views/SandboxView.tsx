@@ -26,7 +26,7 @@ export default function SandboxView() {
         <div>
           <h1 className="page-title">SQL & Code Sandbox</h1>
           <p className="page-subtitle">
-            Solve real engineering queries and algorithmic problems against test datasets. Passing hands-on challenges elevates your skill evidence to Verified.
+            Solve SQL and coding challenges against real test data. Passing a challenge marks that skill as verified.
           </p>
         </div>
         <button
@@ -34,7 +34,7 @@ export default function SandboxView() {
           disabled={isGeneratingChallenge}
           onClick={handleGenerateChallenge}
         >
-          <BrainCircuit size={15} /> {isGeneratingChallenge ? 'Generating...' : 'Generate New Challenge'}
+          <BrainCircuit size={15} /> {isGeneratingChallenge ? 'Generating…' : 'New challenge'}
         </button>
       </div>
 
@@ -81,7 +81,7 @@ export default function SandboxView() {
               {activeChallenge.schemaPreview && (
                 <div style={{ marginTop: '1.25rem' }}>
                   <div className="tiny text-muted" style={{ fontWeight: 600, textTransform: 'uppercase', marginBottom: '0.35rem' }}>
-                    Schema Tables
+                    Schema tables
                   </div>
                   <pre className="code-block" style={{ fontSize: '0.75rem' }}>
                     <code>{activeChallenge.schemaPreview}</code>
@@ -124,7 +124,7 @@ export default function SandboxView() {
                       <AlertCircle size={16} color="var(--danger)" />
                     )}
                     <span style={{ fontWeight: 600, fontSize: '0.85rem', color: sandboxResult.passed ? 'var(--success-text)' : 'var(--danger-text)' }}>
-                      {sandboxResult.passed ? 'All Test Assertions Passed' : 'Tests Failed'}
+                      {sandboxResult.passed ? 'All tests passed' : 'Tests failed'}
                     </span>
                   </div>
 

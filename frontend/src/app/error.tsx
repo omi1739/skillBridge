@@ -24,7 +24,7 @@ export default function ErrorBoundary({
         display: 'grid',
         placeItems: 'center',
         padding: '2rem',
-        background: 'var(--bg-primary)',
+        background: 'var(--bg-app)',
         color: 'var(--text-primary)'
       }}
     >
@@ -35,7 +35,7 @@ export default function ErrorBoundary({
           This page failed to render. Your data is safe — try again, or head back to the start.
         </p>
         {error?.digest ? (
-          <p className="mono" style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
+          <p className="mono" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
             Error reference: {error.digest}
           </p>
         ) : null}

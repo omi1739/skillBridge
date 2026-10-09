@@ -24,7 +24,7 @@ function ResourceRow({ res }: { res: ResourceLink }) {
     <a href={safeExternalUrl(res.url)} target="_blank" rel="noreferrer" className="learn-resource-link">
       <Icon size={14} />
       <span style={{ flex: 1 }}>{res.name}</span>
-      <span className="badge" style={{ fontSize: '0.6rem' }}>{res.source}</span>
+      <span className="small text-muted">{res.source}</span>
       <ExternalLink size={11} style={{ opacity: 0.6, flexShrink: 0 }} />
     </a>
   );
@@ -37,7 +37,6 @@ function TopicDetail({ topic }: { topic: TopicResources }) {
         <h1 className="learn-detail-title">{topic.title}</h1>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <span className={`badge ${DIFFICULTY_COLORS[topic.difficulty]}`}>{topic.difficulty}</span>
-          <span className="badge badge-preferred">{topic.category}</span>
         </div>
       </div>
 
@@ -49,7 +48,7 @@ function TopicDetail({ topic }: { topic: TopicResources }) {
       <section className="learn-section">
         <div className="learn-section-head">
           <Briefcase size={16} />
-          <h2>Job Market Demand</h2>
+          <h2>Why it matters</h2>
         </div>
         <p className="learn-demand-text">{topic.jobDemand}</p>
       </section>
@@ -57,7 +56,7 @@ function TopicDetail({ topic }: { topic: TopicResources }) {
       <section className="learn-section">
         <div className="learn-section-head">
           <Building2 size={16} />
-          <h2>Industries &amp; Sectors</h2>
+          <h2>Where it&apos;s used</h2>
         </div>
         <div className="learn-sectors-grid">
           {topic.sectors.map((sector, i) => (
@@ -72,7 +71,7 @@ function TopicDetail({ topic }: { topic: TopicResources }) {
       <section className="learn-section">
         <div className="learn-section-head">
           <Target size={16} />
-          <h2>Key Concepts</h2>
+          <h2>Key concepts</h2>
         </div>
         <div className="learn-keywords">
           {topic.keywords.filter(k => k.trim().length > 1).map((kw, i) => (
@@ -84,11 +83,11 @@ function TopicDetail({ topic }: { topic: TopicResources }) {
       <section className="learn-section">
         <div className="learn-section-head">
           <Wrench size={16} />
-          <h2>Learning Resources</h2>
+          <h2>Resources</h2>
         </div>
         <div className="learn-resources-grid">
           <div className="learn-resource-group">
-            <h3 className="learn-resource-group-title">Documentation &amp; Tutorials</h3>
+            <h3 className="learn-resource-group-title">Documentation &amp; tutorials</h3>
             <div className="learn-resource-list">
               {topic.resources.filter(r => r.kind === 'Docs').map((res, i) => (
                 <ResourceRow key={i} res={res} />
@@ -96,7 +95,7 @@ function TopicDetail({ topic }: { topic: TopicResources }) {
             </div>
           </div>
           <div className="learn-resource-group">
-            <h3 className="learn-resource-group-title">Video Courses</h3>
+            <h3 className="learn-resource-group-title">Video courses</h3>
             <div className="learn-resource-list">
               {topic.resources.filter(r => r.kind === 'Video').map((res, i) => (
                 <ResourceRow key={i} res={res} />

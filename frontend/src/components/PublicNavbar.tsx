@@ -2,53 +2,39 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { TrendingUp, GraduationCap, LogIn } from 'lucide-react';
 import { useSkillBridge } from '@/lib/skillbridge-context';
 import ThemeToggle from './ThemeToggle';
 import BrandMark from '@/components/ui/BrandMark';
 
 export default function PublicNavbar() {
   const pathname = usePathname();
-  const { landingStats, allJobs, curricula, setAuthMode, setShowAuthModal, handleDemoLogin, isDemoAccessEnabled } = useSkillBridge();
-  const totalJobsCount = landingStats?.jobPostings ?? allJobs.length;
-  const totalCurriculaCount = landingStats?.curriculaCount ?? curricula.length;
+  const { setAuthMode, setShowAuthModal, handleDemoLogin, isDemoAccessEnabled } = useSkillBridge();
 
   return (
     <header className="public-navbar">
       <div className="public-nav-container">
         <Link href="/" className="brand">
-          <BrandMark size={26} />
+          <BrandMark size={28} />
           <span>SkillBridge</span>
         </Link>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <Link
-            href="/market"
-            className={`btn btn-ghost ${pathname === '/market' ? 'active' : ''}`}
-          >
-            <TrendingUp size={15} /> Job Demand ({totalJobsCount})
-          </Link>
-          <Link
-            href="/curriculum"
-            className={`btn btn-ghost ${pathname === '/curriculum' ? 'active' : ''}`}
-          >
-            <GraduationCap size={15} /> Syllabi ({totalCurriculaCount})
-          </Link>
+        <nav className="public-nav-links" aria-label="Primary">
+          <Link href="/market" className={`public-nav-link ${pathname === '/market' ? 'active' : ''}`}>Job Market</Link>
+          <Link href="/curriculum" className={`public-nav-link ${pathname === '/curriculum' ? 'active' : ''}`}>Syllabi</Link>
+          <Link href="/learn" className={`public-nav-link ${pathname === '/learn' ? 'active' : ''}`}>Learn</Link>
+        </nav>
 
+        <div className="public-nav-actions">
           <ThemeToggle />
-
           <button
-            className="btn btn-secondary"
+            className="btn btn-ghost"
             onClick={() => { setAuthMode('LOGIN'); setShowAuthModal(true); }}
           >
-            <LogIn size={15} /> Sign In
+            Sign In
           </button>
           {isDemoAccessEnabled && (
-            <button
-              className="btn btn-primary"
-              onClick={handleDemoLogin}
-            >
-              Try Demo (1-Click)
+            <button className="btn btn-primary" onClick={handleDemoLogin}>
+              Try Demo
             </button>
           )}
         </div>

@@ -61,23 +61,23 @@ export default function MarketView() {
     {
       icon: MapPin,
       accent: 'info',
-      label: 'Focus Region',
+      label: 'Focus region',
       value: role.marketContext.region,
       sub: 'Dhaka, Chittagong & remote hubs'
     },
     {
       icon: BarChart3,
       accent: 'success',
-      label: 'Experience Tier',
+      label: 'Experience tier',
       value: role.marketContext.experienceLevel,
       sub: 'Primary hiring tier for this track'
     },
     {
       icon: Database,
       accent: 'accent',
-      label: 'Live Postings Catalog',
-      value: `N = ${totalJobsCount}`,
-      sub: `${employerCount} employers • ${remoteCount} remote / WFH`,
+      label: 'Live postings',
+      value: totalJobsCount,
+      sub: `${employerCount} employers · ${remoteCount} remote / WFH`,
       mono: true
     }
   ];
@@ -86,10 +86,10 @@ export default function MarketView() {
     <div className="market-page">
       <div className="page-header">
         <div>
-          <div className="market-kicker">Live Market Intelligence</div>
-          <h1 className="page-title">{role.title} Job Market Demand</h1>
+          <div className="market-kicker">Job market</div>
+          <h1 className="page-title">{role.title} demand</h1>
           <p className="page-subtitle">
-            Empirical requirements derived from {totalJobsCount} verified engineering postings — remote and onsite — across the {role.marketContext.region} market.
+            Live demand for {role.title} roles, measured from {totalJobsCount} postings across the {role.marketContext.region} market.
           </p>
         </div>
       </div>
@@ -134,10 +134,10 @@ export default function MarketView() {
       <section className="card market-section">
         <div className="card-header market-section-header">
           <div>
-            <div className="market-section-eyebrow">Demand by Technology</div>
-            <h2 className="card-title">Required Technologies by Frequency</h2>
+            <div className="market-section-eyebrow">By technology</div>
+            <h2 className="card-title">Most-requested technologies</h2>
             <p className="card-subtitle">
-              How often each technology appears in actual job requirements for {role.title.toLowerCase()} roles.
+              How often each technology appears in {role.title.toLowerCase()} job requirements.
             </p>
           </div>
           {currentUser && (
@@ -262,12 +262,7 @@ export default function MarketView() {
         <div className="market-footnote">
           <span><strong>Computed from</strong> {totalJobsCount} live postings</span>
           <span className="market-footnote-sep" />
-          <span><strong>Source</strong> {sourceList}</span>
-          <span className="market-footnote-sep" />
-          <span><strong>Last synced</strong> {lastSync}</span>
-          <span className="market-footnote-sep" />
-          <VerificationBadge status="SOURCE_VERIFIED" />
-          <span className="market-footnote-note">Percentages are occurrence counts across real postings — click a value to open them.</span>
+          <span className="market-footnote-note">Percentages are occurrence counts across real postings — click a value to open the postings.</span>
         </div>
       </section>
     </div>
