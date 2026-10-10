@@ -45,6 +45,40 @@ const FACTOR_WEIGHTS = {
   maintenance: 0.1
 } as const;
 
+/**
+ * Hard budgets so a health check can never stall past the client request
+ * timeout. The live GitHub scan and the AI call run in parallel and each falls
+ * back gracefully (stored data / heuristic narrative) when it exceeds budget.
+ */
+const VERIFY_TIMEOUT_MS = Number(process.env.PROJECT_HEALTH_VERIFY_TIMEOUT_MS || 12_000);
+const AI_TIMEOUT_MS = Number(process.env.PROJECT_HEALTH_AI_TIMEOUT_MS || 14_000);
+
+/** Resolve with `fallback` if the promise does not settle within `ms`. */
+function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return new Promise<T>(resolve => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      settled = true;
+      resolve(fallback);
+    }, ms);
+    promise
+      .then(value => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timer);
+          resolve(value);
+        }
+      })
+      .catch(() => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timer);
+          resolve(fallback);
+        }
+      });
+  });
+}
+
 /** Map a detected stack label onto a /learn topic slug for deep-linking. */
 const LEARN_TOPIC_BY_STACK: Array<{ test: RegExp; slug: string }> = [
   { test: /javascript|typescript|node/i, slug: 'javascript' },
@@ -104,16 +138,25 @@ export class ProjectHealthService {
     const project = projects.find(p => p.id === projectId);
     if (!project) return null;
 
+    // Kick off AI enrichment in parallel with the live GitHub check so the two
+    // slow, network-bound steps overlap instead of stacking (keeps the endpoint
+    // well under the client timeout). Both are individually time-bounded.
+    const prelimSignals = this.buildSignals(project, null);
+    const prelimReport = this.score(project, prelimSignals);
+    const aiPromise = this.fetchAiNarrative(prelimSignals, prelimReport.overallScore);
+
     const verification = await this.safeVerify(project.repoUrl);
     const signals = this.buildSignals(project, verification);
     const report = this.score(project, signals);
-    return this.enrich(userId, report, signals);
+
+    const ai = await aiPromise;
+    return ai ? this.applyAiNarrative(report, ai) : report;
   }
 
-  /** Live GitHub check that never throws — returns null on any failure. */
+  /** Live GitHub check that never throws and never exceeds its time budget. */
   private async safeVerify(repoUrl: string): Promise<RepoVerification | null> {
     try {
-      return await this.verifier.verify(repoUrl);
+      return await withTimeout(this.verifier.verify(repoUrl), VERIFY_TIMEOUT_MS, null);
     } catch {
       return null;
     }
@@ -123,7 +166,9 @@ export class ProjectHealthService {
     project: ProjectEvidence,
     verification: RepoVerification | null
   ): ProjectHealthSignals {
-    const reachable = verification?.reachable === true;
+    // Without a live result, trust our stored state: a previously verified
+    // project should not be downgraded just because a fresh check timed out.
+    const reachable = verification ? verification.reachable === true : project.verificationStatus === 'VERIFIED';
     const stack = new Set<string>(project.detectedStack || []);
     if (verification?.detectedStack) {
       for (const label of verification.detectedStack) stack.add(label);
@@ -369,15 +414,14 @@ export class ProjectHealthService {
   }
 
   /**
-   * Optionally enrich the narrative with AI-generated issues/suggestions. The
-   * deterministic score and factors are always preserved; if no provider is
-   * configured or the call fails, the heuristic report is returned unchanged.
+   * Ask an AI provider for richer issue/suggestion narrative. Time-bounded and
+   * never throws: returns null when no provider is configured, the call fails,
+   * or it exceeds its budget (in which case the heuristic report stands).
    */
-  private async enrich(
-    _userId: string,
-    report: ProjectHealthReport,
-    signals: ProjectHealthSignals
-  ): Promise<ProjectHealthReport> {
+  private async fetchAiNarrative(
+    signals: ProjectHealthSignals,
+    deterministicScore: number
+  ): Promise<{ issues: ProjectHealthIssue[]; suggestions: ProjectHealthSuggestion[]; model: string } | null> {
     const systemPrompt =
       'You are a senior software engineer reviewing a candidate\'s portfolio project. ' +
       'Given objective repository signals, produce concise, specific, actionable feedback. ' +
@@ -400,26 +444,41 @@ export class ProjectHealthService {
         isArchived: signals.isArchived,
         isFork: signals.isFork,
         daysSinceLastPush: daysSince(signals.lastPushedAt),
-        deterministicScore: report.overallScore
+        deterministicScore
       });
 
-    const result = await generateAIJson<{ issues?: unknown; suggestions?: unknown }>(systemPrompt, userPrompt);
-    if (!result) return report;
+    const result = await withTimeout(
+      generateAIJson<{ issues?: unknown; suggestions?: unknown }>(systemPrompt, userPrompt),
+      AI_TIMEOUT_MS,
+      null
+    );
+    if (!result) return null;
 
-    const aiIssues = this.sanitizeIssues(result.data?.issues);
-    const aiSuggestions = this.sanitizeSuggestions(result.data?.suggestions);
+    return {
+      issues: this.sanitizeIssues(result.data?.issues),
+      suggestions: this.sanitizeSuggestions(result.data?.suggestions),
+      model: result.model
+    };
+  }
 
-    // Keep the objectively-derived CRIT issues (missing tests, archived, etc.)
-    // even if the model omitted them, then layer the AI's narrative on top.
+  /**
+   * Layer the AI narrative onto the deterministic report. Objectively-derived
+   * CRIT issues (missing tests, archived, etc.) are always preserved even if
+   * the model omitted them.
+   */
+  private applyAiNarrative(
+    report: ProjectHealthReport,
+    ai: { issues: ProjectHealthIssue[]; suggestions: ProjectHealthSuggestion[]; model: string }
+  ): ProjectHealthReport {
     const guaranteed = report.issues.filter(i => i.severity === 'CRIT');
-    const merged = this.mergeIssues(guaranteed, aiIssues.length > 0 ? aiIssues : report.issues);
+    const merged = this.mergeIssues(guaranteed, ai.issues.length > 0 ? ai.issues : report.issues);
 
     return {
       ...report,
       issues: merged.slice(0, 8),
-      suggestions: aiSuggestions.length > 0 ? aiSuggestions : report.suggestions,
+      suggestions: ai.suggestions.length > 0 ? ai.suggestions : report.suggestions,
       source: 'ai',
-      model: result.model
+      model: ai.model
     };
   }
 

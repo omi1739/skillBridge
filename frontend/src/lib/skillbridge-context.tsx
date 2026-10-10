@@ -34,6 +34,9 @@ const TAB_PATH: Record<AppTab, string> = {
 };
 
 const API_TIMEOUT_MS = Number(process.env.NEXT_PUBLIC_API_TIMEOUT_MS || 20000);
+// Health checks run a live GitHub scan plus optional AI review; allow more
+// headroom than standard calls (the backend enforces its own hard budgets).
+const HEALTH_CHECK_TIMEOUT_MS = Number(process.env.NEXT_PUBLIC_HEALTH_CHECK_TIMEOUT_MS || 40000);
 
 function hasAuthorizationHeader(init?: RequestInit): boolean {
   if (!init?.headers) return false;
@@ -61,9 +64,13 @@ function notifyUnauthorized(): void {
  * through this so a slow/unreachable API surfaces a clear message instead of an
  * indefinite spinner, and stale tokens sign the user out exactly once.
  */
-async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+async function apiFetch(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+  timeoutMs: number = API_TIMEOUT_MS
+): Promise<Response> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), Math.max(1000, API_TIMEOUT_MS));
+  const timer = setTimeout(() => controller.abort(), Math.max(1000, timeoutMs));
   try {
     const res = await globalThis.fetch(input, { ...init, signal: init.signal ?? controller.signal });
     if (res.status === 401 && hasAuthorizationHeader(init)) notifyUnauthorized();
@@ -78,8 +85,8 @@ async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Promi
   }
 }
 
-function fetchJSON<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
-  return apiFetch(input, init).then(async res => {
+function fetchJSON<T>(input: RequestInfo | URL, init?: RequestInit, timeoutMs?: number): Promise<T> {
+  return apiFetch(input, init, timeoutMs).then(async res => {
     const body = await res.json().catch(() => null);
     if (!res.ok) {
       throw new Error(apiErrorMessage(body, `Request failed (${res.status})`));
@@ -1397,7 +1404,10 @@ function useSkillBridgeValue() {
     try {
       const report = await fetchJSON<ProjectHealthReport>(
         `${API_BASE}/me/projects/${encodeURIComponent(projectId)}/health`,
-        { headers: authHeaders() }
+        { headers: authHeaders() },
+        // Live GitHub scan + optional AI enrichment can take longer than the
+        // default budget; the backend is time-bounded well under this.
+        HEALTH_CHECK_TIMEOUT_MS
       );
       setProjectHealth(prev => ({ ...prev, [projectId]: report }));
     } catch (err: any) {
