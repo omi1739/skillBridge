@@ -1,12 +1,25 @@
 import './globals.css';
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
+import { Inter } from 'next/font/google';
 import Script from 'next/script';
 import { SkillBridgeProvider } from '@/lib/skillbridge-context';
 import GlobalModals from '@/components/GlobalModals';
 
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+  display: 'swap'
+});
+
 export const metadata: Metadata = {
   title: 'SkillBridge | Evidence-Based Talent Intelligence',
   description: 'Labor market demand analysis, practical diagnostic skill assessments, and explainable career pathways.'
+};
+
+export const viewport: Viewport = {
+  themeColor: '#13795b',
+  width: 'device-width',
+  initialScale: 1
 };
 
 const THEME_INIT = `(function(){try{var t=localStorage.getItem('skillbridge_theme');if(t!=='light'&&t!=='dark'){t='light';}document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','light');}})();`;
@@ -17,7 +30,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" className={inter.variable}>
       <head>
         <Script
           id="theme-init"

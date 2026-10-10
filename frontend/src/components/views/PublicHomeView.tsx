@@ -84,6 +84,38 @@ export default function PublicHomeView() {
           )}
         </div>
 
+        <div className="lp-visual" aria-hidden="true">
+          <div className="lp-window">
+            <div className="lp-window-bar">
+              <span className="lp-window-dots"><i /><i /><i /></span>
+              <span className="lp-window-addr">skillbridge.app/market</span>
+            </div>
+            <div className="lp-window-body">
+              <div className="lp-window-head">
+                <div>
+                  <div className="lp-window-kicker">Live demand snapshot</div>
+                  <div className="lp-window-title">Full-Stack Developer</div>
+                </div>
+                <span className="lp-window-score">84</span>
+              </div>
+              <div className="lp-window-skills">
+                {[
+                  ['SQL', 94],
+                  ['JavaScript', 81],
+                  ['React', 68],
+                  ['Node.js', 57]
+                ].map(([name, v]) => (
+                  <div key={name} className="lp-window-skill">
+                    <span className="lp-window-skill-name">{name}</span>
+                    <span className="lp-window-skill-bar"><span style={{ width: `${v}%` }} /></span>
+                    <span className="lp-window-skill-pct">{v}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div className="lp-stats">
           <div className="lp-stat">
             <div className="lp-stat-value">{totalJobsCount}</div>
@@ -103,6 +135,7 @@ export default function PublicHomeView() {
       {topSkills.length > 0 && (
         <section className="lp-section">
           <div className="lp-section-head">
+            <span className="lp-kicker">Demand</span>
             <h2>What employers ask for most</h2>
             <p>
               Share of live postings that list each skill for {role?.title || 'your target role'}.
@@ -136,6 +169,7 @@ export default function PublicHomeView() {
 
       <section className="lp-section">
         <div className="lp-section-head">
+          <span className="lp-kicker">Process</span>
           <h2>How it works</h2>
           <p>Four steps from market signal to a matched application.</p>
         </div>
@@ -152,6 +186,7 @@ export default function PublicHomeView() {
 
       <section className="lp-section">
         <div className="lp-section-head">
+          <span className="lp-kicker">Who it's for</span>
           <h2>Built for people starting their engineering career</h2>
         </div>
         <div className="lp-audience">
