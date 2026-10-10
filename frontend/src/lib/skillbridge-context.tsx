@@ -10,6 +10,7 @@ import {
   ActionRecommendation,
   JobMatchResult,
   ProjectEvidence,
+  ProjectHealthReport,
   CurriculumProfile,
   CurriculumComparisonResult,
   Skill,
@@ -198,6 +199,11 @@ function useSkillBridgeValue() {
   });
   const [isSubmittingProject, setIsSubmittingProject] = useState(false);
   const [projectSuccessMsg, setProjectSuccessMsg] = useState('');
+
+  // Project health check state (keyed by project id)
+  const [projectHealth, setProjectHealth] = useState<Record<string, ProjectHealthReport>>({});
+  const [projectHealthError, setProjectHealthError] = useState<Record<string, string>>({});
+  const [checkingProjectHealthId, setCheckingProjectHealthId] = useState<string | null>(null);
 
   // Skill passport state
   const [showPassportModal, setShowPassportModal] = useState(false);
@@ -1379,6 +1385,31 @@ function useSkillBridgeValue() {
     }
   };
 
+  const checkProjectHealth = async (projectId: string) => {
+    if (!authToken) return;
+    setCheckingProjectHealthId(projectId);
+    setProjectHealthError(prev => {
+      if (!(projectId in prev)) return prev;
+      const next = { ...prev };
+      delete next[projectId];
+      return next;
+    });
+    try {
+      const report = await fetchJSON<ProjectHealthReport>(
+        `${API_BASE}/me/projects/${encodeURIComponent(projectId)}/health`,
+        { headers: authHeaders() }
+      );
+      setProjectHealth(prev => ({ ...prev, [projectId]: report }));
+    } catch (err: any) {
+      console.error('[SkillBridge] Project health check failed:', err);
+      const message = err?.message || 'Could not analyze this project.';
+      setProjectHealthError(prev => ({ ...prev, [projectId]: message }));
+      reportError(message);
+    } finally {
+      setCheckingProjectHealthId(null);
+    }
+  };
+
   const handleCreateAlias = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!aliasForm.rawAlias.trim() || !aliasForm.canonicalSkillId) return;
@@ -1619,6 +1650,11 @@ function useSkillBridgeValue() {
     isSubmittingProject,
     projectSuccessMsg,
     handleProjectSubmit,
+    // project health check
+    projectHealth,
+    projectHealthError,
+    checkingProjectHealthId,
+    checkProjectHealth,
     // passport
     showPassportModal,
     setShowPassportModal,

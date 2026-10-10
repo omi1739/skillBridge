@@ -72,6 +72,7 @@ Error bodies follow the Nest shape `{ statusCode, message, error }`, where
 |--------|-----------------------|-------------------------|
 | GET    | `/api/me/projects`    | Verified portfolio      |
 | POST   | `/api/me/projects`    | `ProjectSubmissionDto` (GitHub verification) |
+| GET    | `/api/me/projects/:id/health` | `ProjectHealthReport` — tech stack, issues, improvements; AI-enriched when a provider is configured, deterministic otherwise. Rate-limited (10/min). |
 
 ## Jobs
 

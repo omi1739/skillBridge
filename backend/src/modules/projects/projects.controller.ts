@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Body,
+  Param,
   Inject,
   UseGuards
 } from '@nestjs/common';
@@ -12,6 +13,8 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthPayload } from '../../services/auth.service';
 import { ProjectSubmissionDto } from '../../dto/project.dto';
 import { demoAccessAllowed } from '../../common/demo-access';
+import { RateLimitGuard } from '../../common/rate-limit.guard';
+import { RateLimit, RateWindow } from '../../common/rate-limit.decorators';
 
 @Controller()
 export class ProjectsController {
@@ -25,6 +28,17 @@ export class ProjectsController {
       return [];
     }
     return this.projectsService.getProjects(userId);
+  }
+
+  @Get('me/projects/:id/health')
+  @UseGuards(JwtAuthGuard, RateLimitGuard)
+  @RateLimit(10)
+  @RateWindow(60_000)
+  async getProjectHealth(
+    @CurrentUser() user: AuthPayload,
+    @Param('id') id: string
+  ) {
+    return this.projectsService.checkProjectHealth(user.userId, id);
   }
 
   @Post('me/projects')

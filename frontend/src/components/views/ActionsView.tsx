@@ -1,13 +1,153 @@
 'use client';
 
-import { PlusCircle, FolderGit2, Github, ExternalLink, AlertTriangle } from 'lucide-react';
+import Link from 'next/link';
+import { PlusCircle, FolderGit2, Github, ExternalLink, AlertTriangle, Activity, Lightbulb, BookOpen } from 'lucide-react';
+import { ProjectHealthReport, ProjectHealthIssueSeverity, ProjectHealthStatus } from '@skillbridge/types';
 import { useSkillBridge } from '@/lib/skillbridge-context';
 import { safeExternalUrl } from '@/lib/safe-url';
 import { RolePromptView, SignInPromptView, NoEvidenceView } from './prompts';
 import { EmptyState, Chip } from '@/components/ui/primitives';
 
+type HealthTone = 'healthy' | 'fair' | 'at-risk' | 'unhealthy';
+
+function healthTone(status: ProjectHealthStatus): HealthTone {
+  if (status === 'HEALTHY') return 'healthy';
+  if (status === 'FAIR') return 'fair';
+  if (status === 'AT_RISK') return 'at-risk';
+  return 'unhealthy';
+}
+
+function statusChipTone(status: ProjectHealthStatus): 'success' | 'info' | 'warning' | 'danger' {
+  if (status === 'HEALTHY') return 'success';
+  if (status === 'FAIR') return 'info';
+  if (status === 'AT_RISK') return 'warning';
+  return 'danger';
+}
+
+function statusLabel(status: ProjectHealthStatus): string {
+  if (status === 'HEALTHY') return 'Healthy';
+  if (status === 'FAIR') return 'Fair';
+  if (status === 'AT_RISK') return 'At risk';
+  return 'Unhealthy';
+}
+
+function severityTone(severity: ProjectHealthIssueSeverity): 'crit' | 'warn' | 'info' {
+  if (severity === 'CRIT') return 'crit';
+  if (severity === 'WARN') return 'warn';
+  return 'info';
+}
+
+function factorBarTone(score: number): string {
+  if (score >= 0.75) return 'progress-emerald';
+  if (score >= 0.4) return 'progress-amber';
+  return 'progress-rose';
+}
+
+function ProjectHealthPanel({ report }: { report: ProjectHealthReport }) {
+  const tone = healthTone(report.status);
+  return (
+    <div className="health-panel">
+      <div className="health-panel-head">
+        <div className={`health-score health-score-${tone}`}>
+          <span className="health-score-num">{report.overallScore}</span>
+          <span className="health-score-grade">Grade {report.grade}</span>
+        </div>
+        <div className="health-panel-summary">
+          <div className="row" style={{ gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            <Chip tone={statusChipTone(report.status)}>{statusLabel(report.status)}</Chip>
+            <span className="tiny text-muted">
+              {report.source === 'ai' ? 'AI-assisted review' : 'Automated review'}
+            </span>
+          </div>
+          <p className="small text-secondary" style={{ marginTop: '0.35rem' }}>
+            {report.detectedStack.length > 0
+              ? `Tech detected: ${report.detectedStack.join(', ')}${report.primaryLanguage ? ` (primary: ${report.primaryLanguage})` : ''}.`
+              : 'No tech stack could be detected from the repository.'}
+          </p>
+        </div>
+      </div>
+
+      <div className="health-factors">
+        {report.factors.map(factor => (
+          <div className="health-factor" key={factor.key}>
+            <div className="health-factor-head">
+              <span className="small">{factor.label}</span>
+              <span className="small mono text-muted">{Math.round(factor.score * 100)}%</span>
+            </div>
+            <div className="progress-container">
+              <div className={`progress-bar ${factorBarTone(factor.score)}`} style={{ width: `${Math.round(factor.score * 100)}%` }} />
+            </div>
+            <p className="tiny text-muted" style={{ marginTop: '0.25rem' }}>{factor.detail}</p>
+          </div>
+        ))}
+      </div>
+
+      {report.issues.length > 0 && (
+        <div className="health-block">
+          <div className="health-block-title">
+            <AlertTriangle size={14} /> Issues found ({report.issues.length})
+          </div>
+          <div className="stack stack-sm">
+            {report.issues.map((issue, idx) => {
+              const sev = severityTone(issue.severity);
+              return (
+                <div key={idx} className={`health-issue health-issue-${sev}`}>
+                  <span className={`health-issue-dot health-issue-dot-${sev}`} />
+                  <div>
+                    <div className="health-issue-title">{issue.title}</div>
+                    <p className="tiny text-muted" style={{ marginTop: '0.15rem' }}>{issue.detail}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {report.suggestions.length > 0 && (
+        <div className="health-block">
+          <div className="health-block-title">
+            <Lightbulb size={14} /> What to improve
+          </div>
+          <div className="stack stack-sm">
+            {report.suggestions.map((sug, idx) => (
+              <div key={idx} className="health-suggestion">
+                <div className="row" style={{ gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <span className="health-suggestion-title">{sug.title}</span>
+                  {sug.category && <span className="badge badge-chip" style={{ fontSize: '0.65rem' }}>{sug.category}</span>}
+                </div>
+                <p className="small text-secondary" style={{ marginTop: '0.2rem' }}>{sug.detail}</p>
+                {sug.learnTopicSlug && (
+                  <Link href={`/learn?topic=${sug.learnTopicSlug}`} className="health-suggestion-link small">
+                    <BookOpen size={12} /> Learn {sug.learnTopicSlug}
+                  </Link>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <p className="tiny text-muted" style={{ marginTop: '0.85rem' }}>
+        Analyzed {new Date(report.generatedAt).toLocaleString()}{report.model ? ` · ${report.model}` : ''}
+      </p>
+    </div>
+  );
+}
+
 export default function ActionsView() {
-  const { currentUser, activeTargetRoleId, recommendations, userProjects, setShowProjectModal, personalDataError } = useSkillBridge();
+  const {
+    currentUser,
+    activeTargetRoleId,
+    recommendations,
+    userProjects,
+    setShowProjectModal,
+    personalDataError,
+    projectHealth,
+    projectHealthError,
+    checkingProjectHealthId,
+    checkProjectHealth
+  } = useSkillBridge();
 
   if (!currentUser) {
     return (
@@ -84,6 +224,9 @@ export default function ActionsView() {
         </div>
 
         <div className="stack stack-sm">
+          {userProjects.length === 0 && (
+            <p className="small text-muted">You haven&apos;t submitted any projects yet. Submit one above to unlock health checks.</p>
+          )}
           {userProjects.map(proj => (
             <div key={proj.id} className="list-item">
               <div className="row-between">
@@ -102,6 +245,29 @@ export default function ActionsView() {
                   </span>
                 ))}
               </div>
+
+              <div className="row" style={{ gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.7rem' }}>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => checkProjectHealth(proj.id)}
+                  disabled={checkingProjectHealthId === proj.id}
+                >
+                  <Activity size={13} />
+                  {checkingProjectHealthId === proj.id
+                    ? 'Analyzing…'
+                    : projectHealth[proj.id]
+                      ? 'Re-check health'
+                      : 'Check health'}
+                </button>
+              </div>
+
+              {projectHealthError[proj.id] && (
+                <p className="small" style={{ color: 'var(--danger-text)', marginTop: '0.6rem' }}>
+                  {projectHealthError[proj.id]}
+                </p>
+              )}
+
+              {projectHealth[proj.id] && <ProjectHealthPanel report={projectHealth[proj.id]} />}
             </div>
           ))}
         </div>

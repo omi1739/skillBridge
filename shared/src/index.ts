@@ -184,6 +184,55 @@ export interface ProjectEvidence {
   submittedAt: string;
 }
 
+export type ProjectHealthIssueSeverity = 'INFO' | 'WARN' | 'CRIT';
+export type ProjectHealthStatus = 'HEALTHY' | 'FAIR' | 'AT_RISK' | 'UNHEALTHY';
+export type ProjectHealthGrade = 'A' | 'B' | 'C' | 'D' | 'F';
+
+export interface ProjectHealthIssue {
+  severity: ProjectHealthIssueSeverity;
+  title: string;
+  detail: string;
+}
+
+export interface ProjectHealthSuggestion {
+  title: string;
+  detail: string;
+  /** Improvement area, e.g. 'testing' | 'docs' | 'devops' | 'architecture' | 'code-quality' | 'security'. */
+  category: string;
+  /** Optional /learn topic slug to deep-link a relevant learning resource. */
+  learnTopicSlug?: string;
+}
+
+export interface ProjectHealthFactor {
+  key: string;
+  label: string;
+  /** Normalized 0..1 sub-score for this factor. */
+  score: number;
+  /** Relative weight (0..1) used to combine factors into the overall score. */
+  weight: number;
+  detail: string;
+}
+
+export interface ProjectHealthReport {
+  projectId: string;
+  userId: string;
+  title: string;
+  repoUrl: string;
+  /** Overall health score, 0..100. */
+  overallScore: number;
+  grade: ProjectHealthGrade;
+  status: ProjectHealthStatus;
+  detectedStack: string[];
+  primaryLanguage?: string;
+  factors: ProjectHealthFactor[];
+  issues: ProjectHealthIssue[];
+  suggestions: ProjectHealthSuggestion[];
+  /** Whether the narrative was produced by an AI provider or built heuristically. */
+  source: 'ai' | 'heuristic';
+  model: string | null;
+  generatedAt: string;
+}
+
 export interface CurriculumCoverageArea {
   skillId: string;
   canonicalName: string;

@@ -25,6 +25,8 @@ export interface AIProvider {
   readonly name: string;
   available: boolean;
   generateQuestions(req: QuestionGenerationRequest): Promise<AiGeneratedQuestion[]>;
+  /** Generic JSON completion for non-question use cases (e.g. project health). */
+  generateJSON<T = any>(systemPrompt: string, userPrompt: string): Promise<T>;
 }
 
 const GEMINI_KEY = process.env.GEMINI_API_KEY || '';
@@ -216,6 +218,12 @@ export class GeminiProvider implements AIProvider {
     const list: any[] = Array.isArray(parsed?.questions) ? parsed.questions : [];
     return mapQuestions(req, list);
   }
+
+  async generateJSON<T = any>(systemPrompt: string, userPrompt: string): Promise<T> {
+    return this.chatJson([
+      { role: 'user', parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }
+    ]) as Promise<T>;
+  }
 }
 
 /** OpenAI, pay-per-use (kept as an optional fallback). */
@@ -259,6 +267,13 @@ export class OpenAIProvider implements AIProvider {
     const list: any[] = Array.isArray(parsed?.questions) ? parsed.questions : [];
     return mapQuestions(req, list);
   }
+
+  async generateJSON<T = any>(systemPrompt: string, userPrompt: string): Promise<T> {
+    return this.chatJson([
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt }
+    ]) as Promise<T>;
+  }
 }
 
 /** All configured providers, in priority order (free tier first). */
@@ -274,4 +289,26 @@ export function getAIProviders(): AIProvider[] {
 /** The primary AI provider, or null if none is configured. */
 export function getAIProvider(): AIProvider | null {
   return getAIProviders()[0] ?? null;
+}
+
+/**
+ * Run a generic JSON completion against the first provider that succeeds.
+ * Returns `null` (never throws) when no provider is configured or every
+ * provider fails, so callers can always fall back to deterministic logic.
+ */
+export async function generateAIJson<T = any>(
+  systemPrompt: string,
+  userPrompt: string
+): Promise<{ data: T; model: string } | null> {
+  const providers = getAIProviders();
+  if (providers.length === 0) return null;
+  for (const provider of providers) {
+    try {
+      const data = await provider.generateJSON<T>(systemPrompt, userPrompt);
+      if (data) return { data, model: provider.name };
+    } catch (err: any) {
+      console.warn(`[ai] ${provider.name} JSON generation failed: ${err?.message || err}`);
+    }
+  }
+  return null;
 }
