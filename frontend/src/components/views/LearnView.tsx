@@ -145,6 +145,9 @@ export default function LearnView() {
 
   return (
     <div className="learn-layout">
+      {mobileSidebarOpen && (
+        <div className="learn-sidebar-overlay" onClick={() => setMobileSidebarOpen(false)} />
+      )}
       <aside className={`learn-sidebar ${mobileSidebarOpen ? 'open' : ''}`}>
         <div className="learn-sidebar-search">
           <Search size={14} />
