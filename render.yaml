@@ -21,8 +21,10 @@ services:
         sync: false
       # Optional second Neon project: when the primary hits its monthly
       # compute-hour quota (project paused), the API automatically fails over to
-      # this connection string and probes the primary to switch back. Set in the
-      # Render dashboard so the URL stays out of this file.
+      # this connection string and probes the primary to switch back. The probe
+      # only runs while the fallback is active, so a healthy primary is not kept
+      # awake by periodic pings. Set in the Render dashboard so the URL stays out
+      # of this file.
       - key: DATABASE_URL_FALLBACK
         sync: false
       - key: JWT_SECRET

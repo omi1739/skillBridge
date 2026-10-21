@@ -194,35 +194,28 @@ const PROBE_INTERVAL_MS = Number(process.env.DB_FAILOVER_PROBE_INTERVAL_MS) || 6
 let probeTimer: ReturnType<typeof setInterval> | null = null;
 
 async function probeDatabases(): Promise<void> {
-  let primaryUp = false;
+  // Only poll while serving from the fallback. Querying the primary every
+  // minute while it is already active would keep Neon's compute awake 24/7,
+  // exhausting the free-tier compute-hour quota (the exact 53000 error the
+  // failover handles). Normal traffic detects a primary outage via
+  // runWithRetry, and only then does this probe need to test for recovery.
+  if (activeIsPrimary) return;
+
   try {
     await pool.query('SELECT 1');
-    primaryUp = true;
   } catch {
-    // primary unreachable
-  }
-
-  if (primaryUp) {
-    if (!activeIsPrimary) {
-      activeIsPrimary = true;
-      console.log('[SkillBridge DB] Primary database recovered; switched back to primary.');
-    }
+    // primary still unreachable
     return;
   }
 
-  if (fallbackPool && activeIsPrimary) {
-    try {
-      await fallbackPool.query('SELECT 1');
-      activeIsPrimary = false;
-      console.warn('[SkillBridge DB] Primary unavailable; switched to fallback database.');
-    } catch {
-      // both unreachable - keep primary selected so failures surface normally
-    }
-  }
+  activeIsPrimary = true;
+  console.log('[SkillBridge DB] Primary database recovered; switched back to primary.');
 }
 
 export function startFailoverProbe(): void {
-  if (probeTimer) return;
+  // No fallback means there is nothing to fail over to and no reason to keep
+  // the primary database awake with periodic pings.
+  if (probeTimer || !fallbackPool) return;
   void probeDatabases();
   probeTimer = setInterval(probeDatabases, PROBE_INTERVAL_MS);
   probeTimer.unref?.();

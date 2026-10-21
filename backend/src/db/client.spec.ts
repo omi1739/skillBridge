@@ -112,6 +112,31 @@ describe('db/client failover', () => {
     expect(client.pool.query).toHaveBeenCalled();
   });
 
+  it('does not poll the primary while it is already active', async () => {
+    client = loadClient();
+    client.pool.query.mockClear();
+
+    client.startFailoverProbe();
+    await waitNextTick();
+    client.stopFailoverProbe();
+
+    expect(client.pool.query).not.toHaveBeenCalled();
+  });
+
+  it('does not start a probe when no fallback is configured', async () => {
+    delete process.env.DATABASE_URL_FALLBACK;
+    const noFallbackClient = loadClient();
+    noFallbackClient.pool.query.mockClear();
+
+    noFallbackClient.startFailoverProbe();
+    await waitNextTick();
+    noFallbackClient.stopFailoverProbe();
+
+    expect(noFallbackClient.fallbackPool).toBeNull();
+    expect(noFallbackClient.pool.query).not.toHaveBeenCalled();
+    process.env.DATABASE_URL_FALLBACK = 'postgresql://user:pw@fallback-test/db';
+  });
+
   it('throws instead of failing over on ordinary SQL errors', async () => {
     client = loadClient();
     client.pool.query.mockRejectedValue(sqlError);
