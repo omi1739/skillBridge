@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import * as path from 'path';
 import { Pool, PoolClient } from 'pg';
 
@@ -18,21 +19,57 @@ function resolveDatabaseUrl(): string {
   return 'postgresql://postgres:postgrespassword@localhost:5432/skillbridge';
 }
 
-function resolveSslConfig(databaseUrl: string): boolean | { rejectUnauthorized: true } {
+const DEFAULT_SUPABASE_CA_PATH = path.resolve(__dirname, '../../certs/supabase-ca.crt');
+
+function loadSslCa(databaseUrl: string): string | undefined {
+  if (!/supabase\.(co|com)/.test(databaseUrl)) {
+    return undefined;
+  }
+  const caPath = path.resolve(process.env.DATABASE_SSL_CA_PATH || DEFAULT_SUPABASE_CA_PATH);
+  try {
+    return fs.readFileSync(caPath, 'utf8');
+  } catch (err) {
+    console.warn(`[SkillBridge DB] Could not read SSL CA at ${caPath}: ${(err as Error).message}`);
+    return undefined;
+  }
+}
+
+function resolveSslConfig(databaseUrl: string): boolean | { rejectUnauthorized: boolean; ca?: string } {
   const sslMode = (databaseUrl.match(/[?&]sslmode=([^&]+)/) || [])[1] || '';
-  const wantsSsl = ['require', 'verify-ca', 'verify-full', 'prefer'].includes(sslMode) || databaseUrl.includes('neon.tech');
+  if (sslMode === 'disable') {
+    return false;
+  }
+  const wantsSsl =
+    ['require', 'verify-ca', 'verify-full', 'prefer'].includes(sslMode) ||
+    databaseUrl.includes('neon.tech') ||
+    /supabase\.(co|com)/.test(databaseUrl);
   if (!wantsSsl) {
     return false;
   }
-  // Never disable certificate verification. 'sslmode=require' is satisfied
-  // with encrypted transport while still validating the server certificate
-  // against the system trust store (node-postgres default behavior).
-  return { rejectUnauthorized: true };
+  // Never disable certificate verification. Supabase's pooler uses a private
+  // CA, so pin the bundled certificate; Neon and public-CA providers validate
+  // against the system trust store.
+  const ca = loadSslCa(databaseUrl);
+  return ca ? { rejectUnauthorized: true, ca } : { rejectUnauthorized: true };
+}
+
+/**
+ * `pg-connection-string` replaces the explicit `ssl` object with the parsed
+ * `sslmode` value, dropping any `ca` we attach. Strip `sslmode` from the URL so
+ * the `ssl` object above (including the Supabase CA) is the one used.
+ */
+function stripSslMode(databaseUrl: string): string {
+  const [base, query] = databaseUrl.split('?');
+  if (!query) {
+    return databaseUrl;
+  }
+  const params = query.split('&').filter(p => p && !/^sslmode=/.test(p));
+  return params.length ? `${base}?${params.join('&')}` : base;
 }
 
 function makePool(connectionString: string): Pool {
   return new Pool({
-    connectionString,
+    connectionString: stripSslMode(connectionString),
     ssl: resolveSslConfig(connectionString),
     // Neon (and serverless Postgres generally) enforces hard connection caps per
     // project; a bloated default pool (10) can trip them when the API service and

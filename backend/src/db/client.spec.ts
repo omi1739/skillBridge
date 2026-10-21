@@ -137,6 +137,28 @@ describe('db/client failover', () => {
     process.env.DATABASE_URL_FALLBACK = 'postgresql://user:pw@fallback-test/db';
   });
 
+  it('pins the Supabase CA and strips sslmode from the connection string', () => {
+    const { Pool } = require('pg');
+    const originalUrl = process.env.DATABASE_URL;
+    const originalFallback = process.env.DATABASE_URL_FALLBACK;
+    try {
+      process.env.DATABASE_URL =
+        'postgresql://postgres.ref:pw@aws-0-ap-northeast-1.pooler.supabase.com:5432/postgres?sslmode=require';
+      delete process.env.DATABASE_URL_FALLBACK;
+      Pool.mockClear();
+
+      loadClient();
+
+      const config = Pool.mock.calls[0][0];
+      expect(config.connectionString).not.toContain('sslmode=');
+      expect(config.ssl.rejectUnauthorized).toBe(true);
+      expect(config.ssl.ca).toContain('BEGIN CERTIFICATE');
+    } finally {
+      process.env.DATABASE_URL = originalUrl;
+      process.env.DATABASE_URL_FALLBACK = originalFallback;
+    }
+  });
+
   it('throws instead of failing over on ordinary SQL errors', async () => {
     client = loadClient();
     client.pool.query.mockRejectedValue(sqlError);
