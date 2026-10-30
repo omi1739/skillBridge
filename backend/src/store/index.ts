@@ -15,6 +15,7 @@ import {
   JobMatchResult
 } from '@skillbridge/types';
 import { query, withTransaction } from '../db/client';
+import { htmlToText } from '../common/text';
 import type { GeneratedChallenge } from '../services/challenge-generator.service';
 
 interface SkillRow {
@@ -521,12 +522,12 @@ export class AppDataStore {
     );
     return rows.map(j => ({
       id: j.id,
-      title: j.title,
-      company: j.company,
-      location: j.location || '',
+      title: htmlToText(j.title, 300),
+      company: htmlToText(j.company, 200),
+      location: htmlToText(j.location, 200),
       experienceLevel: j.experience_level || '',
       roleId: j.role_id,
-      description: j.description,
+      description: htmlToText(j.description, 4000),
       requiredSkillIds: reqMap.get(j.id) || [],
       preferredSkillIds: prefMap.get(j.id) || [],
       postedAt: j.posted_at,
@@ -1002,11 +1003,15 @@ export class AppDataStore {
     let updated = 0;
     await withTransaction(async client => {
       for (const j of jobs) {
+        const title = htmlToText(j.title, 300);
+        const company = htmlToText(j.company, 200);
+        const location = htmlToText(j.location, 200);
+        const description = htmlToText(j.description, 4000);
         // The id is derived from (source, company, external id) so two sources
         // can never produce the same primary key while the (source_id,
         // external_id) upsert target still dedupes within a source.
         const sourceTag = j.sourceId ? j.sourceId.slice(0, 8) : 'nosrc';
-        const id = `job_src_${sourceTag}_${this.effectiveCompanyKey(j)}_${this.hashExternal(j.externalId)}`;
+        const id = `job_src_${sourceTag}_${this.effectiveCompanyKey({ company })}_${this.hashExternal(j.externalId)}`;
         const upsert = await client.query(
           `INSERT INTO jobs
              (id, source_id, external_id, title, company, location, experience_level, role_id, description, posting_url, posted_at, is_remote, verification_status, last_verified_at)
@@ -1019,8 +1024,8 @@ export class AppDataStore {
              is_remote=EXCLUDED.is_remote,
              verification_status='SOURCE_VERIFIED', last_verified_at=CURRENT_TIMESTAMP
            RETURNING (xmax = 0) AS freshly_inserted`,
-          [id, j.sourceId, j.externalId, j.title, j.company, j.location,
-           j.experienceLevel, j.roleId, j.description, j.postingUrl,
+          [id, j.sourceId, j.externalId, title, company, location,
+           j.experienceLevel, j.roleId, description, j.postingUrl,
            j.postedAt || new Date().toISOString(),
            j.isRemote ? true : false]
         );

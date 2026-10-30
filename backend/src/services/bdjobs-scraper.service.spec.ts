@@ -52,7 +52,7 @@ describe('BdJobsScraper', () => {
       postingUrl: 'https://bdjobs.com/h/details/12345?ln=1',
       isRemote: false
     });
-    expect(items[0].description).toBe('Build REST APIs Node.js PostgreSQL');
+    expect(items[0].description).toBe('Build REST APIs\n• Node.js\n• PostgreSQL');
     expect(items[0].postedAt).toBe('2026-09-03T12:00:00.000Z');
   });
 

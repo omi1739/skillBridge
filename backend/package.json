@@ -16,6 +16,7 @@
     "db:setup": "tsx src/db/seed.ts",
     "db:seed": "tsx src/db/seed.ts",
     "db:ingest": "node dist/scripts/ingest.js",
+    "db:sanitize-jobs": "tsx src/scripts/sanitize-jobs.ts",
     "admin:promote": "tsx src/scripts/promote-admin.ts"
   },
   "dependencies": {

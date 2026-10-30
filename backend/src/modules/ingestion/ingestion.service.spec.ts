@@ -1,5 +1,5 @@
 import { IngestionService } from './ingestion.service';
-import { INITIAL_ROLES } from '../../data/seed';
+import { INITIAL_ROLES, INITIAL_SKILLS } from '../../data/seed';
 
 function item(title: string) {
   return {
@@ -35,5 +35,27 @@ describe('IngestionService role selection', () => {
     expect(pick('Software Engineer', ['skill_react', 'skill_typescript', 'skill_html_css'])).toBe('role_frontend');
     expect(pick('Software Engineer', ['skill_nodejs', 'skill_sql', 'skill_postgresql', 'skill_docker'])).toBe('role_junior_backend');
     expect(pick('Software Engineer', ['skill_react', 'skill_nodejs', 'skill_sql', 'skill_docker'])).toBe('role_full_stack');
+  });
+
+  it('rejects technical pre-sales titles even when the body mentions dev skills', () => {
+    const classified = (service as any).classifyAndMatch(
+      item('Senior Solutions Engineer'),
+      INITIAL_SKILLS,
+      1
+    );
+    expect(classified).toBeNull();
+  });
+
+  it('sanitizes double-encoded HTML before storing a description', () => {
+    const classified = (service as any).classifyAndMatch(
+      {
+        ...item('Backend Developer'),
+        description: '&lt;p&gt;Node.js &amp;amp; SQL&lt;/p&gt;'
+      },
+      INITIAL_SKILLS,
+      1
+    );
+    expect(classified).not.toBeNull();
+    expect(classified.description).toBe('Node.js & SQL');
   });
 });

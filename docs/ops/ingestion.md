@@ -90,6 +90,20 @@ GET /api/ingest/sources  -> one entry per source
 GET /api/health/ingest   -> status = "ok", recent lastSuccessAt
 ```
 
+## Description cleanup
+
+Job-board descriptions arrive as a mix of plain text, HTML and double-encoded
+HTML. Ingestion converts them to readable plain text before writing, and the API
+sanitizes again on read so old rows cannot leak markup into the UI.
+
+To repair rows that were ingested before this cleanup was added:
+
+```bash
+npm run db:sanitize-jobs
+```
+
+The command is idempotent and only updates rows whose text actually changed.
+
 ## Retention
 
 `job_ingest_runs` and `job_sources` are the audit trail. Jobs are refreshed on
@@ -101,6 +115,8 @@ therefore starts removing stale listings after a week.
 
 - Role assignment is keyword-based: explicit frontend/back-end/full-stack
   titles win, otherwise the role with the closest skill overlap is used.
+- Technical pre-sales titles (solutions engineer, sales engineer, solution
+  architect) are rejected even when their descriptions mention dev skills.
 - BdJobs has a low classification yield because its list response is sparse and
   only engineering-titled rows are enriched with details.
 - The classifier is keyword-based, not an LLM or a formal role taxonomy.

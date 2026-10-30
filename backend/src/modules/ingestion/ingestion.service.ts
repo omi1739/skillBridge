@@ -6,6 +6,7 @@ import { CacheService } from '../../common/cache.service';
 import { fetchWithTimeout } from '../../common/http';
 import { reportAlert } from '../../common/error-reporter';
 import { bdJobsScraper, BdJobItem } from '../../services/bdjobs-scraper.service';
+import { htmlToText } from '../../common/text';
 
 const TARGET_ROLE = 'role_full_stack';
 
@@ -34,7 +35,13 @@ const NON_DEV_TITLE = [
   'finance', 'accountant', 'support specialist', 'content', 'copywriter',
   'designer', 'product manager', 'scrum master', 'analyst', 'data analyst',
   'operations', 'administrative', 'sales representative', 'accountant',
-  'talent', 'people ops', 'community', 'brand', 'legal', 'compliance'
+  'talent', 'people ops', 'community', 'brand', 'legal', 'compliance',
+  // Technical pre-sales / customer-facing roles are not software engineering
+  // jobs even when the description mentions APIs or a programming language.
+  'solutions engineer', 'solution engineer', 'solutions architect',
+  'solution architect', 'sales engineer', 'pre-sales', 'presales',
+  'technical account manager', 'sales development', 'value engineer',
+  'technical consultant', 'implementation consultant'
 ];
 
 interface RawJob {
@@ -356,13 +363,14 @@ export class IngestionService {
         const items: ArbeitnowItem[] = Array.isArray(json) ? json : json.data;
         if (!items || items.length === 0) break;
         for (const it of items) {
-          const description = this.stripHtml(it.description || '');
-          if (!it.title || !description) continue;
+          const title = htmlToText(it.title, 300);
+          const description = htmlToText(it.description, 4000);
+          if (!title || !description) continue;
           out.push({
-            externalId: String(it.slug || it.url || `${it.title}|${it.company_name}`),
-            title: it.title.trim(),
-            company: it.company_name || 'Unknown',
-            location: it.location || '',
+            externalId: String(it.slug || it.url || `${title}|${it.company_name}`),
+            title,
+            company: htmlToText(it.company_name || 'Unknown', 200),
+            location: htmlToText(it.location || '', 200),
             description,
             postingUrl: it.url || '',
             postedAt: this.toIsoDate(it.created_at),
@@ -394,7 +402,13 @@ export class IngestionService {
     requiredSkills: string[];
     preferredSkills: string[];
   } | null {
-    const haystack = `${item.title} ${item.description}`.toLowerCase();
+    const title = htmlToText(item.title, 300);
+    const company = htmlToText(item.company, 200);
+    const location = htmlToText(item.location, 200);
+    const description = htmlToText(item.description, 4000);
+    if (!title || !description) return null;
+
+    const haystack = `${title} ${description}`.toLowerCase();
     const isEngineeringByHint = ENGINEERING_HINTS.some(h => haystack.includes(h));
 
     const matched: { skill: Skill; confidence: number }[] = [];
@@ -409,7 +423,7 @@ export class IngestionService {
 
     // A hint alone is a weak signal; require the min skill matches unless a
     // strong engineering title keyword was present.
-    const titleLower = item.title.toLowerCase();
+    const titleLower = title.toLowerCase();
     const strongTitleHint = /frontend|front-end|front end|backend|back-end|back end|full.?stack|node|express|nest|react|angular|devops|api|software|engineer|developer/.test(titleLower);
 
     // Reject obvious non-engineering job families even if the description
@@ -437,10 +451,10 @@ export class IngestionService {
     if (requiredSkills.length === 0 && preferredSkills.length === 0) return null;
 
     return {
-      title: item.title,
-      company: item.company,
-      location: item.location,
-      description: item.description.slice(0, 4000),
+      title,
+      company,
+      location,
+      description,
       postingUrl: item.postingUrl,
       postedAt: item.postedAt,
       isRemote: item.isRemote,
@@ -460,7 +474,7 @@ export class IngestionService {
     const byId = new Map(roles.map(role => [role.id, role]));
     const fallback = byId.has(TARGET_ROLE) ? TARGET_ROLE : (roles[0]?.id || TARGET_ROLE);
     const pick = (id: string) => (byId.has(id) ? id : fallback);
-    const title = item.title.toLowerCase();
+    const title = htmlToText(item.title, 300).toLowerCase();
 
     if (/full[\s-]?stack/.test(title)) {
       return pick('role_full_stack');
@@ -501,24 +515,11 @@ export class IngestionService {
     const title = (it.title || '').toLowerCase();
     if (/remote|work from home|\bwfh\b|fully remote|remote-first/i.test(title)) return true;
 
-    const desc = this.stripHtml(it.description || '').toLowerCase();
+    const desc = htmlToText(it.description).toLowerCase();
     // Avoid over-matching; only flag when the description strongly commits to remote.
     if (/(fully remote|100% remote|remote-first|work from anywhere|work from home)/.test(desc)) return true;
 
     return false;
-  }
-
-  private stripHtml(html: string): string {
-    return html
-      .replace(/<[^>]*>/g, ' ')
-      .replace(/&nbsp;/g, ' ')
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
-      .replace(/\s+/g, ' ')
-      .trim();
   }
 
   private toIsoDate(value: string | number | undefined): string | undefined {
@@ -541,8 +542,11 @@ export class IngestionService {
 
   private async bustCaches(): Promise<void> {
     try {
-      await this.cacheInstance.del('landing:stats:v2');
-      await this.cacheInstance.del(`market:demand:${TARGET_ROLE}:v1`);
+      const roles = await store.getRoles();
+      await this.cacheInstance.del('landing:stats:v3');
+      await Promise.all(
+        roles.map(role => this.cacheInstance.del(`market:demand:${role.id}:v1`))
+      );
     } catch {
       // cache miss is fine
     }
@@ -560,10 +564,10 @@ function isWholeWordOrSubmatch(haystack: string, token: string): boolean {
 function toRawJob(item: BdJobItem): RawJob {
   return {
     externalId: item.externalId,
-    title: item.title,
-    company: item.company,
-    location: item.location,
-    description: item.description,
+    title: htmlToText(item.title, 300),
+    company: htmlToText(item.company, 200),
+    location: htmlToText(item.location, 200),
+    description: htmlToText(item.description, 4000),
     postingUrl: item.postingUrl,
     postedAt: item.postedAt,
     isRemote: item.isRemote

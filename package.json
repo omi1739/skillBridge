@@ -19,6 +19,7 @@
     "test": "npm run test --workspaces --if-present",
     "db:setup": "npm run db:setup --workspace=@skillbridge/api",
     "db:seed": "npm run db:seed --workspace=@skillbridge/api",
+    "db:sanitize-jobs": "npm run db:sanitize-jobs --workspace=@skillbridge/api",
     "admin:promote": "npm run admin:promote --workspace=@skillbridge/api"
   },
   "keywords": [

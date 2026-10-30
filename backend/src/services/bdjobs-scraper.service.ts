@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { fetchWithRetry } from '../common/http';
+import { htmlToText } from '../common/text';
 
 /**
  * Scraper for BdJobs (bdjobs.com), Bangladesh's largest job board.
@@ -161,10 +162,10 @@ export class BdJobsScraper {
         const html = [rec.JobDescription, rec.SkillsRequired]
           .filter(Boolean)
           .join(' ');
-        const description = this.stripHtml(html).slice(0, 4000);
+        const description = htmlToText(html, 4000);
         return {
           description,
-          skillsRequired: this.stripHtml(rec.SkillsRequired || '')
+          skillsRequired: htmlToText(rec.SkillsRequired, 500)
         };
       } catch {
         // transient network error; retry once
@@ -175,20 +176,21 @@ export class BdJobsScraper {
 
   private normalize(it: BdApiRecord): BdJobItem | null {
     const rawId = it.Jobid;
-    const title = (it.jobTitle || it.JobTitleBng || '').trim();
-    const company = (it.companyName || '').trim();
+    const title = htmlToText(it.jobTitle || it.JobTitleBng, 300);
+    const company = htmlToText(it.companyName, 200);
     if (!rawId || !title || !company) return null;
 
-    const context = this.stripHtml(it.jobContext || '');
-    const description = this.stripHtml(it.jobDescription || '');
-    const combined = [context, description].filter(Boolean).join(' ').slice(0, 4000);
+    const description = htmlToText(
+      [it.jobContext, it.jobDescription].filter(Boolean).join('\n'),
+      4000
+    );
 
     return {
       externalId: String(rawId),
       title,
       company,
-      location: (it.location || '').trim(),
-      description: combined,
+      location: htmlToText(it.location, 200),
+      description,
       postingUrl: `https://bdjobs.com/h/details/${String(rawId)}?ln=1`,
       postedAt: this.toIsoDate(it.publishDate || ''),
       isRemote: this.isRemotePosting(it)
@@ -200,21 +202,6 @@ export class BdJobsScraper {
     if (/(remote|work from home|wfh|hybrid|fully remote)/.test(place)) return true;
     const location = (it.location || '').toLowerCase();
     return /(remote|work from home|wfh)/.test(location);
-  }
-
-  private stripHtml(html: string | null | undefined): string {
-    if (!html) return '';
-    return html
-      .replace(/<[^>]*>/g, ' ')
-      .replace(/&nbsp;/g, ' ')
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
-      .replace(/\u00a0/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
   }
 
   private toIsoDate(value: string | undefined): string | undefined {
