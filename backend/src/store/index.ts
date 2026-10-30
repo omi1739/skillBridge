@@ -56,6 +56,7 @@ interface QuestionRow {
   sub_skill: string;
   difficulty: string;
   points: number;
+  skill_id: string | null;
 }
 
 interface ProjectRow {
@@ -149,6 +150,14 @@ export class AppDataStore {
     return assessments.find(a => a.id === id);
   }
 
+  /** Distinct skills that have at least one question in the assessment bank. */
+  async getQuestionSkillIds(): Promise<string[]> {
+    const rows = await query<{ skill_id: string }>(
+      `SELECT DISTINCT skill_id FROM questions WHERE skill_id IS NOT NULL`
+    );
+    return rows.map(r => r.skill_id);
+  }
+
   async getAssessments(includeAnswers = false): Promise<Assessment[]> {
     const rows = await query<any>(`SELECT * FROM assessments ORDER BY id`);
     const qRows = await query<QuestionRow>(`SELECT * FROM questions ORDER BY id`);
@@ -173,6 +182,7 @@ export class AppDataStore {
     const question: Question = {
       id: q.id,
       assessmentId: q.assessment_id,
+      skillId: q.skill_id || undefined,
       prompt: q.prompt,
       codeSnippet: q.code_snippet || undefined,
       questionType: q.question_type as Question['questionType'],
@@ -1132,29 +1142,34 @@ export class AppDataStore {
     const totalJobs = roleCounts.reduce((sum, r) => sum + Number(r.total_jobs), 0);
     let updatedRoles = 0;
 
-    for (const rc of roleCounts) {
-      const total = Number(rc.total_jobs);
-      if (total === 0) continue;
-      const skillCounts = await query<{ skill_id: string; cnt: string }>(
-        `SELECT js.skill_id, COUNT(*)::text AS cnt
-         FROM job_skills js
-         JOIN jobs j ON j.id = js.job_id
-         WHERE j.role_id = $1
-         GROUP BY js.skill_id`,
-        [rc.role_id]
-      );
-      await withTransaction(async client => {
-        for (const sc of skillCounts) {
-          const freq = Number(sc.cnt) / total;
+    // Reset every role/skill pair first. Without this, skills that disappear
+    // from the live market keep their previous frequency forever, and seeded
+    // priors can survive a completely empty ingestion run.
+    await withTransaction(async client => {
+      await client.query('UPDATE role_skills SET market_demand_frequency = 0');
+
+      for (const rc of roleCounts) {
+        const total = Number(rc.total_jobs);
+        if (total === 0) continue;
+        const skillCounts = await client.query<{ skill_id: string; cnt: string }>(
+          `SELECT js.skill_id, COUNT(*)::text AS cnt
+           FROM job_skills js
+           JOIN jobs j ON j.id = js.job_id
+           WHERE j.role_id = $1
+           GROUP BY js.skill_id`,
+          [rc.role_id]
+        );
+        for (const row of skillCounts.rows) {
+          const freq = Number(row.cnt) / total;
           await client.query(
             `UPDATE role_skills SET market_demand_frequency = $3
              WHERE role_id = $1 AND skill_id = $2`,
-            [rc.role_id, sc.skill_id, Number(freq.toFixed(2))]
+            [rc.role_id, row.skill_id, Number(freq.toFixed(2))]
           );
         }
-      });
-      updatedRoles++;
-    }
+        updatedRoles++;
+      }
+    });
 
     return { updatedRoles, totalJobs };
   }

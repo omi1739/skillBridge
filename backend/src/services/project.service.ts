@@ -84,8 +84,22 @@ export class ProjectService {
     const verifiedSkills: string[] = [];
     const confidence = verification.verified ? 'HIGH' : 'MEDIUM';
 
+    // Resolve names, aliases and IDs against the canonical skill catalogue. Do
+    // not invent a skill id when the submitted label is unknown: a project must
+    // not award evidence for a skill the platform does not track.
+    const skillLookup = new Map<string, string>();
+    for (const skill of await store.getSkills()) {
+      skillLookup.set(skill.id.toLowerCase(), skill.id);
+      skillLookup.set(skill.canonicalName.toLowerCase(), skill.id);
+      for (const alias of skill.aliases || []) {
+        skillLookup.set(alias.toLowerCase(), skill.id);
+      }
+    }
+
     for (const skillName of data.primarySkills) {
-      const skillId = SKILL_MAPPING[skillName] || `skill_${skillName.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+      const normalizedName = skillName.trim();
+      const skillId = skillLookup.get(normalizedName.toLowerCase()) || SKILL_MAPPING[normalizedName];
+      if (!skillId) continue;
       if (verification.verified) {
         verifiedSkills.push(skillName);
       }

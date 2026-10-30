@@ -20,7 +20,7 @@ SkillBridge is structured as a modular TypeScript monorepo to ensure clean separ
 
 - **Frontend (`frontend/`)**: Next.js 14, React, custom responsive dark-theme CSS design system.
 - **Backend (`backend/`)**: NestJS (Node.js runtime), modular architecture (Auth, Roles, Skills, Assessments, Sandbox, Projects, Jobs, Curriculum, Admin).
-- **Database**: PostgreSQL (Neon Serverless) with normalized schema (16 relational tables).
+- **Database**: PostgreSQL (Supabase) with normalized schema (16 relational tables).
 - **Shared Types (`shared/`)**: Domain interfaces & DTOs shared across backend and frontend.
 
 ### Repository Layout
@@ -158,7 +158,7 @@ To maintain focus, the initial implementation targets one specific role archetyp
 ### Prerequisites
 - Node.js (>= 20.x)
 - npm (>= 10.x)
-- PostgreSQL (>= 15) OR a Neon Serverless connection string
+- PostgreSQL (>= 15) OR a Supabase/Neon Serverless connection string
 
 ### 1. Install Dependencies
 ```bash
@@ -218,8 +218,21 @@ Backend unit and e2e tests isolate the real Postgres connection by mocking the `
 
 
 ### Demo Access
+
+The demo and staff accounts below are created only in local development, or in
+production when `SEED_DEMO_USERS=true` is set explicitly.
+
 - Demo candidate: `candidate@skillbridge.org` / `SkillBridge@123`
 - Recruiter: `recruiter@skillbridge.org` / `RecruitBridge@123`
+
+To promote an existing production account to admin:
+
+```bash
+npm run admin:promote --workspace=@skillbridge/api -- you@example.com
+```
+
+Sign out and sign back in afterwards so the new JWT carries the `ADMIN` role.
+The script never creates accounts; it only updates an existing user.
 
 Roles are resolved from the database and enforced end-to-end. The demo login is a regular `USER` (candidate); the **Admin & Ontology Console** tab only appears for `ADMIN` users, and the protected admin endpoints (`/api/admin/*`) return `403` for non-admin roles instead of being bypassed by the demo token.
 
@@ -227,10 +240,10 @@ Roles are resolved from the database and enforced end-to-end. The demo login is 
 
 ## Current Status
 
-The core platform is fully scaffolded, functional, and deployed to production (backend on Render, frontend on Vercel, PostgreSQL on Neon):
+The core platform is fully scaffolded, functional, and deployed to production (backend on Render, frontend on Vercel, PostgreSQL on Supabase):
 - **9 NestJS modules**: Auth, Roles, Skills, Assessments, Sandbox, Projects, Jobs, Curriculum, Admin + a dedicated ingestion module.
 - **Live, real job data only** — no hardcoded job listings. The feed is populated by two scrapers: **Arbeitnow** (international/remote) and **BdJobs** (Bangladesh). Job demand percentages are computed from verifiable postings with `source_id` provenance.
-- **Scheduled ingestion** — a Render cron job (`skillbridge-api-bdjobs-ingest`) runs the BdJobs scraper three times a day (00/08/16 UTC).
+- **Scheduled ingestion** — `.github/workflows/ingest.yml` runs the full ingestion command every 8 hours (00/08/16 UTC) and can be triggered manually. The Render cron alternative requires a paid compute plan. See `docs/ops/ingestion.md`.
 - **8-tab interactive UI**: Market, Curriculum, Assessment, Sandbox, Gaps, Actions, Jobs, Admin.
 - **Modern sign-in / sign-up modal** with email + Google authentication, branded Google button, and role-based tabs.
 - **JWT authentication** with role-based protection on admin writes (`RolesGuard` + `@Roles('ADMIN')`).
@@ -243,10 +256,10 @@ The core platform is fully scaffolded, functional, and deployed to production (b
 |-----------|------|-----|
 | Web frontend | Vercel | `https://skillbridge-dev-1739.vercel.app` |
 | API backend | Render | `https://skillbridge-cv3e.onrender.com` |
-| Job ingestion (cron) | Render | runs every 8h on `main` push |
-| PostgreSQL | Neon Serverless | via `backend/.env` |
+| Job ingestion | GitHub Actions (or paid Render cron) | every 8h; see `docs/ops/ingestion.md` |
+| PostgreSQL | Supabase | via `backend/.env` |
 
-> **Uptime note:** The free Render web service sleeps after ~15 min of inactivity. An external uptime monitor (e.g. UptimeRobot) pings `GET /api/health` every 5 minutes to keep it warm. `GET /api/jobs` requires a `Bearer` token (e.g. `demo_token_demo_user_01`).
+> **Uptime note:** The free Render web service sleeps after ~15 min of inactivity. An external uptime monitor (e.g. UptimeRobot) pings `GET /api/health` every 5 minutes to keep it warm. `GET /api/jobs` requires a `Bearer` token. The anonymous demo token works only when `ALLOW_DEMO_TOKEN=true`; do not rely on it in production.
 
 > GitHub verification requires network access to `api.github.com`; set `GITHUB_TOKEN` in `backend/.env` for higher rate limits. Unverifiable repos are stored as `PENDING`/`NEEDS_REVIEW` rather than falsely marked verified.
 

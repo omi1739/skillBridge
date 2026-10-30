@@ -59,7 +59,13 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException('Invalid or expired token.');
     }
 
-    request.user = payload;
+    // Re-read the account so a deleted user, a demoted admin, or a role change
+    // takes effect immediately instead of surviving until the JWT expires.
+    const user = await store.getUser(payload.userId);
+    if (!user) {
+      throw new UnauthorizedException('Account no longer exists.');
+    }
+    request.user = { userId: user.id, email: user.email, role: user.role };
     return true;
   }
 }
@@ -81,7 +87,10 @@ export class OptionalJwtAuthGuard implements CanActivate {
       }
       const payload = authService.verifyToken(token);
       if (payload) {
-        request.user = payload;
+        const user = await store.getUser(payload.userId).catch(() => undefined);
+        if (user) {
+          request.user = { userId: user.id, email: user.email, role: user.role };
+        }
       }
     }
     return true;

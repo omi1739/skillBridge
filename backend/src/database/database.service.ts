@@ -22,7 +22,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       this.logger.warn('Initial database ping check failed. Check DATABASE_URL in .env.');
       return;
     }
-    this.logger.log('Connected to Neon PostgreSQL database.');
+    this.logger.log('Connected to PostgreSQL database.');
 
     // Self-initialize on boot so a fresh deploy comes up without a manual
     // db:setup. Both are idempotent (CREATE TABLE IF NOT EXISTS + UPSERTs).

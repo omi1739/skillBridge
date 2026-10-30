@@ -1,0 +1,58 @@
+name: Scheduled job ingestion
+
+# Free alternative to a paid Render cron job. Runs the same ingestion command
+# every 8 hours, and can be triggered manually from the Actions tab.
+#
+# Required repository secret:
+#   SUPABASE_DATABASE_URL = the Postgres connection string for the Supabase project
+#
+# Add it under Settings -> Secrets and variables -> Actions -> New repository secret.
+on:
+  schedule:
+    - cron: "0 */8 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: job-ingestion
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    name: Fetch and upsert live jobs
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared types
+        run: npm run build --workspace=@skillbridge/types
+
+      - name: Build API
+        run: npm run build --workspace=@skillbridge/api
+
+      - name: Run ingestion
+        env:
+          NODE_ENV: production
+          DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
+          HTTP_TIMEOUT_MS: "15000"
+          JOB_MIN_MATCHES: "1"
+          JOB_API_PAGES: "3"
+          JOB_BD_PAGES: "4"
+          JOB_EXPIRE_DAYS: "7"
+          JOB_RETENTION_DAYS: "14"
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::SUPABASE_DATABASE_URL is not set. Add it as a repository secret."
+            exit 1
+          fi
+          npm run db:ingest --workspace=@skillbridge/api all

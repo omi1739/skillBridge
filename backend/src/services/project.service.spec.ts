@@ -10,6 +10,7 @@ jest.mock('../store', () => ({
     saveEvidence: jest.fn(),
     getRecommendations: jest.fn(),
     updateRecommendationStatus: jest.fn(),
+    getSkills: jest.fn(),
     getTargetRoleId: jest.fn().mockResolvedValue('role_junior_backend')
   }
 }));
@@ -50,6 +51,10 @@ describe('ProjectService', () => {
     mockedStore.saveEvidence.mockResolvedValue([]);
     mockedStore.getRecommendations.mockResolvedValue([]);
     mockedStore.updateRecommendationStatus.mockResolvedValue();
+    mockedStore.getSkills.mockResolvedValue([
+      { id: 'skill_nodejs', canonicalName: 'Node.js', category: 'Runtime', description: '', aliases: ['node'], prerequisites: [] },
+      { id: 'skill_postgresql', canonicalName: 'PostgreSQL', category: 'Database', description: '', aliases: ['postgres'], prerequisites: [] }
+    ]);
   });
 
   it('marks a project VERIFIED and records HIGH confidence evidence when the repo passes checks', async () => {
@@ -101,5 +106,17 @@ describe('ProjectService', () => {
 
     expect(out.project.verificationStatus).toBe('PENDING');
     expect(out.verifiedSkills).toEqual([]);
+  });
+
+  it('does not create evidence for unknown or empty skill labels', async () => {
+    const verifier = fakeVerifier({ reachable: true, verified: true, hasTests: true, commitCount: 10 });
+    const service = new ProjectService(verifier);
+
+    await service.submitProject('user_1', { ...baseData, primarySkills: ['Not A Real Skill'] });
+    expect(mockedStore.saveEvidence.mock.calls[0][1]).toEqual([]);
+
+    mockedStore.saveEvidence.mockClear();
+    await service.submitProject('user_1', { ...baseData, primarySkills: [] });
+    expect(mockedStore.saveEvidence.mock.calls[0][1]).toEqual([]);
   });
 });

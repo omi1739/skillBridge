@@ -1,12 +1,24 @@
 'use client';
 
+import { useState, type FormEvent } from 'react';
 import { X } from 'lucide-react';
 import { useSkillBridge } from '@/lib/skillbridge-context';
 
 export default function ProjectModal() {
-  const { showProjectModal, setShowProjectModal, projectForm, setProjectForm, isSubmittingProject, projectSuccessMsg, handleProjectSubmit } = useSkillBridge();
+  const { showProjectModal, setShowProjectModal, projectForm, setProjectForm, isSubmittingProject, projectSuccessMsg, handleProjectSubmit, skills } = useSkillBridge();
+  const [skillError, setSkillError] = useState('');
 
   if (!showProjectModal) return null;
+
+  const onSubmit = (e: FormEvent) => {
+    if (projectForm.primarySkills.length === 0) {
+      e.preventDefault();
+      setSkillError('Select at least one skill this project demonstrates.');
+      return;
+    }
+    setSkillError('');
+    handleProjectSubmit(e);
+  };
 
   return (
     <div className="modal-backdrop">
@@ -18,7 +30,7 @@ export default function ProjectModal() {
           </button>
         </div>
 
-        <form onSubmit={handleProjectSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div>
             <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>
               Project title
@@ -63,6 +75,36 @@ export default function ProjectModal() {
               minLength={1}
               style={{ width: '100%', padding: '0.65rem', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '0.85rem', resize: 'vertical' }}
             />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>
+              Skills demonstrated
+            </label>
+            <select
+              multiple
+              required
+              value={projectForm.primarySkills}
+              onChange={e => {
+                const selected = Array.from(e.target.selectedOptions, option => option.value);
+                setProjectForm({ ...projectForm, primarySkills: selected });
+                if (selected.length > 0) setSkillError('');
+              }}
+              size={Math.min(6, Math.max(3, skills.length))}
+              style={{ width: '100%', padding: '0.65rem', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '0.85rem' }}
+            >
+              {skills.map(skill => (
+                <option key={skill.id} value={skill.canonicalName}>{skill.canonicalName}</option>
+              ))}
+            </select>
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>
+              Hold Ctrl/Cmd to select more than one. Only selected skills can become project evidence.
+            </div>
+            {skillError && (
+              <div style={{ color: 'var(--danger-text, #f87171)', fontSize: '0.75rem', marginTop: '0.35rem' }}>
+                {skillError}
+              </div>
+            )}
           </div>
 
           {projectSuccessMsg && (

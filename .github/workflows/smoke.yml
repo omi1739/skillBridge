@@ -33,5 +33,23 @@ jobs:
           total=$(jq -r '.totalJobs // 0' /tmp/demand.json)
           echo "totalJobs=$total"
           if [ "$total" -eq 0 ]; then
-            echo "::warning::Market demand returned 0 jobs - ingestion may be failing."
+            echo "::error::Market demand returned 0 jobs - ingestion is not running."
+            exit 1
+          fi
+
+      - name: Ingestion freshness
+        run: |
+          BASE="${{ secrets.PROD_API_BASE || 'https://skillbridge-cv3e.onrender.com/api' }}"
+          code=$(curl -sS -o /tmp/ingest.json -w '%{http_code}' --max-time 30 --retry 3 --retry-all-errors "$BASE/health/ingest")
+          echo "HTTP $code"
+          cat /tmp/ingest.json
+          if [ "$code" = "404" ]; then
+            echo "::warning::Ingestion health endpoint is not deployed yet; skipping freshness check."
+            exit 0
+          fi
+          test "$code" = "200"
+          status=$(jq -r '.status // "error"' /tmp/ingest.json)
+          if [ "$status" != "ok" ]; then
+            echo "::error::Ingestion is stale or unhealthy (status=$status)."
+            exit 1
           fi

@@ -1,7 +1,7 @@
 import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
 import { store } from '../../store';
 import { query, withAdvisoryLock } from '../../db/client';
-import { Skill, MarketDemandResponse, MarketDemandStat } from '@skillbridge/types';
+import { Skill, Role, MarketDemandResponse, MarketDemandStat } from '@skillbridge/types';
 import { CacheService } from '../../common/cache.service';
 import { fetchWithTimeout } from '../../common/http';
 import { reportAlert } from '../../common/error-reporter';
@@ -189,6 +189,7 @@ export class IngestionService {
       }
 
       const skills = await store.getSkills();
+      const roles = await store.getRoles();
       const raw: RawJob[] = source === 'bdjobs'
         ? (await bdJobsScraper.scrape()).map(toRawJob)
         : await this.fetchRaw(sourceUrl);
@@ -197,6 +198,7 @@ export class IngestionService {
       for (const item of raw) {
         const classification = this.classifyAndMatch(item, skills, minMatches);
         if (!classification) continue;
+        const matchedSkillIds = [...classification.requiredSkills, ...classification.preferredSkills];
         built.push({
           externalId: String(item.externalId),
           sourceId,
@@ -204,7 +206,7 @@ export class IngestionService {
           company: classification.company,
           location: classification.location,
           experienceLevel: '',
-          roleId: TARGET_ROLE,
+          roleId: this.pickRoleId(item, roles, matchedSkillIds),
           description: classification.description,
           postingUrl: classification.postingUrl,
           postedAt: classification.postedAt,
@@ -445,6 +447,45 @@ export class IngestionService {
       requiredSkills,
       preferredSkills
     };
+  }
+
+  /**
+   * Choose the role whose skill profile best matches the posting. Explicit
+   * title signals (frontend/backend/full-stack) win; otherwise the role with
+   * the highest weighted overlap with the classified skills is used, with
+   * full-stack as the tie-breaker. Keeping every posting on one role made the
+   * other role market pages permanently empty.
+   */
+  private pickRoleId(item: RawJob, roles: Role[], matchedSkillIds: string[]): string {
+    const byId = new Map(roles.map(role => [role.id, role]));
+    const fallback = byId.has(TARGET_ROLE) ? TARGET_ROLE : (roles[0]?.id || TARGET_ROLE);
+    const pick = (id: string) => (byId.has(id) ? id : fallback);
+    const title = item.title.toLowerCase();
+
+    if (/full[\s-]?stack/.test(title)) {
+      return pick('role_full_stack');
+    }
+    if (/\bfront[\s-]?end\b|\breact\b|\bui\s+(engineer|developer)\b/.test(title)) {
+      return pick('role_frontend');
+    }
+    if (/\bback[\s-]?end\b|\bserver[\s-]?side\b|\bapi\s+(engineer|developer)\b|\bnode(?:\.js)?\s+(developer|engineer)\b|\bjava\s+(developer|engineer)\b|\bpython\s+(developer|engineer)\b/.test(title)) {
+      return pick('role_junior_backend');
+    }
+
+    const matched = new Set(matchedSkillIds);
+    let bestId = fallback;
+    let bestScore = -1;
+    for (const role of roles) {
+      const score = role.roleSkills.reduce(
+        (sum, rs) => sum + (matched.has(rs.skillId) ? rs.roleWeight : 0),
+        0
+      );
+      if (score > bestScore || (score === bestScore && role.id === fallback)) {
+        bestScore = score;
+        bestId = role.id;
+      }
+    }
+    return pick(bestId);
   }
 
   private isRemotePosting(it: ArbeitnowItem): boolean {

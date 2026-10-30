@@ -1,5 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
-import { testConnection } from './db/client';
+import { query, testConnection } from './db/client';
 
 @Controller()
 export class AppController {
@@ -30,5 +30,40 @@ export class AppController {
       database: dbStatus,
       timestamp: new Date().toISOString()
     };
+  }
+
+  @Get('health/ingest')
+  async getIngestHealth() {
+    const staleAfterHours = Math.max(1, Number(process.env.INGEST_STALE_HOURS || 12));
+    try {
+      const [last] = await query<{ last_success: string | null }>(
+        `SELECT MAX(finished_at)::text AS last_success
+           FROM job_ingest_runs
+          WHERE status = 'success'`
+      );
+      const [counts] = await query<{ jobs: string }>('SELECT COUNT(*)::text AS jobs FROM jobs');
+      const lastSuccessAt = last.last_success;
+      const ageHours = lastSuccessAt
+        ? (Date.now() - new Date(lastSuccessAt).getTime()) / 3_600_000
+        : null;
+      const stale = ageHours === null || ageHours > staleAfterHours;
+
+      return {
+        status: stale ? 'stale' : 'ok',
+        jobs: Number(counts.jobs),
+        lastSuccessAt,
+        ageHours: ageHours === null ? null : Number(ageHours.toFixed(1)),
+        staleAfterHours,
+        timestamp: new Date().toISOString()
+      };
+    } catch (err) {
+      return {
+        status: 'error',
+        jobs: 0,
+        lastSuccessAt: null,
+        error: (err as Error).message,
+        timestamp: new Date().toISOString()
+      };
+    }
   }
 }

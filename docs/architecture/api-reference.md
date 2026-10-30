@@ -17,8 +17,9 @@ prefix `/api`. Requests are validated with a global `ValidationPipe`
 
 | Method | Route          | Description                                        |
 |--------|----------------|----------------------------------------------------|
-| GET    | `/api/health`  | Service liveness (DB-free — safe for monitor polling without waking Neon compute) |
+| GET    | `/api/health`  | Service liveness (DB-free — safe for monitor polling without waking the database) |
 | GET    | `/api/health/db` | Explicit Postgres connectivity probe (`database`) |
+| GET    | `/api/health/ingest` | Last successful ingestion, job count, and stale/ok status |
 | GET    | `/api/stats`   | Landing market counts (cached, Redis or in-memory) |
 
 ## Auth & Candidate Profile
@@ -120,7 +121,7 @@ See `backend/.env.example` for the authoritative list. Key values:
 
 | Variable           | Purpose                                             |
 |--------------------|-----------------------------------------------------|
-| `DATABASE_URL`     | PostgreSQL / Neon connection string (required)      |
+| `DATABASE_URL`     | PostgreSQL / Supabase connection string (required)  |
 | `JWT_SECRET`       | JWT signing secret (required in production)         |
 | `PORT`             | API port (default `4000`)                           |
 | `GITHUB_TOKEN`     | Optional GitHub token for project verification      |

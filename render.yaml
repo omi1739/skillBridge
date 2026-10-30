@@ -19,7 +19,10 @@ services:
         value: 10000
       - key: DATABASE_URL
         sync: false
-      # Optional second Neon project: when the primary hits its monthly
+      # One trusted proxy hop (Render terminates TLS in front of the API).
+      - key: TRUST_PROXY
+        value: "1"
+      # Optional second Postgres project: when the primary hits its monthly
       # compute-hour quota (project paused), the API automatically fails over to
       # this connection string and probes the primary to switch back. The probe
       # only runs while the fallback is active, so a healthy primary is not kept
@@ -80,45 +83,13 @@ services:
       - key: GEMINI_FALLBACK_MODELS
         value: gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.8-flash
 
-  # Scheduled job-board ingestion, separate from the always-on web service so
-  # it runs a fixed number of times per day instead of in the background.
-  # Runs both boards (Arbeitnow + BdJobs) three times a day (00/08/16 UTC) so
-  # every source stays fresh and its jobs are re-upserted (which refreshes the
-  # verification timestamp) before the retention sweep can delete them.
-  - type: cron
-    name: skillbridge-api-ingest
-    runtime: node
-    plan: free
-    schedule: "0 */8 * * *"
-    buildCommand: npm install && npm run build --workspace=@skillbridge/types && npm run build --workspace=@skillbridge/api
-    startCommand: npm run db:ingest --workspace=@skillbridge/api all
-    envVars:
-      - key: NODE_ENV
-        value: production
-      - key: DATABASE_URL
-        sync: false
-      # Second Neon connection string for failover (see web service comment).
-      - key: DATABASE_URL_FALLBACK
-        sync: false
-      - key: JWT_SECRET
-        sync: false
-      - key: REDIS_URL
-        sync: false
-      - key: JOB_INGEST_SOURCE
-        value: all
-      - key: JOB_BD_PAGES
-        sync: false
-      - key: JOB_MIN_MATCHES
-        sync: false
-      # Jobs are refreshed every 8 hours by this cron, so a 7-day expiry plus a
-      # 14-day hard-delete window tolerates a few missed runs without letting
-      # stale postings linger indefinitely.
-      - key: JOB_EXPIRE_DAYS
-        value: 7
-      - key: JOB_RETENTION_DAYS
-        value: 14
-      - key: HTTP_TIMEOUT_MS
-        value: "15000"
-      # Optional alert webhook: failed/zero-yield ingestion runs are POSTed here.
-      - key: ALERT_WEBHOOK_URL
-        sync: false
+  # Job-board ingestion is scheduled by .github/workflows/ingest.yml, which
+  # runs the same command every 8 hours without requiring paid Render compute.
+  #
+  # If you prefer a Render cron job instead, create one with a paid plan and:
+  #   startCommand: npm run db:ingest --workspace=@skillbridge/api all
+  #   schedule: "0 */8 * * *"
+  #   DATABASE_URL: the same Supabase connection string as this web service
+  #   JOB_EXPIRE_DAYS: 7
+  #   JOB_RETENTION_DAYS: 14
+  # Do not enable both schedulers; they would duplicate ingestion work.

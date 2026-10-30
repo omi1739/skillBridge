@@ -30,7 +30,7 @@ export class ProjectsService {
       title,
       repoUrl,
       description,
-      primarySkills: primarySkills || ['Node.js', 'PostgreSQL', 'REST APIs', 'Docker']
+      primarySkills: primarySkills || []
     });
   }
 }

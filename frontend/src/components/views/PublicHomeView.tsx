@@ -22,6 +22,14 @@ export default function PublicHomeView() {
     .sort((a, b) => b.marketDemandFrequency - a.marketDemandFrequency)
     .slice(0, 6);
 
+  const snapshotSkills = topSkills.slice(0, 4).map(rs => ({
+    name: rs.skill?.canonicalName || rs.skillId,
+    pct: Math.round(rs.marketDemandFrequency * 100)
+  }));
+  const snapshotScore = snapshotSkills.length > 0
+    ? Math.round(snapshotSkills.reduce((sum, s) => sum + s.pct, 0) / snapshotSkills.length)
+    : 0;
+
   const steps = [
     { n: '01', title: 'Read the market', desc: 'See which skills appear in live postings for your target role.' },
     { n: '02', title: 'Test your skills', desc: 'Timed, auto-graded SQL and code challenges in a real sandbox.' },
@@ -94,23 +102,20 @@ export default function PublicHomeView() {
               <div className="lp-window-head">
                 <div>
                   <div className="lp-window-kicker">Live demand snapshot</div>
-                  <div className="lp-window-title">Full-Stack Developer</div>
+                  <div className="lp-window-title">{role?.title || 'Your target role'}</div>
                 </div>
-                <span className="lp-window-score">84</span>
+                <span className="lp-window-score">{snapshotScore}</span>
               </div>
               <div className="lp-window-skills">
-                {[
-                  ['SQL', 94],
-                  ['JavaScript', 81],
-                  ['React', 68],
-                  ['Node.js', 57]
-                ].map(([name, v]) => (
+                {snapshotSkills.length > 0 ? snapshotSkills.map(({ name, pct }) => (
                   <div key={name} className="lp-window-skill">
                     <span className="lp-window-skill-name">{name}</span>
-                    <span className="lp-window-skill-bar"><span style={{ width: `${v}%` }} /></span>
-                    <span className="lp-window-skill-pct">{v}%</span>
+                    <span className="lp-window-skill-bar"><span style={{ width: `${pct}%` }} /></span>
+                    <span className="lp-window-skill-pct">{pct}%</span>
                   </div>
-                ))}
+                )) : (
+                  <div className="lp-window-empty">Waiting for the next ingestion run…</div>
+                )}
               </div>
             </div>
           </div>

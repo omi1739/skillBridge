@@ -64,6 +64,7 @@ export type QuestionType = 'MCQ' | 'OUTPUT_PREDICTION' | 'CODE_DEBUG' | 'SQL_QUE
 export interface Question {
   id: string;
   assessmentId: string;
+  skillId?: string;
   prompt: string;
   codeSnippet?: string;
   questionType: QuestionType;

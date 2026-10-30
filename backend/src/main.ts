@@ -23,6 +23,14 @@ async function bootstrap() {
   // (comma-separated), e.g. CORS_ORIGIN=https://skillbridge.vercel.app
   // When CORS_ORIGIN is unset in production, deny cross-origin requests entirely.
   const isProd = process.env.NODE_ENV === 'production';
+  // Render, Vercel and most managed hosts terminate TLS at a proxy. Without
+  // this, req.ip is the proxy's address and every user shares one rate-limit
+  // bucket. Default to one trusted hop in production; override with TRUST_PROXY.
+  const trustProxy = process.env.TRUST_PROXY ?? (isProd ? '1' : '');
+  if (trustProxy) {
+    const hops = Number(trustProxy);
+    app.getHttpAdapter().getInstance().set('trust proxy', Number.isFinite(hops) && hops > 0 ? hops : trustProxy);
+  }
   const corsOrigin = process.env.CORS_ORIGIN
     ? process.env.CORS_ORIGIN.split(',').map(o => o.trim()).filter(Boolean)
     : isProd ? [] : true;

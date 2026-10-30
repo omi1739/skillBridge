@@ -15,7 +15,7 @@ export interface LandingStats {
 
 @Injectable()
 export class StatsService {
-  private readonly CACHE_KEY = 'landing:stats:v2';
+  private readonly CACHE_KEY = 'landing:stats:v3';
   private readonly CACHE_TTL = 60;
   private readonly cacheInstance: CacheService;
 
@@ -29,19 +29,17 @@ export class StatsService {
       return cached;
     }
 
-    const [jobs, skills, curricula, assessments] = await Promise.all([
+    const [jobs, skills, curricula, questionSkillIds] = await Promise.all([
       store.getJobs(),
       store.getSkills(),
       curriculumService.getCurricula(),
-      store.getAssessments()
+      store.getQuestionSkillIds()
     ]);
     const uniqueCompanies = new Set(jobs.map((j: JobListing) => j.company)).size;
     // "Validation" = how much of the canonical skill set is underpinned by
-    // assessment content. Compute it from real coverage instead of a hardcoded
-    // constant so the landing figure cannot overstate the platform's maturity.
-    const assessedSkillIds = new Set(
-      assessments.map(a => a.skillId).filter((id): id is string => Boolean(id))
-    );
+    // assessment content. Count every question in the bank, including the
+    // generated questions that are not yet attached to an assessment row.
+    const assessedSkillIds = new Set(questionSkillIds);
     const skillsWithCoverage = skills.filter(s => assessedSkillIds.has(s.id)).length;
     const validationPercent = skills.length > 0
       ? Math.round((skillsWithCoverage / skills.length) * 100)
