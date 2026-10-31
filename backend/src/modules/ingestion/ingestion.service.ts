@@ -7,6 +7,7 @@ import { fetchWithTimeout } from '../../common/http';
 import { reportAlert } from '../../common/error-reporter';
 import { bdJobsScraper, BdJobItem } from '../../services/bdjobs-scraper.service';
 import { htmlToText } from '../../common/text';
+import { isJobFresh, jobMaxAgeDays } from '../../common/job-freshness';
 
 const TARGET_ROLE = 'role_full_stack';
 
@@ -181,11 +182,19 @@ export class IngestionService {
   private async performIngest(cfg: IngestConfig): Promise<IngestReport> {
     const { source, sourceUrl, minMatches, replace, sourceName, sourceConfig } = cfg;
     const runId = await store.recordIngestRunStart(sourceName);
+    let sweep = { expired: 0, deleted: 0, recentlyChecked: 0, verified: 0 };
 
     try {
       const sourceId = await store.ensureJobSource(sourceName, 'API',
         sourceConfig.description,
         sourceConfig.meta);
+
+      // Retention runs before any network work so stale postings are removed
+      // even when the upstream board is down or the fetch times out.
+      sweep = await store.runVerificationSweep();
+      this.logger.log(
+        `Retention sweep: removed=${sweep.deleted} expired=${sweep.expired} (${jobMaxAgeDays()}-day freshness window).`
+      );
 
       // Replacing clears this source's previously-ingested jobs first so a
       // re-sync with a stricter classifier (or expired listings) stays accurate.
@@ -202,7 +211,13 @@ export class IngestionService {
         : await this.fetchRaw(sourceUrl);
 
       const built: Array<Parameters<typeof store.upsertJobs>[0][number]> = [];
+      let skippedStale = 0;
       for (const item of raw) {
+        // Never re-introduce a posting that is already outside the window.
+        if (!isJobFresh(item.postedAt)) {
+          skippedStale++;
+          continue;
+        }
         const classification = this.classifyAndMatch(item, skills, minMatches);
         if (!classification) continue;
         const matchedSkillIds = [...classification.requiredSkills, ...classification.preferredSkills];
@@ -231,10 +246,9 @@ export class IngestionService {
         updated = res.updated;
       }
 
-      // Mark this source as synced and run verification sweep to expire old
-      // jobs from sources that haven't been re-checked recently.
+      // Mark this source as synced after a successful fetch. The retention
+      // sweep already ran at the start of this attempt.
       await store.markSourceSynced(sourceId);
-      const sweep = await store.runVerificationSweep();
 
       const recomputed = await store.recomputeMarketDemand();
       await this.bustCaches();
@@ -256,7 +270,7 @@ export class IngestionService {
       await store.recordIngestRunFinish(runId, { status, ...report });
 
       this.logger.log(
-        `Ingestion complete: fetched=${report.fetched} classified=${report.classified} inserted=${inserted} updated=${updated} removed=${removed} expired=${sweep.expired} deleted=${sweep.deleted} totalJobs=${recomputed.totalJobs}`
+        `Ingestion complete: fetched=${report.fetched} classified=${report.classified} inserted=${inserted} updated=${updated} removed=${removed} staleSkipped=${skippedStale} expired=${sweep.expired} deleted=${sweep.deleted} totalJobs=${recomputed.totalJobs}`
       );
 
       // A scrape that yields nothing new is usually a silent upstream breakage.
@@ -272,6 +286,8 @@ export class IngestionService {
     } catch (err: any) {
       await store.recordIngestRunFinish(runId, {
         status: 'failed',
+        expired: sweep.expired,
+        deleted: sweep.deleted,
         error: err?.message || String(err)
       }).catch(() => undefined);
       this.logger.error(`Ingestion for "${sourceName}" failed: ${err?.message || err}`, err?.stack);

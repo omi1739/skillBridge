@@ -16,6 +16,7 @@ import {
 } from '@skillbridge/types';
 import { query, withTransaction } from '../db/client';
 import { htmlToText } from '../common/text';
+import { jobMaxAgeDays } from '../common/job-freshness';
 import type { GeneratedChallenge } from '../services/challenge-generator.service';
 
 interface SkillRow {
@@ -504,21 +505,28 @@ export class AppDataStore {
 
     // Bangladesh keyword set (cities/areas + country). Drives the "Bangladesh first" default sort.
     const bdExpr = `(LOWER(COALESCE(j.location,'')) ~ 'dhaka|bangladesh|gulshan|dhanmondi|tejgaon|baridhara|banani|bashundhara|uttara|mirpur|motijheel|mogbazar|badda|agargaon|farmgate|chittagong|sylhet|khulna|rajshahi|rangpur|mymensingh|comilla|cumilla|barisal|bogra|jashore|gazipur|narayanganj|cox''?s bazar')`;
+    // Recency is measured from the real posting date, falling back to the row's
+    // ingest timestamp for feeds that omit one.
+    const recencyExpr = `COALESCE(j.posted_at, j.created_at)`;
     const orderClause = sort === 'recent'
-      ? `j.posted_at DESC NULLS LAST, j.id`
+      ? `${recencyExpr} DESC NULLS LAST, j.id`
       : `CASE
            WHEN ${bdExpr} AND NOT COALESCE(j.is_remote, false) THEN 1
            WHEN COALESCE(j.is_remote, false) THEN 2
            ELSE 3
          END,
-         j.posted_at DESC NULLS LAST, j.id`;
+         ${recencyExpr} DESC NULLS LAST, j.id`;
 
     const rows = await query<any>(
       `SELECT j.*, s.name AS source_name, s.access_method AS source_access_method,
               ${bdExpr} AS is_bd
        FROM jobs j
        LEFT JOIN job_sources s ON s.id = j.source_id
-       ORDER BY ${orderClause}`
+       WHERE COALESCE(j.verification_status, 'UNVERIFIED') <> 'EXPIRED'
+         AND COALESCE(j.posted_at, j.created_at)
+             >= CURRENT_TIMESTAMP - ($1::int * INTERVAL '1 day')
+       ORDER BY ${orderClause}`,
+      [jobMaxAgeDays()]
     );
     return rows.map(j => ({
       id: j.id,
@@ -530,7 +538,7 @@ export class AppDataStore {
       description: htmlToText(j.description, 4000),
       requiredSkillIds: reqMap.get(j.id) || [],
       preferredSkillIds: prefMap.get(j.id) || [],
-      postedAt: j.posted_at,
+      postedAt: j.posted_at || j.created_at,
       sourceName: j.source_name || undefined,
       sourceUrl: j.posting_url || undefined,
       sourceAccessMethod: j.source_access_method || undefined,
@@ -752,22 +760,43 @@ export class AppDataStore {
     }));
   }
 
+  /**
+   * Permanently remove every posting outside the freshness window. This is the
+   * authoritative retention rule: it deliberately ignores verification status,
+   * so even recruiter-hosted or already-expired rows cannot outlive the window.
+   */
+  async pruneStaleJobs(maxAgeDays: number = jobMaxAgeDays()): Promise<number> {
+    const rows = await query<{ c: string }>(
+      `WITH purged AS (
+         DELETE FROM jobs
+         WHERE COALESCE(posted_at, created_at)
+               < CURRENT_TIMESTAMP - ($1::int * INTERVAL '1 day')
+         RETURNING id
+       )
+       SELECT COUNT(*)::text AS c FROM purged`,
+      [maxAgeDays]
+    );
+    return Number(rows[0]?.c || 0);
+  }
+
   async runVerificationSweep(): Promise<{ expired: number; deleted: number; recentlyChecked: number; verified: number }> {
     const RECENT_INTERVAL = "48 hours";
+    const freshnessDays = jobMaxAgeDays();
 
-    // How long a listing can go without re-verification before it is flagged
-    // EXPIRED (shown to users as a visible "Expired" badge). Defaults to 4 days.
-    const expireDays = Number(process.env.JOB_EXPIRE_DAYS || 4) || 4;
-    const expireInterval = `${expireDays} days`;
+    // 1. Hard retention first. Postings older than the freshness window are
+    //    gone for everyone, regardless of their previous verification status.
+    const deleted = await this.pruneStaleJobs(freshnessDays);
 
-    // How long an EXPIRED listing is kept for audit before being permanently
-    // removed to keep the job-plan bounded. Defaults to 7 days.
-    const retentionDays = Number(process.env.JOB_RETENTION_DAYS || 7) || 7;
-    const retentionInterval = `${retentionDays} days`;
+    // 2. Soft-expire listings whose source became inactive or which have not
+    //    been re-verified recently. The read path also filters EXPIRED rows, so
+    //    users never see a stale posting during a short ingestion outage.
+    const rawExpireDays = Number(process.env.JOB_EXPIRE_DAYS || freshnessDays);
+    const expireDays = Number.isFinite(rawExpireDays)
+      ? Math.min(365, Math.max(1, Math.round(rawExpireDays)))
+      : freshnessDays;
 
-    // Soft-expire: a listing whose source became inactive OR wasn't re-verified
-    // within the expire window. Never flag recruiter-hosted (EMPLOYER_VERIFIED)
-    // jobs or ones already EXPIRED. This is what users see as the badge.
+    // Never flag recruiter-hosted (EMPLOYER_VERIFIED) jobs or ones already
+    // EXPIRED. This is an early-warning status; hard deletion above is final.
     const expired = await query<{ c: string }>(
       `WITH expiring AS (
          UPDATE jobs SET verification_status = 'EXPIRED'
@@ -777,28 +806,13 @@ export class AppDataStore {
 )
            OR
            (COALESCE(last_verified_at, created_at, posted_at)
-            < CURRENT_TIMESTAMP - INTERVAL '${expireInterval}')
+            < CURRENT_TIMESTAMP - ($1::int * INTERVAL '1 day'))
           )
          AND verification_status NOT IN ('EMPLOYER_VERIFIED', 'EXPIRED')
          RETURNING id
        )
-       SELECT COUNT(*)::text AS c FROM expiring`
-    );
-
-    // Physical purge: permanently remove listings that are EXPIRED and have been
-    // stale beyond the retention window. Keeps the table bounded. Employment-
-    // verified (recruiter-hosted) postings are already excluded by the status.
-    // Jobs that were never verified (last_verified_at IS NULL) fall back to
-    // their ingest timestamp so they can never dodge the retention window.
-    const deleted = await query<{ c: string }>(
-      `WITH purged AS (
-         DELETE FROM jobs
-         WHERE verification_status = 'EXPIRED'
-           AND COALESCE(last_verified_at, created_at, posted_at)
-               < CURRENT_TIMESTAMP - INTERVAL '${retentionInterval}'
-         RETURNING id
-       )
-       SELECT COUNT(*)::text AS c FROM purged`
+       SELECT COUNT(*)::text AS c FROM expiring`,
+      [expireDays]
     );
 
     // RECENTLY_CHECKED: source is active AND last_verified_at within 48h
@@ -827,7 +841,7 @@ export class AppDataStore {
 
     return {
       expired: Number(expired[0]?.c || 0),
-      deleted: Number(deleted[0]?.c || 0),
+      deleted,
       recentlyChecked: Number(recent[0]?.c || 0),
       verified: Number(verified[0]?.c || 0)
     };
@@ -1138,11 +1152,16 @@ export class AppDataStore {
 
   // ---- Market demand (recomputed from real job postings) ----
   async recomputeMarketDemand(): Promise<{ updatedRoles: number; totalJobs: number }> {
+    const freshnessDays = jobMaxAgeDays();
     const roleCounts = await query<{ role_id: string; total_jobs: string }>(
-      `SELECT role_id, COUNT(*)::text AS total_jobs
-       FROM jobs
-       WHERE role_id IS NOT NULL
-       GROUP BY role_id`
+      `SELECT j.role_id, COUNT(*)::text AS total_jobs
+       FROM jobs j
+       WHERE j.role_id IS NOT NULL
+         AND COALESCE(j.verification_status, 'UNVERIFIED') <> 'EXPIRED'
+         AND COALESCE(j.posted_at, j.created_at)
+             >= CURRENT_TIMESTAMP - ($1::int * INTERVAL '1 day')
+       GROUP BY j.role_id`,
+      [freshnessDays]
     );
     const totalJobs = roleCounts.reduce((sum, r) => sum + Number(r.total_jobs), 0);
     let updatedRoles = 0;
@@ -1161,8 +1180,11 @@ export class AppDataStore {
            FROM job_skills js
            JOIN jobs j ON j.id = js.job_id
            WHERE j.role_id = $1
+             AND COALESCE(j.verification_status, 'UNVERIFIED') <> 'EXPIRED'
+             AND COALESCE(j.posted_at, j.created_at)
+                 >= CURRENT_TIMESTAMP - ($2::int * INTERVAL '1 day')
            GROUP BY js.skill_id`,
-          [rc.role_id]
+          [rc.role_id, freshnessDays]
         );
         for (const row of skillCounts.rows) {
           const freq = Number(row.cnt) / total;

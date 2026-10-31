@@ -48,8 +48,9 @@ jobs:
           JOB_MIN_MATCHES: "1"
           JOB_API_PAGES: "3"
           JOB_BD_PAGES: "4"
-          JOB_EXPIRE_DAYS: "7"
-          JOB_RETENTION_DAYS: "14"
+          JOB_MAX_AGE_DAYS: "3"
+          JOB_EXPIRE_DAYS: "3"
+          JOB_RETENTION_DAYS: "3"
         run: |
           if [ -z "$DATABASE_URL" ]; then
             echo "::error::SUPABASE_DATABASE_URL is not set. Add it as a repository secret."

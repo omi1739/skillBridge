@@ -185,6 +185,7 @@ Ingest real job postings (Arbeitnow international + BdJobs Bangladesh):
 ```bash
 npm run db:ingest --workspace=@skillbridge/api bdjobs   # Bangladesh scraper
 npm run db:ingest --workspace=@skillbridge/api arbeitnow # international remote
+npm run db:prune-jobs                                    # delete postings older than 3 days now
 ```
 
 ### 4. Run in Development

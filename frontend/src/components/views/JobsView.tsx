@@ -1,15 +1,104 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import type { CSSProperties } from 'react';
+import type { JobMatchResult } from '@skillbridge/types';
 import { useSkillBridge } from '@/lib/skillbridge-context';
-import { RemoteBadge } from '@/components/ui/badges';
+import { safeExternalUrl } from '@/lib/safe-url';
 import { RolePromptView, SignInPromptView } from './prompts';
 import {
-  ChevronLeft, ChevronRight, Building2, MapPin, CheckCircle2, XCircle,
-  Calendar, ChevronDown
+  Briefcase,
+  Building2,
+  Calendar,
+  CheckCircle2,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  ExternalLink,
+  Globe2,
+  Home,
+  MapPin,
+  Search,
+  Sparkles,
+  Target,
+  X,
+  XCircle
 } from 'lucide-react';
 
-const PAGE_SIZE = 6;
+const PAGE_SIZE = 8;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const FRESHNESS_DAYS = 3;
+
+type PageItem = number | 'gap-start' | 'gap-end';
+
+function buildPageItems(current: number, total: number): PageItem[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  if (current <= 4) return [1, 2, 3, 4, 5, 'gap-end', total];
+  if (current >= total - 3) {
+    return [1, 'gap-start', total - 4, total - 3, total - 2, total - 1, total];
+  }
+  return [1, 'gap-start', current - 1, current, current + 1, 'gap-end', total];
+}
+
+function companyInitials(company: string): string {
+  const words = company
+    .trim()
+    .split(/\s+/)
+    .map(word => word.replace(/^[^A-Za-z0-9]+/, ''))
+    .filter(Boolean);
+  if (words.length === 0) return company.trim().slice(0, 2).toUpperCase() || '?';
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return `${words[0][0]}${words[1][0]}`.toUpperCase();
+}
+
+function postedDate(value: string): Date | null {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function relativePostedLabel(value: string): string | null {
+  const date = postedDate(value);
+  if (!date) return null;
+  const days = Math.floor((Date.now() - date.getTime()) / DAY_MS);
+  if (days <= 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return `${days} days ago`;
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function longPostedLabel(value: string): string {
+  const date = postedDate(value);
+  return date
+    ? date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+    : 'Unknown';
+}
+
+function isNewPosting(value: string): boolean {
+  const date = postedDate(value);
+  return !!date && Date.now() - date.getTime() < DAY_MS;
+}
+
+function matchesSearch(match: JobMatchResult, terms: string[]): boolean {
+  if (terms.length === 0) return true;
+  const job = match.job;
+  const haystack = [
+    job.title,
+    job.company,
+    job.location,
+    job.description,
+    job.sourceName,
+    ...(job.requiredSkillIds || []),
+    ...(job.preferredSkillIds || []),
+    ...match.matchedSkills.map(s => s.canonicalName),
+    ...match.missingSkills.map(s => s.canonicalName)
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+  return terms.every(term => haystack.includes(term));
+}
 
 export default function JobsView() {
   const {
@@ -27,9 +116,13 @@ export default function JobsView() {
   } = useSkillBridge();
 
   const [page, setPage] = useState(1);
+  const [query, setQuery] = useState('');
 
   const filteredMatches = useMemo(() => {
-    const regionMatches = jobMatches.filter(match => {
+    const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const searched = jobMatches.filter(match => matchesSearch(match, terms));
+
+    const regionMatches = searched.filter(match => {
       if (jobRegionFilter === 'BANGLADESH') return !!match.job.isBangladesh;
       if (jobRegionFilter === 'INTERNATIONAL') return !match.job.isBangladesh;
       return true;
@@ -43,7 +136,11 @@ export default function JobsView() {
 
     const sorted = [...remoteFiltered];
     if (jobSort === 'recent') {
-      sorted.sort((a, b) => new Date(b.job.postedAt).getTime() - new Date(a.job.postedAt).getTime());
+      sorted.sort((a, b) => {
+        const aTime = postedDate(a.job.postedAt)?.getTime() || 0;
+        const bTime = postedDate(b.job.postedAt)?.getTime() || 0;
+        return bTime - aTime;
+      });
     } else {
       sorted.sort((a, b) => {
         const pa = (a.job.isBangladesh && !a.job.isRemote) ? 0 : a.job.isRemote ? 1 : 2;
@@ -53,7 +150,7 @@ export default function JobsView() {
       });
     }
     return sorted;
-  }, [jobMatches, jobRegionFilter, jobRemoteFilter, jobSort]);
+  }, [jobMatches, jobRegionFilter, jobRemoteFilter, jobSort, query]);
 
   if (!currentUser) {
     return (
@@ -68,91 +165,125 @@ export default function JobsView() {
   const bdCount = jobMatches.filter(m => m.job.isBangladesh).length;
   const internationalCount = jobMatches.length - bdCount;
   const remoteCount = jobMatches.filter(m => m.job.isRemote).length;
+  const onsiteCount = jobMatches.length - remoteCount;
+  const hasActiveFilters = !!(query.trim() || jobRegionFilter !== 'ALL' || jobRemoteFilter !== 'ALL');
 
   const totalPages = Math.max(1, Math.ceil(filteredMatches.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const startIdx = (safePage - 1) * PAGE_SIZE;
   const pageMatches = filteredMatches.slice(startIdx, startIdx + PAGE_SIZE);
+  const rangeStart = filteredMatches.length === 0 ? 0 : startIdx + 1;
+  const rangeEnd = Math.min(startIdx + PAGE_SIZE, filteredMatches.length);
+  const pageItems = buildPageItems(safePage, totalPages);
 
   const goToPage = (p: number) => {
     setPage(Math.max(1, Math.min(totalPages, p)));
   };
 
-  const showDate = (m: any) => {
-    const d = new Date(m.job.postedAt);
-    if (isNaN(d.getTime())) return null;
-    const today = new Date();
-    const diffDays = Math.floor((today.getTime() - d.getTime()) / 86400000);
-    if (diffDays <= 0) return 'Today';
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const resetFilters = () => {
+    setQuery('');
+    setJobRegionFilter('ALL');
+    setJobRemoteFilter('ALL');
+    setJobSort('recent');
+    setPage(1);
   };
 
   return (
     <div className="jobs-page">
-      <div className="page-header">
+      <div className="page-header jobs-header">
         <div>
           <div className="jobs-kicker">Job matches</div>
-          <h1 className="page-title">Matching engineering jobs</h1>
+          <h1 className="page-title">Fresh engineering roles, ranked for you</h1>
           <p className="page-subtitle">
-            Roles ranked against your verified skills. On-site jobs in Bangladesh come first, then remote, then other on-site postings.
+            Only roles posted in the last {FRESHNESS_DAYS} days make it here. Each one is ranked against
+            your verified skills, with on-site roles in Bangladesh first, then remote, then other on-site postings.
           </p>
+        </div>
+        <div className="jobs-header-stat" aria-label={`${jobMatches.length} live roles`}>
+          <span className="jobs-header-stat-num">{jobMatches.length}</span>
+          <span className="jobs-header-stat-label">live roles</span>
         </div>
       </div>
 
-      <div className="filter-bar">
-        <div className="filter-row">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
-            <span className="filter-label">Region:</span>
-            <div className="filter-segment-group">
+      <section className="jobs-toolbar" aria-label="Search and filter jobs">
+        <div className="jobs-toolbar-top">
+          <label className="jobs-search">
+            <Search size={16} aria-hidden="true" />
+            <input
+              type="search"
+              value={query}
+              onChange={event => { setQuery(event.target.value); setPage(1); }}
+              placeholder="Search roles, companies, or skills..."
+              aria-label="Search jobs"
+            />
+            {query && (
+              <button
+                type="button"
+                className="jobs-search-clear"
+                onClick={() => { setQuery(''); setPage(1); }}
+                aria-label="Clear search"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </label>
+          <span className="jobs-fresh-pill">
+            <Sparkles size={13} aria-hidden="true" />
+            Fresh for {FRESHNESS_DAYS} days
+          </span>
+        </div>
+
+        <div className="jobs-filter-grid">
+          <div className="jobs-filter-group">
+            <span className="jobs-filter-label">Region</span>
+            <div className="jobs-segment-group">
               {([
-                { key: 'ALL', label: `All (${jobMatches.length})` },
-                { key: 'BANGLADESH', label: `Bangladesh (${bdCount})` },
-                { key: 'INTERNATIONAL', label: `International (${internationalCount})` }
+                { key: 'ALL', label: 'All', count: jobMatches.length },
+                { key: 'BANGLADESH', label: 'Bangladesh', count: bdCount },
+                { key: 'INTERNATIONAL', label: 'International', count: internationalCount }
               ] as const).map(o => (
                 <button
                   key={o.key}
-                  className={`filter-segment-btn ${jobRegionFilter === o.key ? 'active' : ''}`}
+                  className={`jobs-segment-btn ${jobRegionFilter === o.key ? 'active' : ''}`}
                   onClick={() => { setJobRegionFilter(o.key); setPage(1); }}
                 >
                   {o.label}
+                  <span className="jobs-segment-count">{o.count}</span>
                 </button>
               ))}
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
-            <span className="filter-label">Work Mode:</span>
-            <div className="filter-segment-group">
+          <div className="jobs-filter-group">
+            <span className="jobs-filter-label">Work mode</span>
+            <div className="jobs-segment-group">
               {([
-                { key: 'ALL', label: 'All Modes' },
-                { key: 'REMOTE', label: `Remote / WFH (${remoteCount})` },
-                { key: 'ONSITE', label: `Onsite (${jobMatches.length - remoteCount})` }
+                { key: 'ALL', label: 'All modes' },
+                { key: 'REMOTE', label: 'Remote', count: remoteCount },
+                { key: 'ONSITE', label: 'On-site', count: onsiteCount }
               ] as const).map(o => (
                 <button
                   key={o.key}
-                  className={`filter-segment-btn ${jobRemoteFilter === o.key ? 'active' : ''}`}
+                  className={`jobs-segment-btn ${jobRemoteFilter === o.key ? 'active' : ''}`}
                   onClick={() => { setJobRemoteFilter(o.key); setPage(1); }}
                 >
                   {o.label}
+                  {'count' in o && <span className="jobs-segment-count">{o.count}</span>}
                 </button>
               ))}
             </div>
           </div>
-        </div>
 
-        <div className="filter-bar-bottom">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <span className="filter-label">Sort by:</span>
-            <div className="filter-segment-group">
+          <div className="jobs-filter-group">
+            <span className="jobs-filter-label">Sort by</span>
+            <div className="jobs-segment-group">
               {([
-                { key: 'recent', label: 'Most Recent' },
-                { key: 'priority', label: 'Prioritize BD Onsite → Remote' }
+                { key: 'recent', label: 'Newest' },
+                { key: 'priority', label: 'Best fit' }
               ] as const).map(o => (
                 <button
                   key={o.key}
-                  className={`filter-segment-btn ${jobSort === o.key ? 'active' : ''}`}
+                  className={`jobs-segment-btn ${jobSort === o.key ? 'active' : ''}`}
                   onClick={() => { setJobSort(o.key); setPage(1); }}
                 >
                   {o.label}
@@ -160,61 +291,112 @@ export default function JobsView() {
               ))}
             </div>
           </div>
-          <span className="filter-summary">
-            {filteredMatches.length} result{filteredMatches.length === 1 ? '' : 's'}
+        </div>
+
+        <div className="jobs-toolbar-foot">
+          <span className="jobs-result-summary">
+            {filteredMatches.length === 0
+              ? 'No roles found'
+              : `Showing ${rangeStart}–${rangeEnd} of ${filteredMatches.length} role${filteredMatches.length === 1 ? '' : 's'}`}
+          </span>
+          <span className="jobs-window-note">
+            <Clock size={12} aria-hidden="true" />
+            Listings auto-remove after {FRESHNESS_DAYS} days
           </span>
         </div>
-      </div>
+      </section>
 
       <div className="jobs-results">
         <div className="jobs-list">
           {filteredMatches.length === 0 && (
             <div className="card jobs-empty">
-              {jobMatches.length === 0
-                ? 'No matching jobs yet — sign in and take the diagnostic to see tailored engineering postings.'
-                : 'No jobs match the selected filter.'}
+              <div className="jobs-empty-icon" aria-hidden="true">
+                {jobMatches.length === 0 ? <Briefcase size={22} /> : <Search size={22} />}
+              </div>
+              <h3 className="jobs-empty-title">
+                {jobMatches.length === 0 ? 'No fresh roles yet' : 'No roles match those filters'}
+              </h3>
+              <p className="jobs-empty-copy">
+                {jobMatches.length === 0
+                  ? 'New postings appear after the next ingestion run. Check back shortly — stale roles are removed automatically.'
+                  : 'Try a different keyword, region, or work mode. Fresh roles are added throughout the day.'}
+              </p>
+              {jobMatches.length > 0 && hasActiveFilters && (
+                <button className="btn btn-secondary jobs-empty-btn" onClick={resetFilters}>
+                  Reset filters
+                </button>
+              )}
             </div>
           )}
+
           {pageMatches.map(match => {
             const score = Math.round(match.matchScore);
             const scoreTier = score >= 70 ? 'high' : score >= 45 ? 'mid' : 'low';
             const isExpanded = expandedMatchId === match.job.id;
-            const dateLabel = showDate(match);
+            const dateLabel = relativePostedLabel(match.job.postedAt);
+            const isNew = isNewPosting(match.job.postedAt);
+            const applyUrl = safeExternalUrl(match.job.sourceUrl);
+            const totalSkills = match.matchedSkills.length + match.missingSkills.length;
+            const location = match.job.location?.trim();
+
             return (
               <article key={match.job.id} className={`card job-card ${isExpanded ? 'expanded' : ''}`}>
                 <div className="job-card-head">
+                  <div className="job-company-mark" aria-hidden="true">
+                    {companyInitials(match.job.company)}
+                  </div>
+
                   <div className="job-card-identity">
-                    <h3 className="job-card-title">{match.job.title}</h3>
+                    <div className="job-card-title-row">
+                      <h3 className="job-card-title">{match.job.title}</h3>
+                      {isNew && <span className="job-new-badge">New</span>}
+                    </div>
                     <div className="job-card-company">
-                      <Building2 size={13} />
-                      <span>{match.job.company}</span>
-                      {match.job.location ? (
-                        <>
-                          <span className="job-card-dot" />
-                          <MapPin size={12} />
-                          <span className="job-card-location">{match.job.location}</span>
-                        </>
-                      ) : null}
-                    </div>
-                    <div className="job-card-badges">
-                      {match.job.isBangladesh && (
-                        <span className="badge-chip">
-                          <span className="badge-chip-dot" style={{ background: 'var(--accent-primary)' }} />
-                          Bangladesh
-                        </span>
-                      )}
-                      <RemoteBadge isRemote={match.job.isRemote} location={match.job.location} />
-                      {dateLabel && (
-                        <span className="job-card-date">
-                          <Calendar size={11} /> {dateLabel}
+                      <span className="job-company-name">
+                        <Building2 size={13} aria-hidden="true" />
+                        {match.job.company}
+                      </span>
+                      {location && (
+                        <span className="job-card-location">
+                          <MapPin size={12} aria-hidden="true" />
+                          {location}
                         </span>
                       )}
                     </div>
                   </div>
-                  <div className={`match-score match-score-${scoreTier}`}>
-                    <span className="match-score-num">{score}%</span>
-                    <span className="match-score-label">Match</span>
+
+                  <div
+                    className={`job-match-ring job-match-ring-${scoreTier}`}
+                    style={{ '--match-pct': `${score}%` } as CSSProperties}
+                    aria-label={`${score} percent match`}
+                  >
+                    <div className="job-match-ring-inner">
+                      <span className="job-match-score">{score}%</span>
+                      <span className="job-match-label">match</span>
+                    </div>
                   </div>
+                </div>
+
+                <div className="job-card-badges">
+                  <span className={`job-flag ${match.job.isRemote ? 'job-flag-remote' : 'job-flag-onsite'}`}>
+                    {match.job.isRemote ? <Home size={11} aria-hidden="true" /> : <Briefcase size={11} aria-hidden="true" />}
+                    {match.job.isRemote ? 'Remote' : 'On-site'}
+                  </span>
+                  {match.job.isBangladesh && (
+                    <span className="job-flag job-flag-bd">
+                      <Globe2 size={11} aria-hidden="true" />
+                      Bangladesh
+                    </span>
+                  )}
+                  {dateLabel && (
+                    <span className="job-card-date">
+                      <Calendar size={11} aria-hidden="true" />
+                      Posted {dateLabel}
+                    </span>
+                  )}
+                  {match.job.sourceName && (
+                    <span className="job-card-source">{match.job.sourceName}</span>
+                  )}
                 </div>
 
                 <p className="job-card-desc">{match.job.description}</p>
@@ -224,7 +406,7 @@ export default function JobsView() {
                   <div className="job-card-skill-chips">
                     {match.matchedSkills.map(m => (
                       <span key={m.skillId} className="job-skill-chip">
-                        <CheckCircle2 size={11} />
+                        <CheckCircle2 size={11} aria-hidden="true" />
                         {m.canonicalName}
                       </span>
                     ))}
@@ -235,30 +417,86 @@ export default function JobsView() {
                 </div>
 
                 <div className="job-card-footer">
-                  <button
-                    className="btn btn-secondary job-card-toggle"
-                    onClick={() => setExpandedMatchId(isExpanded ? null : match.job.id)}
-                    aria-expanded={isExpanded}
-                  >
-                    {isExpanded ? 'Hide Details' : 'View Role Details'}
-                    <ChevronDown size={14} className={isExpanded ? 'rotate-180' : ''} />
-                  </button>
+                  <span className="job-card-match-note">
+                    {match.matchedSkills.length} of {totalSkills} skill{totalSkills === 1 ? '' : 's'} matched
+                  </span>
+                  <div className="job-card-actions">
+                    <button
+                      className="btn btn-ghost job-card-toggle"
+                      onClick={() => setExpandedMatchId(isExpanded ? null : match.job.id)}
+                      aria-expanded={isExpanded}
+                    >
+                      {isExpanded ? 'Hide details' : 'View details'}
+                      <ChevronDown size={14} className={isExpanded ? 'rotate-180' : ''} />
+                    </button>
+                    {applyUrl && (
+                      <a
+                        className="btn btn-primary job-card-apply"
+                        href={applyUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Apply
+                        <ExternalLink size={13} aria-hidden="true" />
+                      </a>
+                    )}
+                  </div>
                 </div>
 
                 {isExpanded && (
                   <div className="job-card-details">
-                    <p className="job-card-explanation">{match.explanation}</p>
+                    <div className="job-detail-section">
+                      <div className="job-detail-heading">
+                        <Target size={13} aria-hidden="true" />
+                        Why this matches
+                      </div>
+                      <p className="job-card-explanation">{match.explanation}</p>
+                    </div>
+
                     {match.missingSkills.length > 0 && (
                       <div className="job-card-missing">
-                        <span className="job-card-missing-label">Missing skills</span>
+                        <span className="job-card-missing-label">Skills to build next</span>
                         <div className="job-card-missing-chips">
                           {match.missingSkills.map(m => (
                             <span key={m.skillId} className="job-missing-chip">
-                              <XCircle size={11} />
+                              <XCircle size={11} aria-hidden="true" />
                               {m.canonicalName}
                             </span>
                           ))}
                         </div>
+                      </div>
+                    )}
+
+                    <div className="job-facts">
+                      <div className="job-fact">
+                        <span className="job-fact-label">Posted</span>
+                        <span className="job-fact-value">{longPostedLabel(match.job.postedAt)}</span>
+                      </div>
+                      <div className="job-fact">
+                        <span className="job-fact-label">Work mode</span>
+                        <span className="job-fact-value">{match.job.isRemote ? 'Remote' : 'On-site'}</span>
+                      </div>
+                      <div className="job-fact">
+                        <span className="job-fact-label">Location</span>
+                        <span className="job-fact-value">{location || 'Not specified'}</span>
+                      </div>
+                      <div className="job-fact">
+                        <span className="job-fact-label">Source</span>
+                        <span className="job-fact-value">{match.job.sourceName || 'Direct posting'}</span>
+                      </div>
+                    </div>
+
+                    {applyUrl && (
+                      <div className="job-detail-actions">
+                        <a
+                          className="btn btn-secondary job-detail-link"
+                          href={applyUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          View original posting
+                          <ExternalLink size={13} aria-hidden="true" />
+                        </a>
                       </div>
                     )}
                   </div>
@@ -271,26 +509,30 @@ export default function JobsView() {
         {filteredMatches.length > PAGE_SIZE && (
           <nav className="jobs-pagination" aria-label="Job results pagination">
             <button
-              className="jobs-page-btn"
+              className="jobs-page-btn jobs-page-arrow"
               onClick={() => goToPage(safePage - 1)}
               disabled={safePage === 1}
               aria-label="Previous page"
             >
               <ChevronLeft size={15} />
             </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
-              <button
-                key={p}
-                className={`jobs-page-btn ${p === safePage ? 'active' : ''}`}
-                onClick={() => goToPage(p)}
-                aria-label={`Page ${p}`}
-                aria-current={p === safePage ? 'page' : undefined}
-              >
-                {p}
-              </button>
-            ))}
+            {pageItems.map(item =>
+              typeof item === 'number' ? (
+                <button
+                  key={item}
+                  className={`jobs-page-btn ${item === safePage ? 'active' : ''}`}
+                  onClick={() => goToPage(item)}
+                  aria-label={`Page ${item}`}
+                  aria-current={item === safePage ? 'page' : undefined}
+                >
+                  {item}
+                </button>
+              ) : (
+                <span key={item} className="jobs-page-gap" aria-hidden="true">…</span>
+              )
+            )}
             <button
-              className="jobs-page-btn"
+              className="jobs-page-btn jobs-page-arrow"
               onClick={() => goToPage(safePage + 1)}
               disabled={safePage === totalPages}
               aria-label="Next page"

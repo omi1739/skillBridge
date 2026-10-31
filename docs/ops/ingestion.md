@@ -107,9 +107,27 @@ The command is idempotent and only updates rows whose text actually changed.
 ## Retention
 
 `job_ingest_runs` and `job_sources` are the audit trail. Jobs are refreshed on
-each run; the retention sweep expires postings after `JOB_EXPIRE_DAYS` (default
-7) and hard-deletes them after `JOB_RETENTION_DAYS` (default 14). A missed run
-therefore starts removing stale listings after a week.
+each run, and the product only shows roles from the last **3 days**:
+
+- `JOB_MAX_AGE_DAYS` (default `3`) is the single freshness window. Age is
+  measured from `posted_at`, falling back to `created_at` when a source omits
+  the posting date.
+- Reads (`GET /api/jobs`, matches, market demand and landing stats) filter out
+  anything older than the window as well as rows marked `EXPIRED`.
+- Ingestion skips stale postings and runs the retention sweep **before** it
+  fetches, so cleanup still happens when an upstream board is unavailable.
+- `JOB_EXPIRE_DAYS` (default `3`) controls the soft-expiry status used as an
+  early warning; `JOB_RETENTION_DAYS` remains a fallback for the freshness
+  window for backwards compatibility.
+
+To prune immediately instead of waiting for the next 8-hourly run:
+
+```bash
+npm run db:prune-jobs
+```
+
+The command hard-deletes every posting outside the window and is safe to run
+repeatedly. It never prints the database connection string.
 
 ## Known limitations
 

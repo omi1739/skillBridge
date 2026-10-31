@@ -68,6 +68,12 @@ services:
         sync: false
       - key: JOB_BD_PAGES
         sync: false
+      # Product rule: only roles posted in the last three days are shown, and
+      # older rows are hard-deleted by the retention sweep.
+      - key: JOB_MAX_AGE_DAYS
+        value: "3"
+      - key: JOB_EXPIRE_DAYS
+        value: "3"
       - key: OPENAI_API_KEY
         sync: false
       - key: OPENAI_MODEL
@@ -91,6 +97,7 @@ services:
   #   startCommand: npm run db:ingest --workspace=@skillbridge/api all
   #   schedule: "0 */8 * * *"
   #   DATABASE_URL: the same Supabase connection string as this web service
-  #   JOB_EXPIRE_DAYS: 7
-  #   JOB_RETENTION_DAYS: 14
+  #   JOB_MAX_AGE_DAYS: 3
+  #   JOB_EXPIRE_DAYS: 3
+  #   JOB_RETENTION_DAYS: 3
   # Do not enable both schedulers; they would duplicate ingestion work.
