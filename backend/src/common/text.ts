@@ -88,6 +88,7 @@ export function htmlToText(input: string | null | undefined, maxLength = 0): str
 
   text = text
     .replace(/\u00a0/g, ' ')
+    // eslint-disable-next-line no-control-regex -- deliberately strip control bytes
     .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, ' ')
     .replace(/[\u200b-\u200d\u2060\ufeff]/g, '');
 

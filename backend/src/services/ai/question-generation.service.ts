@@ -23,6 +23,29 @@ import { questionValidationService } from './question-validation.service';
  * fails gracefully with a clear message rather than producing low-quality
  * questions or blocking anything.
  */
+
+/** Hard ceiling across every provider attempt so the HTTP request cannot hang. */
+const GENERATION_BUDGET_MS = Number(process.env.AI_GENERATION_TIMEOUT_MS || 40_000);
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`AI generation timed out after ${ms}ms`)),
+      Math.max(1000, ms)
+    );
+    promise.then(
+      value => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      err => {
+        clearTimeout(timer);
+        reject(err);
+      }
+    );
+  });
+}
+
 export class QuestionGenerationService {
   async generate(req: QuestionGenerationRequest): Promise<QuestionGenerationResult> {
     const providers = getAIProviders();
@@ -43,10 +66,16 @@ export class QuestionGenerationService {
     let generated: AiGeneratedQuestion[] = [];
     const errors: string[] = [];
     let succeeded = false;
+    const deadline = Date.now() + GENERATION_BUDGET_MS;
 
     for (const provider of providers) {
+      const remaining = deadline - Date.now();
+      if (remaining < 1000) {
+        errors.push('Overall AI generation budget exceeded before trying all providers.');
+        break;
+      }
       try {
-        generated = await provider.generateQuestions(req);
+        generated = await withTimeout(provider.generateQuestions(req), remaining);
         succeeded = true;
         break;
       } catch (err: any) {

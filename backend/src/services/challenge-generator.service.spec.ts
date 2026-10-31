@@ -48,6 +48,21 @@ describe('ChallengeGeneratorService offline bank', () => {
     await expect(generator.generate({ type: 'PYTHON' as any })).rejects.toThrow(BadRequestException);
   });
 
+  it('falls back to the offline bank when the AI provider fails', async () => {
+    const originalFetch = global.fetch;
+    process.env.OPENAI_API_KEY = 'test-key';
+    global.fetch = jest.fn().mockRejectedValue(new Error('request timed out')) as any;
+    try {
+      const result = await new ChallengeGeneratorService().generate({ type: 'SQL' });
+      expect(result.verified).toBe(true);
+      expect(result.type).toBe('SQL');
+    } finally {
+      global.fetch = originalFetch;
+      if (originalKey === undefined) delete process.env.OPENAI_API_KEY;
+      else process.env.OPENAI_API_KEY = originalKey;
+    }
+  });
+
   it('restoreDynamicChallenges hydrates persisted rows without clobbering existing ids', () => {
     const persisted: GeneratedChallenge[] = [
       {

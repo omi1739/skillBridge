@@ -71,7 +71,6 @@ describe('GeminiProvider model fallback', () => {
     });
     const fetchMock = mockFetchResponder([
       { status: 503, body: '{"error":{"code":503,"message":"high demand"}}' },
-      { status: 503, body: '{"error":{"code":503,"message":"high demand"}}' },
       { status: 200, body: questionBody() }
     ]);
 
@@ -113,5 +112,44 @@ describe('GeminiProvider model fallback', () => {
     mockFetchResponder([{ status: 503, body: '{"error":{"code":503}}' }]);
 
     await expect(new GeminiProvider().generateQuestions(REQ)).rejects.toThrow(/model-a.*model-b/s);
+  });
+
+  it('defaults to the fast Flash Lite model with low thinking enabled', async () => {
+    const { GeminiProvider } = loadProvider({
+      GEMINI_API_KEY: 'test-key',
+      GEMINI_MODEL: '',
+      GEMINI_FALLBACK_MODELS: ' ',
+      GEMINI_REQUEST_TIMEOUT_MS: '5000'
+    });
+    const fetchMock = mockFetchResponder([{ status: 200, body: questionBody() }]);
+
+    await new GeminiProvider().generateQuestions(REQ);
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain('/models/gemini-3.5-flash-lite:');
+    const body = JSON.parse(String((init as RequestInit).body));
+    expect(body.generationConfig.thinkingConfig).toEqual({ thinkingLevel: 'low' });
+  });
+
+  it('does not retry a timed-out model (moves on immediately)', async () => {
+    const { GeminiProvider } = loadProvider({
+      GEMINI_API_KEY: 'test-key',
+      GEMINI_MODEL: 'slow-model',
+      GEMINI_FALLBACK_MODELS: ' ',
+      GEMINI_REQUEST_TIMEOUT_MS: '1000'
+    });
+    const fetchMock = jest.fn((_url: any, init: any) => {
+      return new Promise((_resolve, reject) => {
+        init.signal.addEventListener('abort', () => {
+          const err = new Error('aborted');
+          err.name = 'AbortError';
+          reject(err);
+        });
+      });
+    });
+    global.fetch = fetchMock as any;
+
+    await expect(new GeminiProvider().generateQuestions(REQ)).rejects.toThrow(/timed out/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

@@ -77,11 +77,12 @@ services:
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_MODEL
-        sync: false
+        value: gemini-3.5-flash-lite
       # Fallback models tried in order when the primary is overloaded (503) or
-      # retired (404); free-tier models are frequently saturated.
+      # retired (404). Keep this list short and fast: every entry adds latency
+      # when the primary is unavailable.
       - key: GEMINI_FALLBACK_MODELS
-        value: gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.8-flash
+        value: gemini-3.5-flash,gemini-3-flash-preview
 
   # Job-board ingestion is scheduled by .github/workflows/ingest.yml, which
   # runs the same command every 8 hours without requiring paid Render compute.

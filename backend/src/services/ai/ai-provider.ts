@@ -30,18 +30,31 @@ export interface AIProvider {
 }
 
 const GEMINI_KEY = process.env.GEMINI_API_KEY || '';
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
+// Flash Lite is the fastest generally-available model and returns valid JSON
+// for our structured prompts. Larger Flash models are kept as fallbacks for
+// quality, but only after the fast path has failed.
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
 /** Ordered fallbacks tried when the primary model is overloaded or retired. */
-const GEMINI_FALLBACK_MODELS = (process.env.GEMINI_FALLBACK_MODELS || 'gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.8-flash')
+const GEMINI_FALLBACK_MODELS = (process.env.GEMINI_FALLBACK_MODELS || 'gemini-3.5-flash,gemini-3-flash-preview')
   .split(',')
   .map(m => m.trim())
   .filter(Boolean);
-const GEMINI_REQUEST_TIMEOUT_MS = Number(process.env.GEMINI_REQUEST_TIMEOUT_MS || 25000);
+const GEMINI_REQUEST_TIMEOUT_MS = Number(process.env.GEMINI_REQUEST_TIMEOUT_MS || 15000);
 /** Hard ceiling across all Gemini model attempts so a request can never hang. */
-const GEMINI_TOTAL_BUDGET_MS = Number(process.env.GEMINI_TOTAL_BUDGET_MS || 60000);
+const GEMINI_TOTAL_BUDGET_MS = Number(process.env.GEMINI_TOTAL_BUDGET_MS || 30000);
+/**
+ * Gemini 3 models "think" by default, which can add tens of seconds to a
+ * response. Structured generation does not need that reasoning budget, so use
+ * the low setting unless explicitly overridden.
+ */
+const GEMINI_THINKING_LEVEL = process.env.GEMINI_THINKING_LEVEL || 'low';
+// Models that are not actually available to this API version. Keeping them in
+// a fallback list turns a transient outage into a minute-long hang because the
+// request never gets a useful HTTP response.
+const UNUSABLE_GEMINI_MODELS = new Set(['gemini-3.8-flash']);
 const OPENAI_KEY = process.env.OPENAI_API_KEY || '';
 const DEFAULT_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
-const OPENAI_REQUEST_TIMEOUT_MS = Number(process.env.OPENAI_REQUEST_TIMEOUT_MS || 30000);
+const OPENAI_REQUEST_TIMEOUT_MS = Number(process.env.OPENAI_REQUEST_TIMEOUT_MS || 15000);
 
 /** Shared prompt used by every provider so question quality is consistent. */
 function buildSystemPrompt(): string {
@@ -94,7 +107,7 @@ function isRetryableStatus(status: number): boolean {
   return status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
 }
 
-const RETRYABLE_DELAYS_MS = [800, 1600, 3200];
+const RETRYABLE_DELAYS_MS = [400, 1000];
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -128,6 +141,7 @@ async function fetchWithRetry(
   let lastError: Error | null = null;
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     let status = 0;
+    let timedOut = false;
     const { signal, clear } = withTimeout(opts.timeoutMs);
     try {
       const res = await doFetch(signal);
@@ -135,14 +149,19 @@ async function fetchWithRetry(
       if (res.ok) return res;
       lastError = new Error(`HTTP ${res.status}: ${res.body.slice(0, 400)}`);
     } catch (err: any) {
-      lastError =
-        err?.name === 'AbortError'
-          ? new Error(`request timed out after ${opts.timeoutMs}ms`)
-          : err instanceof Error
-            ? err
-            : new Error(String(err));
+      timedOut = err?.name === 'AbortError';
+      lastError = timedOut
+        ? new Error(`request timed out after ${opts.timeoutMs}ms`)
+        : err instanceof Error
+          ? err
+          : new Error(String(err));
     } finally {
       clear();
+    }
+    // A timeout means the model is too slow; retrying the same model just
+    // doubles the wait. Move on to the next model/provider immediately.
+    if (timedOut) {
+      throw lastError || new Error('Request timed out');
     }
     // Non-transient HTTP status -> fail fast without more retries.
     if (status && !isRetryableStatus(status)) {
@@ -157,7 +176,20 @@ async function fetchWithRetry(
 
 /** Ordered, de-duplicated list of Gemini models to try. */
 function geminiModels(): string[] {
-  return Array.from(new Set([GEMINI_MODEL, ...GEMINI_FALLBACK_MODELS]));
+  return Array.from(new Set([GEMINI_MODEL, ...GEMINI_FALLBACK_MODELS]))
+    .filter(model => !UNUSABLE_GEMINI_MODELS.has(model));
+}
+
+/** Gemini generation settings; disables expensive thinking for 3.x models. */
+function geminiGenerationConfig(model: string): Record<string, unknown> {
+  const config: Record<string, unknown> = {
+    temperature: 0.7,
+    responseMimeType: 'application/json'
+  };
+  if (GEMINI_THINKING_LEVEL && /^gemini-3(?:[.-]|$)/i.test(model)) {
+    config.thinkingConfig = { thinkingLevel: GEMINI_THINKING_LEVEL };
+  }
+  return config;
 }
 
 /** Google Gemini, via the free tier (AI Studio API key). */
@@ -169,41 +201,55 @@ export class GeminiProvider implements AIProvider {
 
   private async generateOnModel(
     model: string,
-    contents: Array<{ role: string; parts: Array<{ text: string }> }>
+    contents: Array<{ role: string; parts: Array<{ text: string }> }>,
+    timeoutMs: number = GEMINI_REQUEST_TIMEOUT_MS
   ): Promise<any> {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(GEMINI_KEY)}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
     const { body } = await fetchWithRetry(
       async signal => {
         const r = await fetch(url, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': GEMINI_KEY
+          },
           signal,
           body: JSON.stringify({
             contents,
-            generationConfig: { temperature: 0.7, responseMimeType: 'application/json' }
+            generationConfig: geminiGenerationConfig(model)
           })
         });
         return { status: r.status, ok: r.ok, body: await r.text() };
       },
-      { timeoutMs: GEMINI_REQUEST_TIMEOUT_MS, attempts: 2 }
+      // Do not retry the same Gemini model: a 503 usually means the model is
+      // saturated, so falling through to the next model is faster and more
+      // reliable than waiting for the same one again.
+      { timeoutMs, attempts: 1 }
     );
     const json: any = JSON.parse(body);
     const parts: Array<{ text?: string }> = json?.candidates?.[0]?.content?.parts || [];
     const content = parts.map(p => p.text || '').join('');
+    if (!content.trim()) {
+      throw new Error('Gemini returned an empty response');
+    }
     return JSON.parse(content);
   }
 
   private async chatJson(contents: Array<{ role: string; parts: Array<{ text: string }> }>): Promise<any> {
     const models = geminiModels();
+    if (models.length === 0) {
+      throw new Error('No usable Gemini model is configured');
+    }
     const deadline = Date.now() + GEMINI_TOTAL_BUDGET_MS;
     const errors: string[] = [];
     for (const model of models) {
-      if (Date.now() >= deadline) {
+      const remaining = deadline - Date.now();
+      if (remaining < 1000) {
         errors.push('overall time budget exceeded before trying remaining models');
         break;
       }
       try {
-        return await this.generateOnModel(model, contents);
+        return await this.generateOnModel(model, contents, Math.min(GEMINI_REQUEST_TIMEOUT_MS, remaining));
       } catch (err: any) {
         errors.push(`${model}: ${err?.message || err}`);
       }
@@ -252,7 +298,7 @@ export class OpenAIProvider implements AIProvider {
         });
         return { status: r.status, ok: r.ok, body: await r.text() };
       },
-      { timeoutMs: OPENAI_REQUEST_TIMEOUT_MS }
+      { timeoutMs: OPENAI_REQUEST_TIMEOUT_MS, attempts: 2 }
     );
     const json: any = JSON.parse(body);
     const content: string = json?.choices?.[0]?.message?.content || '';

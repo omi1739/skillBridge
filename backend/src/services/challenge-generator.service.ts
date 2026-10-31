@@ -79,12 +79,20 @@ export class ChallengeGeneratorService {
       throw new BadRequestException('type (SQL|JAVASCRIPT) is required');
     }
     if (this.hasApiKey) {
-      const generated = await this.generateWithModel(req);
-      // Validate generated SQL by executing the reference query against the seed.
-      if (generated.type === 'SQL' && !(await this.sqlSelfCheck(generated))) {
-        throw new BadRequestException('Generated SQL challenge failed self-validation. Try again.');
+      try {
+        const generated = await this.generateWithModel(req);
+        // Validate generated SQL by executing the reference query against the seed.
+        if (generated.type === 'SQL' && !(await this.sqlSelfCheck(generated))) {
+          throw new BadRequestException('Generated SQL challenge failed self-validation. Try again.');
+        }
+        return generated;
+      } catch (err: any) {
+        // A slow or failing model must never block the sandbox. The curated
+        // bank is instant and every entry is already runnable.
+        console.warn(
+          `[Sandbox] AI challenge generation unavailable, using offline bank: ${err?.message || err}`
+        );
       }
-      return generated;
     }
     return pickOffline(req);
   }
@@ -112,52 +120,61 @@ Return JSON with these keys:
       { role: 'user', content: userPrompt }
     ];
 
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.apiKey}`
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        messages,
-        temperature: 0.7,
-        response_format: { type: 'json_object' }
-      })
-    });
+    const timeoutMs = Number(process.env.OPENAI_REQUEST_TIMEOUT_MS || 15000);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), Math.max(1000, timeoutMs));
 
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`OpenAI request failed (${res.status}): ${text}`);
-    }
-
-    const json: any = await res.json();
-    const content: string = json?.choices?.[0]?.message?.content || '';
-    let parsed: any;
     try {
-      parsed = JSON.parse(content);
-    } catch {
-      throw new Error('Model did not return valid JSON');
-    }
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.apiKey}`
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: MODEL,
+          messages,
+          temperature: 0.7,
+          response_format: { type: 'json_object' }
+        })
+      });
 
-    const challenge: GeneratedChallenge = {
-      id: parsed.id || this.nextId(req.type),
-      title: String(parsed.title || `${req.type} Challenge`),
-      type: req.type as 'SQL' | 'JAVASCRIPT',
-      skillId: String(parsed.skillId || (req.type === 'SQL' ? 'skill_sql' : 'skill_javascript')),
-      difficulty: (parsed.difficulty as any) || 'Intermediate',
-      description: String(parsed.description || ''),
-      starterCode: String(parsed.starterCode || ''),
-      referenceSolution: String(parsed.referenceSolution || ''),
-      schemaPreview: parsed.schemaPreview,
-      sampleDataDescription: parsed.sampleDataDescription,
-      schemaSql: parsed.schemaSql,
-      seedSql: parsed.seedSql,
-      referenceQuery: parsed.referenceQuery,
-      testCases: Array.isArray(parsed.testCases) ? parsed.testCases : undefined,
-      verified: false
-    };
-    return challenge;
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`OpenAI request failed (${res.status}): ${text}`);
+      }
+
+      const json: any = await res.json();
+      const content: string = json?.choices?.[0]?.message?.content || '';
+      let parsed: any;
+      try {
+        parsed = JSON.parse(content);
+      } catch {
+        throw new Error('Model did not return valid JSON');
+      }
+
+      const challenge: GeneratedChallenge = {
+        id: parsed.id || this.nextId(req.type),
+        title: String(parsed.title || `${req.type} Challenge`),
+        type: req.type as 'SQL' | 'JAVASCRIPT',
+        skillId: String(parsed.skillId || (req.type === 'SQL' ? 'skill_sql' : 'skill_javascript')),
+        difficulty: (parsed.difficulty as any) || 'Intermediate',
+        description: String(parsed.description || ''),
+        starterCode: String(parsed.starterCode || ''),
+        referenceSolution: String(parsed.referenceSolution || ''),
+        schemaPreview: parsed.schemaPreview,
+        sampleDataDescription: parsed.sampleDataDescription,
+        schemaSql: parsed.schemaSql,
+        seedSql: parsed.seedSql,
+        referenceQuery: parsed.referenceQuery,
+        testCases: Array.isArray(parsed.testCases) ? parsed.testCases : undefined,
+        verified: false
+      };
+      return challenge;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   private nextId(type: 'SQL' | 'JAVASCRIPT'): string {

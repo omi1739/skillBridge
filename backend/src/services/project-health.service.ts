@@ -51,7 +51,7 @@ const FACTOR_WEIGHTS = {
  * back gracefully (stored data / heuristic narrative) when it exceeds budget.
  */
 const VERIFY_TIMEOUT_MS = Number(process.env.PROJECT_HEALTH_VERIFY_TIMEOUT_MS || 12_000);
-const AI_TIMEOUT_MS = Number(process.env.PROJECT_HEALTH_AI_TIMEOUT_MS || 14_000);
+const AI_TIMEOUT_MS = Number(process.env.PROJECT_HEALTH_AI_TIMEOUT_MS || 18_000);
 
 /** Resolve with `fallback` if the promise does not settle within `ms`. */
 function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {

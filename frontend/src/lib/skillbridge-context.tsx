@@ -34,6 +34,10 @@ const TAB_PATH: Record<AppTab, string> = {
 };
 
 const API_TIMEOUT_MS = Number(process.env.NEXT_PUBLIC_API_TIMEOUT_MS || 20000);
+// AI generation can legitimately take longer than a CRUD request (the backend
+// enforces a 40s budget including provider fallbacks). Give it enough headroom
+// that the UI does not abort while the server is still working.
+const AI_REQUEST_TIMEOUT_MS = Number(process.env.NEXT_PUBLIC_AI_TIMEOUT_MS || 45000);
 // Health checks run a live GitHub scan plus optional AI review; allow more
 // headroom than standard calls (the backend enforces its own hard budgets).
 const HEALTH_CHECK_TIMEOUT_MS = Number(process.env.NEXT_PUBLIC_HEALTH_CHECK_TIMEOUT_MS || 40000);
@@ -1293,7 +1297,7 @@ function useSkillBridgeValue() {
         method: 'POST',
         headers: authHeaders(),
         body: JSON.stringify({ type: 'SQL', skillId: 'skill_sql', difficulty: 'Intermediate' })
-      });
+      }, AI_REQUEST_TIMEOUT_MS);
       const data = await res.json().catch(() => null);
       if (!res.ok) {
         throw new Error(apiErrorMessage(data, 'Generation failed.'));
@@ -1514,7 +1518,7 @@ function useSkillBridgeValue() {
           questionType: adminGenForm.questionType,
           count: adminGenForm.count
         })
-      });
+      }, AI_REQUEST_TIMEOUT_MS);
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(apiErrorMessage(data, 'Generation failed.'));
       setAdminQMsg({ ok: true, text: `Generated ${data.created} question(s); ${data.rejected} rejected.` });
